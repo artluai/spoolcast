@@ -20,8 +20,8 @@ It must not depend on any specific session.
 
 Turn a session — a chat, a build, a conversation, an idea — into:
 
-1. a shot list that structures narration into beats and chunks
-2. one AI-generated illustration per chunk in a per-session locked visual style
+1. a screenplay and shot list that tell the real story honestly
+2. one AI-generated illustration per narration chunk in a per-session locked visual style
 3. a deterministic reveal of each illustration (via the preprocessor)
 4. a reliable final video rendered by Remotion against narration audio
 
@@ -30,6 +30,7 @@ The system should minimize:
 - arbitrary visual decisions
 - hidden assumptions
 - renderer improvisation
+- mechanized editorial judgment
 
 When something is important across chats or tools:
 - write it into the repo docs
@@ -88,7 +89,8 @@ The repo root contains:
 - generated preview-data code when needed by the renderer
 
 The content root contains:
-- shot lists
+- session source packages (transcripts, logs, artifacts)
+- screenplays, scene plans, and shot lists
 - session configs
 - source media
 - generated scene illustrations
@@ -103,20 +105,22 @@ The content root contains:
 Per-session content should follow this structure:
 
 1. `../spoolcast-content/sessions/<session-id>/session.json`
-2. `../spoolcast-content/sessions/<session-id>/shot-list/`
-3. `../spoolcast-content/sessions/<session-id>/source/`
-4. `../spoolcast-content/sessions/<session-id>/source/generated-assets/scenes/`
-5. `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
-6. `../spoolcast-content/sessions/<session-id>/frames/<chunk-id>/`
-7. `../spoolcast-content/sessions/<session-id>/manifests/`
-8. `../spoolcast-content/sessions/<session-id>/review/`
-9. `../spoolcast-content/sessions/<session-id>/renders/`
-10. `../spoolcast-content/sessions/<session-id>/working/`
+2. `../spoolcast-content/sessions/<session-id>/source/` — raw session package (transcript, logs, artifacts, notes)
+3. `../spoolcast-content/sessions/<session-id>/script/` — screenplay, scene plan, voiceover script
+4. `../spoolcast-content/sessions/<session-id>/shot-list/` — canonical shot-list file
+5. `../spoolcast-content/sessions/<session-id>/source/generated-assets/scenes/`
+6. `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
+7. `../spoolcast-content/sessions/<session-id>/frames/<chunk-id>/`
+8. `../spoolcast-content/sessions/<session-id>/manifests/`
+9. `../spoolcast-content/sessions/<session-id>/review/`
+10. `../spoolcast-content/sessions/<session-id>/renders/`
+11. `../spoolcast-content/sessions/<session-id>/working/`
 
 Expected contents:
 - `session.json`: per-session config (see `SESSION_CONFIG_SPEC.md`)
-- `shot-list/`: workbook or canonical shot-list file
-- `source/`: source media, audio, approved references
+- `source/`: raw session package (transcript, logs, artifacts, notes) plus session media
+- `script/`: screenplay, scene plan, voiceover script, and any intermediate editorial drafts
+- `shot-list/`: canonical shot-list file (workbook or equivalent)
 - `source/generated-assets/scenes/`: per-chunk AI-generated illustration PNGs
 - `source/fetched-assets/`: externally sourced media when running the alternate stock mode
 - `frames/<chunk-id>/`: preprocessor output — numbered PNG sequences per chunk
@@ -127,14 +131,15 @@ Expected contents:
 
 ## Pipeline Stages
 
-The workflow has six separate stages:
+The workflow has seven separate stages:
 
-1. shot-list editing
-2. chunking (group shot-list rows into illustration units)
-3. scene generation (one AI illustration per chunk)
-4. scene preprocessing (reveal frame sequences per chunk)
-5. review-board generation (human check)
-6. preview-data generation and video rendering
+1. source-to-script (editorial, externally owned)
+2. shot-list editing
+3. chunking (group shot-list rows into illustration units)
+4. scene generation (one AI illustration per chunk)
+5. scene preprocessing (reveal frame sequences per chunk)
+6. review-board generation (human check)
+7. preview-data generation and video rendering
 
 Each stage must have:
 - a known input
@@ -149,9 +154,35 @@ For fragile visual systems:
 
 ## Stage Inputs And Outputs
 
-### 1. Shot-List Editing
+### 1. Source-to-Script (externally owned)
+
 Input:
-- current shot list
+- raw session package: transcript, logs, artifacts, notes
+- optional reference files, screenshots, short clips, external links
+
+Output:
+- a screenplay
+- a scene plan
+- a voiceover script (for TTS or narration)
+- a shot list with narration per beat, chunks defined, timing and visual intent set
+
+This stage is editorially-driven. Its quality depends on judgment about story arc, turning points, pacing, and tone — not on mechanical process.
+
+Current default: handled by a capable agent (typically Codex or Claude in a dedicated session) with the raw session package in full context. Spoolcast's repo does not currently provide code for this stage.
+
+Brief: `spoolcast-content/shared/video-generation-skill-spec.md`.
+Detailed method (pending): `SCRIPT_EXTRACTION_RULES.md`. When this file is authored, this stage's rules expand and the brief becomes a secondary reference.
+
+Canonical output locations:
+- `../spoolcast-content/sessions/<session-id>/script/` — screenplay, scene plan, voiceover
+- `../spoolcast-content/sessions/<session-id>/shot-list/` — canonical shot-list file
+
+Downstream stages read from these outputs; they do not call back into this stage.
+
+### 2. Shot-List Editing
+
+Input:
+- shot list produced by stage 1, or manual edits
 
 Output:
 - updated shot list
@@ -159,7 +190,8 @@ Output:
 Canonical output location:
 - `../spoolcast-content/sessions/<session-id>/shot-list/`
 
-### 2. Chunking
+### 3. Chunking
+
 Input:
 - shot list with narration per beat
 
@@ -168,7 +200,8 @@ Output:
 
 Each unique `Chunk` value corresponds to one illustration.
 
-### 3. Scene Generation
+### 4. Scene Generation
+
 Input:
 - shot list
 - session config
@@ -182,7 +215,8 @@ Canonical output locations:
 - `../spoolcast-content/sessions/<session-id>/source/generated-assets/scenes/<chunk-id>.png`
 - `../spoolcast-content/sessions/<session-id>/manifests/scenes.manifest.json`
 
-### 4. Scene Preprocessing
+### 5. Scene Preprocessing
+
 Input:
 - generated scene PNG per chunk
 - reveal parameters from session config
@@ -195,7 +229,8 @@ Canonical output location:
 
 See `PREPROCESSOR_RULES.md`.
 
-### 5. Review-Board Generation
+### 6. Review-Board Generation
+
 Input:
 - shot list
 - scene manifest
@@ -207,7 +242,8 @@ Output:
 Canonical output location:
 - `../spoolcast-content/sessions/<session-id>/review/`
 
-### 6. Preview-Data Generation And Rendering
+### 7. Preview-Data Generation And Rendering
+
 Input:
 - shot list
 - scene manifest
@@ -228,7 +264,7 @@ When an upstream source changes, every affected downstream artifact must be rege
 
 Examples:
 
-- If the shot list narration changes:
+- If the screenplay or shot list narration changes:
   - regenerate any affected scene illustration
   - regenerate preprocessor frames for that chunk
   - regenerate review board
@@ -306,10 +342,19 @@ If a visual decision matters, it must come from:
 - the preprocessor output
 - or another deterministic system rule
 
+## No Mechanized Editorial Rule
+
+Stage 1 (source-to-script) must not be mechanized with a general-purpose LLM loop that writes screenplays from templates.
+
+This stage depends on judgment about story arc, pacing, turning points, and tone — qualities that degrade when mechanized. If you are building tooling for this stage, it should be agent-assist (a human or capable agent in the loop), not an autonomous pipeline.
+
+This rule may be revisited once `SCRIPT_EXTRACTION_RULES.md` is written and the process is well enough understood to automate without quality loss.
+
 ## Failure Conditions
 
 A task is not complete if any of these are true:
 
+- stage 1 outputs are missing or inconsistent (no screenplay, or shot list doesn't match the screenplay)
 - the shot list is not correct
 - the session config is invalid (see `SESSION_CONFIG_SPEC.md` validation rules)
 - any chunk is missing a generated scene illustration
@@ -326,14 +371,15 @@ A task is not complete if any of these are true:
 
 Before saying a state is correct, verify:
 
-1. shot list reflects intended plan and has `Chunk` populated
-2. session config is valid
-3. every chunk has a generated illustration
-4. every chunk has a valid preprocessor frame folder
-5. review board reflects shot list + current illustrations
-6. preview-data file reflects shot list + current frame folders
-7. render output reflects current preview-data
-8. file locations match the directory contract
+1. stage 1 outputs exist and are consistent (screenplay → shot list → chunks all tell the same story)
+2. shot list reflects intended plan and has `Chunk` populated
+3. session config is valid
+4. every chunk has a generated illustration
+5. every chunk has a valid preprocessor frame folder
+6. review board reflects shot list + current illustrations
+7. preview-data file reflects shot list + current frame folders
+8. render output reflects current preview-data
+9. file locations match the directory contract
 
 If any one layer is stale:
 - the work is not done

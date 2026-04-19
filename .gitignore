@@ -9,3 +9,12 @@ out
 
 # Generated review-board media should not be committed.
 public/*/review-preview
+
+# python sandbox for scripts/
+scripts/.venv/
+__pycache__/
+*.pyc
+
+# google cloud credentials — never commit
+.gcloud-tts-key.json
+*.gcloud-tts-key.json

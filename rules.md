@@ -23,6 +23,8 @@ Read these files in this exact order:
 6. [REVIEW_BOARD_RULES.md](./REVIEW_BOARD_RULES.md)
 7. [RENDER_RULES.md](./RENDER_RULES.md)
 
+If you are about to challenge or change a rule, also read [DESIGN_NOTES.md](./DESIGN_NOTES.md) — it captures the reasoning behind current decisions and what was tried and abandoned. The rule files tell you what to do; design notes tell you why.
+
 ## What Each File Does
 
 ### WORKFLOW_RULES.md
