@@ -152,14 +152,44 @@ Used by:
 - review board
 - preview-data generation
 - render timing context
+- TTS synthesis (the narration text is sent to the TTS provider verbatim)
 
 This field should contain:
 - the exact spoken line
 - one beat-level unit of narration
+- text written the way you want it pronounced (see Pronunciation Rule below)
 
 Do not put:
 - multiple unrelated beats in one cell
 - production notes instead of narration
+
+#### Pronunciation Rule
+
+Narration text is sent to TTS verbatim. Whatever you write is what the
+voice will say. Acronyms are the common trip hazard:
+
+- **Acronyms pronounced as words** (ROAS = "roe-ass", NASA = "nah-suh"):
+  **expand to the full term** in the narration. Example:
+  - Bad: `"...click-through rate, watch time, and ROAS."` (TTS says "R-O-A-S")
+  - Good: `"...click-through rate, watch time, and return on ad spend."`
+
+- **Acronyms pronounced letter-by-letter** (RFP, GPU, VPS, CEO, FAQ):
+  write them as-is — TTS handles letter-by-letter acronyms correctly.
+  Optionally hyphenate (`R-F-P`) if TTS mispronounces them as a single
+  word.
+
+- **Words that happen to look like acronyms** (TRIBE, LAMBDA, SCRUM):
+  write them as regular words — TTS pronounces them as words.
+
+- **Numbers and units**: write them the way you want them spoken. `"3.5
+  hours"` is fine; `"3.5h"` may get said as "three point five H."
+
+- **Unusual proper nouns** (product names, model names): pronounce how
+  the narration reads aloud. If needed, spell phonetically: `"Co-lab"`
+  instead of `"Colab"` if TTS says it wrong.
+
+The rule: **read your narration aloud. If you wouldn't pronounce a
+letter cluster the way it's written, rewrite it.**
 
 ### `Beat`
 Required concise visual/narrative beat description.
@@ -317,13 +347,70 @@ Format expectation:
 Rules:
 - beats with the same `Chunk` value share one illustration
 - chunks must be contiguous in the shot list — do not skip rows and return to the same chunk later unless the narrative explicitly calls for reuse
-- a chunk should be short enough that one image can represent what is being said across all its beats
-- if a chunk intentionally reuses a prior chunk's illustration, the shot list must say so explicitly (e.g. `reuse of C1`)
+- a chunk should pass the chunking heuristics in `WORKFLOW_RULES.md § 3. Chunking`
+- if a chunk intentionally reuses a prior chunk's illustration, use the `Continuity` field (see below)
 
 Used by:
 - scene generation — one illustration per unique chunk
 - preprocessor — one frame folder per unique chunk
 - render — chunks are the timeline scheduling unit
+
+### `Continuity`
+Required per-chunk field declaring how this chunk relates to the previous chunk.
+
+Allowed values:
+- `standalone` — new visual world; no obligation to carry character/setting from the prior chunk
+- `continues-from-prev` — same arc as the previous chunk; image must visually relate (shared character, setting, or motif)
+- `callback-to-<chunk-id>` — deliberately returns to a specific earlier chunk's world
+
+Default (blank): `standalone`.
+
+See `WORKFLOW_RULES.md § 3. Chunking → Chunk Continuity` for how this drives generation.
+
+### `Image Source`
+Required per-chunk field declaring where the chunk's image comes from.
+
+Allowed values:
+- `generated` — AI-illustrated scene, produced by the scene-generation stage (default)
+- `proof` — a real image (chart, screenshot, diagram) from the source session's artifacts; used briefly to prove reality. Style-clash with illustrated scenes is intentional.
+- `reuse` — reuses the exact image from a prior chunk (used with `callback-to-<chunk-id>`)
+
+Default (blank): `generated`.
+
+For `proof` chunks:
+- `image_path` points at the real file (usually in `source/artifacts/` or `source/fetched-assets/`)
+- the scene-generation stage is skipped for this chunk — no kie.ai call
+- `Beat Description` and `Full Prompt` may describe what the proof shows, but are not fed to a generator
+- keep proof inserts brief (typically 2-4 seconds) — use illustrated concept scenes to carry the story, proof inserts only to prove reality
+
+For `reuse` chunks:
+- `image_path` points at an earlier chunk's generated file
+- no new generation is produced
+
+### `Camera Target` (optional)
+Used when the camera frames a specific region of the chunk's illustration during a beat.
+
+Allowed values (zone vocabulary — remaps to pixel coordinates by aspect ratio):
+- `center`
+- `left-third`, `right-third`
+- `top-third`, `bottom-third`
+- `upper-middle`, `lower-middle`
+- `top-left`, `top-right`, `bottom-left`, `bottom-right`
+- `top`, `bottom`, `left`, `right`
+
+Blank = camera inherits previous position (static).
+
+### `Camera Zoom` (optional)
+Vocabulary only, no raw numbers:
+- `wide` — full canvas visible (1.0x)
+- `medium` — ~70% of canvas visible (1.4x)
+- `tight` — ~45% of canvas visible (2.2x)
+- `close` — ~30% of canvas visible (3.3x)
+
+Blank = inherit previous zoom.
+
+### `Camera Reason` (required when Camera Target is set)
+One-sentence explanation of why the camera moves on this beat. If you can't state a reason, don't move the camera.
 
 ## Required Fields For A Valid Beat
 

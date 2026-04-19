@@ -16,12 +16,14 @@ Read repo-local rules before making suggestions, writing workflow docs, or chang
 Read these files in this exact order:
 
 1. [WORKFLOW_RULES.md](./WORKFLOW_RULES.md)
-2. [SESSION_CONFIG_SPEC.md](./SESSION_CONFIG_SPEC.md)
-3. [SHOT_LIST_SPEC.md](./SHOT_LIST_SPEC.md)
-4. [ASSET_RULES.md](./ASSET_RULES.md)
-5. [PREPROCESSOR_RULES.md](./PREPROCESSOR_RULES.md)
-6. [REVIEW_BOARD_RULES.md](./REVIEW_BOARD_RULES.md)
-7. [RENDER_RULES.md](./RENDER_RULES.md)
+2. [SCRIPT_EXTRACTION_RULES.md](./SCRIPT_EXTRACTION_RULES.md)
+3. [SESSION_CONFIG_SPEC.md](./SESSION_CONFIG_SPEC.md)
+4. [SHOT_LIST_SPEC.md](./SHOT_LIST_SPEC.md)
+5. [ASSET_RULES.md](./ASSET_RULES.md)
+6. [PREPROCESSOR_RULES.md](./PREPROCESSOR_RULES.md)
+7. [TRANSITION_RULES.md](./TRANSITION_RULES.md)
+8. [REVIEW_BOARD_RULES.md](./REVIEW_BOARD_RULES.md)
+9. [RENDER_RULES.md](./RENDER_RULES.md)
 
 If you are about to challenge or change a rule, also read [DESIGN_NOTES.md](./DESIGN_NOTES.md) — it captures the reasoning behind current decisions and what was tried and abandoned. The rule files tell you what to do; design notes tell you why.
 
@@ -131,6 +133,32 @@ If a real conflict still remains:
 - report the conflict clearly
 - stop before making a silent assumption
 
+### User request vs existing rule
+
+If the user asks for something that contradicts a documented rule in any
+of the files above, do NOT silently update the rule to justify the new
+request. This is how rules get rewritten every session and lose meaning.
+
+Instead, flag the conflict explicitly before acting, using this format:
+
+> ⚠️ **Rule conflict**
+> `<FILE.md>` says: "*<quote the specific rule>*"
+> You're asking for: *<restate the request>*
+> Options:
+> - (a) **update the rule** — change the documented rule AND apply the
+>   new behavior (both happen)
+> - (b) **one-off exception** — apply the behavior for this case only,
+>   do not touch the rule
+> - (c) **keep the rule** — decline the request
+
+Wait for the user to pick before proceeding. If the user answers with
+anything other than "update", do NOT edit the rule file.
+
+This applies specifically to: `TRANSITION_RULES.md` (reveal type / camera
+/ pauses), `SHOT_LIST_SPEC.md` (shot-list structure), `ASSET_RULES.md`
+(image generation), and any other documented rule. Obvious clarifications
+or typo fixes in the rule itself do not need this ceremony.
+
 ## Expected Agent Behavior
 
 A new agent should:
@@ -140,6 +168,22 @@ A new agent should:
 3. identify the current pipeline stage
 4. make changes only within that stage unless regeneration is required
 5. validate downstream outputs after any upstream change
+
+### Pre-Pass Rule
+
+Before presenting anything to the user — a list of options, a single proposed next step, a recommendation, or an action you are about to take — do an internal pre-pass and drop anything that isn't actually beneficial to what the user is trying to accomplish.
+
+This applies to:
+- Option lists ("A vs B vs C") — drop the ones that don't serve the goal
+- Single proposed next steps ("let's do a dry run", "let me check X") — drop them if they don't prove or change anything that was actually in doubt
+- Tool calls about to be made — drop them if their output doesn't inform a real decision
+- Intermediate goals — drop them if they don't move the real work forward
+
+Do not surface decoy options to seem thorough. Do not propose actions that look productive but aren't. Do not rationalize that "this at least proves X works" when X wasn't in doubt.
+
+The test: if what you are about to propose would be described as "honestly doesn't prove/serve/matter much for what we're doing," it should have been filtered out before you wrote it. Commit to a better alternative, or ask the user for direction, or do nothing.
+
+Narrow rule-lawyering (e.g., "this is a single action, not an options list, so the rule doesn't apply") is itself a violation. The point is: filter for benefit, regardless of the shape of what's being proposed.
 
 ## Expected App Behavior
 

@@ -1,0 +1,2568 @@
+{
+  "sessionId": "pilot",
+  "canvas": {
+    "aspect_ratio": "16:9",
+    "fps": 30
+  },
+  "fps": 30,
+  "playbackRate": 1.2,
+  "revealStyle": "brush-paint",
+  "totalFrames": 9722,
+  "chunkCount": 42,
+  "skipped": [
+    {
+      "chunk": "C21",
+      "reason": "image missing at source/generated-assets/scenes/C21-nano-1k.png"
+    },
+    {
+      "chunk": "C22",
+      "reason": "image missing at source/generated-assets/scenes/C22-nano-1k.png"
+    }
+  ],
+  "chunks": [
+    {
+      "id": "C1",
+      "scene": "01",
+      "sceneTitle": "Cold Open",
+      "summary": "ad-saturated world",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C1-nano-1k.png",
+      "framesDir": "frames/C1",
+      "preGenFrameCount": 45,
+      "startFrame": 0,
+      "endFrame": 150,
+      "durationFrames": 150,
+      "beats": [
+        {
+          "id": "01A",
+          "narration": "Ads are everywhere now.",
+          "audioSrc": "source/audio/01A.mp3",
+          "audioDurationSec": 2.04,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 61,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "01B",
+          "narration": "Which means everybody is trying to make theirs work better.",
+          "audioSrc": "source/audio/01B.mp3",
+          "audioDurationSec": 2.38,
+          "startFrameInChunk": 70,
+          "endFrameInChunk": 141,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 60,
+      "wipeOutFrames": 0,
+      "wipeSeed": 2,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C2",
+      "scene": "01",
+      "sceneTitle": "Cold Open",
+      "summary": "analyst looks at normal ad metrics",
+      "continuity": "standalone",
+      "reveal_direction": "center-out",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C2-nano-1k.png",
+      "framesDir": "frames/C2",
+      "preGenFrameCount": 45,
+      "startFrame": 150,
+      "endFrame": 493,
+      "durationFrames": 343,
+      "beats": [
+        {
+          "id": "01C",
+          "narration": "And most ad-analysis tools do something very reasonable.",
+          "audioSrc": "source/audio/01C.mp3",
+          "audioDurationSec": 3.08,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 92,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "establish the analyst at their desk",
+            "target": "center",
+            "zoom": "wide",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "01D",
+          "narration": "They look at click-through rate, watch time, conversion rate, and return on ad spend.",
+          "audioSrc": "source/audio/01D.mp3",
+          "audioDurationSec": 4.22,
+          "startFrameInChunk": 101,
+          "endFrameInChunk": 228,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "narrator lists metrics shown on the laptop screen \u2014 zoom to the chart",
+            "target": "upper-middle",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 1.2
+          }
+        },
+        {
+          "id": "01E",
+          "narration": "That is the normal way to judge whether an ad is doing its job.",
+          "audioSrc": "source/audio/01E.mp3",
+          "audioDurationSec": 2.74,
+          "startFrameInChunk": 237,
+          "endFrameInChunk": 319,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "pull back for the observational deadpan line",
+            "target": "center",
+            "zoom": "wide",
+            "zoomValue": 1.0,
+            "transitionSec": 1.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 0,
+      "wipeSeed": 3,
+      "wipeDirection": "center-out",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C3",
+      "scene": "01",
+      "sceneTitle": "Cold Open",
+      "summary": "analyst pivots \u2014 stranger question",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "bt",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C3-nano-1k.png",
+      "framesDir": "frames/C3",
+      "preGenFrameCount": 45,
+      "startFrame": 493,
+      "endFrame": 722,
+      "durationFrames": 229,
+      "beats": [
+        {
+          "id": "01F",
+          "narration": "Then we wanted to ask a much stranger question.",
+          "audioSrc": "source/audio/01F.mp3",
+          "audioDurationSec": 2.44,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 73,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "01G",
+          "narration": "What if a model looked at a video",
+          "audioSrc": "source/audio/01G.mp3",
+          "audioDurationSec": 2.08,
+          "startFrameInChunk": 82,
+          "endFrameInChunk": 144,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "01H",
+          "narration": "and tried to predict brain-response patterns from it?",
+          "audioSrc": "source/audio/01H.mp3",
+          "audioDurationSec": 2.24,
+          "startFrameInChunk": 153,
+          "endFrameInChunk": 220,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 4,
+      "wipeDirection": "bt",
+      "transition": "cut"
+    },
+    {
+      "id": "C4",
+      "scene": "01",
+      "sceneTitle": "Cold Open",
+      "summary": "brain patterns, deadpan",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "center-out",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C4-nano-1k.png",
+      "framesDir": "frames/C4",
+      "preGenFrameCount": 45,
+      "startFrame": 722,
+      "endFrame": 910,
+      "durationFrames": 188,
+      "beats": [
+        {
+          "id": "01I",
+          "narration": "Because apparently just watching the ad was no longer enough.",
+          "audioSrc": "source/audio/01I.mp3",
+          "audioDurationSec": 2.44,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 73,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "01J",
+          "narration": "Brain-response patterns. You know. Casually.",
+          "audioSrc": "source/audio/01J.mp3",
+          "audioDurationSec": 2.72,
+          "startFrameInChunk": 82,
+          "endFrameInChunk": 164,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 47,
+      "wipeSeed": 5,
+      "wipeDirection": "center-out",
+      "transition": "cut"
+    },
+    {
+      "id": "C5",
+      "scene": "02",
+      "sceneTitle": "What TRIBE Is",
+      "summary": "TRIBE is not a chatbot",
+      "continuity": "standalone",
+      "reveal_direction": "center-out",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C5-nano-1k.png",
+      "framesDir": "frames/C5",
+      "preGenFrameCount": 60,
+      "startFrame": 910,
+      "endFrame": 1130,
+      "durationFrames": 220,
+      "beats": [
+        {
+          "id": "02A",
+          "narration": "That is what TRIBE is about.",
+          "audioSrc": "source/audio/02A.mp3",
+          "audioDurationSec": 1.44,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 43,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "02B",
+          "narration": "It is not a chatbot.",
+          "audioSrc": "source/audio/02B.mp3",
+          "audioDurationSec": 1.64,
+          "startFrameInChunk": 52,
+          "endFrameInChunk": 101,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "02C",
+          "narration": "It is not \"ask the model a question and get a neat paragraph back.\"",
+          "audioSrc": "source/audio/02C.mp3",
+          "audioDurationSec": 2.88,
+          "startFrameInChunk": 110,
+          "endFrameInChunk": 196,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 88,
+      "wipeOutFrames": 0,
+      "wipeSeed": 0,
+      "wipeDirection": "center-out",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C6",
+      "scene": "02",
+      "sceneTitle": "What TRIBE Is",
+      "summary": "video/audio/text \u2192 brain activity flow",
+      "continuity": "standalone",
+      "reveal_direction": "lr",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C6-nano-1k.png",
+      "framesDir": "frames/C6",
+      "preGenFrameCount": 45,
+      "startFrame": 1130,
+      "endFrame": 1459,
+      "durationFrames": 329,
+      "beats": [
+        {
+          "id": "02D",
+          "narration": "TRIBE takes video, audio, and text,",
+          "audioSrc": "source/audio/02D.mp3",
+          "audioDurationSec": 2.48,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 74,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "02E",
+          "narration": "and predicts patterns of brain activity the content might be associated with.",
+          "audioSrc": "source/audio/02E.mp3",
+          "audioDurationSec": 3.02,
+          "startFrameInChunk": 83,
+          "endFrameInChunk": 174,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "02F",
+          "narration": "Which is a sentence that sounds fake right up until you realize Meta actually built it.",
+          "audioSrc": "source/audio/02F.mp3",
+          "audioDurationSec": 4.08,
+          "startFrameInChunk": 183,
+          "endFrameInChunk": 305,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 0,
+      "wipeSeed": 1,
+      "wipeDirection": "lr",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C7",
+      "scene": "02",
+      "sceneTitle": "What TRIBE Is",
+      "summary": "so we tested it",
+      "continuity": "callback-to-C2",
+      "reveal_direction": "center-out",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C7-nano-1k.png",
+      "framesDir": "frames/C7",
+      "preGenFrameCount": 45,
+      "startFrame": 1459,
+      "endFrame": 1651,
+      "durationFrames": 192,
+      "beats": [
+        {
+          "id": "02G",
+          "narration": "So we wanted to test it properly.",
+          "audioSrc": "source/audio/02G.mp3",
+          "audioDurationSec": 2.14,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 64,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "02H",
+          "narration": "Could TRIBE tell us anything useful about ad creative in a real workflow?",
+          "audioSrc": "source/audio/02H.mp3",
+          "audioDurationSec": 3.18,
+          "startFrameInChunk": 73,
+          "endFrameInChunk": 168,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 77,
+      "wipeOutFrames": 48,
+      "wipeSeed": 2,
+      "wipeDirection": "center-out",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C8",
+      "scene": "03",
+      "sceneTitle": "Why This Mattered",
+      "summary": "Meta quiet in a noisy AI landscape",
+      "continuity": "standalone",
+      "reveal_direction": "lr",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C8-nano-1k.png",
+      "framesDir": "frames/C8",
+      "preGenFrameCount": 45,
+      "startFrame": 1651,
+      "endFrame": 1994,
+      "durationFrames": 343,
+      "beats": [
+        {
+          "id": "03A",
+          "narration": "And part of what made it worth looking at was the timing.",
+          "audioSrc": "source/audio/03A.mp3",
+          "audioDurationSec": 1.94,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 58,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "03B",
+          "narration": "At that point Meta did not exactly feel like the company setting the tone in the public AI conversation.",
+          "audioSrc": "source/audio/03B.mp3",
+          "audioDurationSec": 4.64,
+          "startFrameInChunk": 67,
+          "endFrameInChunk": 206,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "03C",
+          "narration": "A lot of the energy was elsewhere.",
+          "audioSrc": "source/audio/03C.mp3",
+          "audioDurationSec": 1.22,
+          "startFrameInChunk": 215,
+          "endFrameInChunk": 252,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "03D",
+          "narration": "A lot of the attention was going to more familiar product shapes.",
+          "audioSrc": "source/audio/03D.mp3",
+          "audioDurationSec": 2.42,
+          "startFrameInChunk": 261,
+          "endFrameInChunk": 334,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 0,
+      "wipeSeed": 3,
+      "wipeDirection": "lr",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C9",
+      "scene": "03",
+      "sceneTitle": "Why This Mattered",
+      "summary": "Meta shows up with something different",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C9-nano-1k.png",
+      "framesDir": "frames/C9",
+      "preGenFrameCount": 45,
+      "startFrame": 1994,
+      "endFrame": 2103,
+      "durationFrames": 109,
+      "beats": [
+        {
+          "id": "03E",
+          "narration": "So seeing Meta show up with something this different felt notable.",
+          "audioSrc": "source/audio/03E.mp3",
+          "audioDurationSec": 3.34,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 100,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 4,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C10",
+      "scene": "03",
+      "sceneTitle": "Why This Mattered",
+      "summary": "back to the practical question",
+      "continuity": "callback-to-C7",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C10-nano-1k.png",
+      "framesDir": "frames/C10",
+      "preGenFrameCount": 45,
+      "startFrame": 2103,
+      "endFrame": 2230,
+      "durationFrames": 127,
+      "beats": [
+        {
+          "id": "03F",
+          "narration": "But the real question was still practical: does any of this belong in a workflow?",
+          "audioSrc": "source/audio/03F.mp3",
+          "audioDurationSec": 3.44,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 103,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 51,
+      "wipeOutFrames": 32,
+      "wipeSeed": 2,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C11",
+      "scene": "04",
+      "sceneTitle": "The Real Question",
+      "summary": "research vs workflow \u2014 two different standards",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C11-nano-1k.png",
+      "framesDir": "frames/C11",
+      "preGenFrameCount": 45,
+      "startFrame": 2230,
+      "endFrame": 2483,
+      "durationFrames": 253,
+      "beats": [
+        {
+          "id": "04A",
+          "narration": "Because interesting research and useful workflow are two different standards.",
+          "audioSrc": "source/audio/04A.mp3",
+          "audioDurationSec": 3.42,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 103,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "04B",
+          "narration": "Is this a weird and ambitious piece of research?",
+          "audioSrc": "source/audio/04B.mp3",
+          "audioDurationSec": 2.68,
+          "startFrameInChunk": 112,
+          "endFrameInChunk": 192,
+          "pauseFrames": 15,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "04C",
+          "narration": "Obviously.",
+          "audioSrc": "source/audio/04C.mp3",
+          "audioDurationSec": 0.74,
+          "startFrameInChunk": 207,
+          "endFrameInChunk": 229,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 0,
+      "wipeSeed": 3,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C12",
+      "scene": "04",
+      "sceneTitle": "The Real Question",
+      "summary": "the harder question \u2014 survives real use",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C12-nano-1k.png",
+      "framesDir": "frames/C12",
+      "preGenFrameCount": 45,
+      "startFrame": 2483,
+      "endFrame": 2692,
+      "durationFrames": 209,
+      "beats": [
+        {
+          "id": "04D",
+          "narration": "The harder question is whether it stays reasonable once it meets an actual machine, an actual file, and an actual wait time.",
+          "audioSrc": "source/audio/04D.mp3",
+          "audioDurationSec": 6.68,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 200,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 4,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C13",
+      "scene": "04",
+      "sceneTitle": "The Real Question",
+      "summary": "the plan \u2014 a simple A vs B experiment",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C13-nano-1k.png",
+      "framesDir": "frames/C13",
+      "preGenFrameCount": 45,
+      "startFrame": 2692,
+      "endFrame": 2908,
+      "durationFrames": 216,
+      "beats": [
+        {
+          "id": "04E",
+          "narration": "So the plan was simple.",
+          "audioSrc": "source/audio/04E.mp3",
+          "audioDurationSec": 1.64,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 49,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "04F",
+          "narration": "Run a real A-versus-B experiment and see what survived contact with reality.",
+          "audioSrc": "source/audio/04F.mp3",
+          "audioDurationSec": 3.98,
+          "startFrameInChunk": 73,
+          "endFrameInChunk": 192,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 86,
+      "wipeOutFrames": 54,
+      "wipeSeed": 5,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C14",
+      "scene": "05",
+      "sceneTitle": "Setup Friction",
+      "summary": "setup required before any result",
+      "continuity": "callback-to-C7",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C14-nano-1k.png",
+      "framesDir": "frames/C14",
+      "preGenFrameCount": 45,
+      "startFrame": 2908,
+      "endFrame": 2990,
+      "durationFrames": 82,
+      "beats": [
+        {
+          "id": "05A",
+          "narration": "And before there was any result, there was setup.",
+          "audioSrc": "source/audio/05A.mp3",
+          "audioDurationSec": 1.92,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 58,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 33,
+      "wipeOutFrames": 0,
+      "wipeSeed": 0,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C15",
+      "scene": "05",
+      "sceneTitle": "Setup Friction",
+      "summary": "gated access, auth issues, tribev2 install",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C15-nano-1k.png",
+      "framesDir": "frames/C15",
+      "preGenFrameCount": 45,
+      "startFrame": 2990,
+      "endFrame": 3287,
+      "durationFrames": 297,
+      "beats": [
+        {
+          "id": "05B",
+          "narration": "There was gated model access.",
+          "audioSrc": "source/audio/05B.mp3",
+          "audioDurationSec": 1.58,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 47,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "05C",
+          "narration": "There were Hugging Face authentication issues.",
+          "audioSrc": "source/audio/05C.mp3",
+          "audioDurationSec": 1.88,
+          "startFrameInChunk": 56,
+          "endFrameInChunk": 112,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "05D",
+          "narration": "There was the discovery that tribev2 was not a normal package you could just install and move on with your life.",
+          "audioSrc": "source/audio/05D.mp3",
+          "audioDurationSec": 5.08,
+          "startFrameInChunk": 121,
+          "endFrameInChunk": 273,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 1,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C16",
+      "scene": "05",
+      "sceneTitle": "Setup Friction",
+      "summary": "environment mess, computer not persuaded",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C16-nano-1k.png",
+      "framesDir": "frames/C16",
+      "preGenFrameCount": 45,
+      "startFrame": 3287,
+      "endFrame": 3573,
+      "durationFrames": 286,
+      "beats": [
+        {
+          "id": "05E",
+          "narration": "There were environment mismatches and dependency problems.",
+          "audioSrc": "source/audio/05E.mp3",
+          "audioDurationSec": 2.44,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 73,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "05F",
+          "narration": "There was the broader experience of taking a research stack and politely asking it to behave like a product.",
+          "audioSrc": "source/audio/05F.mp3",
+          "audioDurationSec": 4.48,
+          "startFrameInChunk": 82,
+          "endFrameInChunk": 216,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "05G",
+          "narration": "It was not immediately persuaded.",
+          "audioSrc": "source/audio/05G.mp3",
+          "audioDurationSec": 1.72,
+          "startFrameInChunk": 225,
+          "endFrameInChunk": 277,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 2,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C17",
+      "scene": "05",
+      "sceneTitle": "Setup Friction",
+      "summary": "moved to Colab, still slow",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C17-nano-1k.png",
+      "framesDir": "frames/C17",
+      "preGenFrameCount": 45,
+      "startFrame": 3573,
+      "endFrame": 3849,
+      "durationFrames": 276,
+      "beats": [
+        {
+          "id": "05H",
+          "narration": "So the workflow moved into Google Colab on a Tesla T4.",
+          "audioSrc": "source/audio/05H.mp3",
+          "audioDurationSec": 2.94,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 88,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "05I",
+          "narration": "Which sounds encouraging until you remember that it runs and this is practical are not the same sentence.",
+          "audioSrc": "source/audio/05I.mp3",
+          "audioDurationSec": 5.18,
+          "startFrameInChunk": 97,
+          "endFrameInChunk": 252,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 60,
+      "wipeSeed": 3,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C18",
+      "scene": "06",
+      "sceneTitle": "Experiment Design",
+      "summary": "setup over, experiment begins",
+      "continuity": "standalone",
+      "reveal_direction": "lr",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C18-nano-1k.png",
+      "framesDir": "frames/C18",
+      "preGenFrameCount": 45,
+      "startFrame": 3849,
+      "endFrame": 4071,
+      "durationFrames": 222,
+      "beats": [
+        {
+          "id": "06A",
+          "narration": "Eventually the setup friction gave way to the actual experiment.",
+          "audioSrc": "source/audio/06A.mp3",
+          "audioDurationSec": 2.54,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 76,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "06B",
+          "narration": "Two videos went through the TRIBE pipeline in a blind A-versus-B comparison.",
+          "audioSrc": "source/audio/06B.mp3",
+          "audioDurationSec": 4.28,
+          "startFrameInChunk": 85,
+          "endFrameInChunk": 213,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 89,
+      "wipeOutFrames": 0,
+      "wipeSeed": 4,
+      "wipeDirection": "lr",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C19",
+      "scene": "06",
+      "sceneTitle": "Experiment Design",
+      "summary": "measurements: hook strength, peak timing, cortical regions",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "proof",
+      "imageSrc": "source/artifacts/what-was-measured.svg",
+      "framesDir": "",
+      "preGenFrameCount": 0,
+      "startFrame": 4071,
+      "endFrame": 4570,
+      "durationFrames": 499,
+      "beats": [
+        {
+          "id": "06C",
+          "narration": "The output was reduced into measurements that were easier to reason about.",
+          "audioSrc": "source/audio/06C.mp3",
+          "audioDurationSec": 2.98,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 89,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "show the full chart as narrator introduces the measurements",
+            "target": "center",
+            "zoom": "wide",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "06D",
+          "narration": "Hook strength.",
+          "audioSrc": "source/audio/06D.mp3",
+          "audioDurationSec": 1.08,
+          "startFrameInChunk": 98,
+          "endFrameInChunk": 130,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "focus on hook strength as named",
+            "target": "top-left",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 0.6
+          }
+        },
+        {
+          "id": "06E",
+          "narration": "Overall average response and peak ROI response.",
+          "audioSrc": "source/audio/06E.mp3",
+          "audioDurationSec": 3.28,
+          "startFrameInChunk": 139,
+          "endFrameInChunk": 237,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "focus on response metrics as named",
+            "target": "center",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 0.6
+          }
+        },
+        {
+          "id": "06F",
+          "narration": "Peak timing.",
+          "audioSrc": "source/audio/06F.mp3",
+          "audioDurationSec": 0.78,
+          "startFrameInChunk": 246,
+          "endFrameInChunk": 269,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "focus on peak timing as named",
+            "target": "center",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 0.5
+          }
+        },
+        {
+          "id": "06G",
+          "narration": "And a set of cortical regions used as rough proxies for attention, salience, control, evaluation, and higher-level meaning.",
+          "audioSrc": "source/audio/06G.mp3",
+          "audioDurationSec": 7.08,
+          "startFrameInChunk": 278,
+          "endFrameInChunk": 490,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "focus on cortical regions as named",
+            "target": "right-third",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 0.7
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 5,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C20",
+      "scene": "06",
+      "sceneTitle": "Experiment Design",
+      "summary": "plain english \u2014 which video gets stronger attention?",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C20-nano-1k.png",
+      "framesDir": "frames/C20",
+      "preGenFrameCount": 45,
+      "startFrame": 4570,
+      "endFrame": 4778,
+      "durationFrames": 208,
+      "beats": [
+        {
+          "id": "06H",
+          "narration": "In plain English, the question was simple: which video seems more likely to trigger a stronger pay-attention-to-this response?",
+          "audioSrc": "source/audio/06H.mp3",
+          "audioDurationSec": 6.14,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 184,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 83,
+      "wipeOutFrames": 52,
+      "wipeSeed": 3,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C23",
+      "scene": "08",
+      "sceneTitle": "Model Answer",
+      "summary": "pipeline produced a real, non-random answer",
+      "continuity": "callback-to-C14",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C23-nano-1k.png",
+      "framesDir": "frames/C23",
+      "preGenFrameCount": 45,
+      "startFrame": 4778,
+      "endFrame": 4983,
+      "durationFrames": 205,
+      "beats": [
+        {
+          "id": "08A",
+          "narration": "And once the pipeline finally got through the setup and the waiting, it did actually produce a real answer.",
+          "audioSrc": "source/audio/08A.mp3",
+          "audioDurationSec": 4.58,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 137,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "08B",
+          "narration": "The output was not random noise.",
+          "audioSrc": "source/audio/08B.mp3",
+          "audioDurationSec": 1.68,
+          "startFrameInChunk": 146,
+          "endFrameInChunk": 196,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 82,
+      "wipeOutFrames": 0,
+      "wipeSeed": 0,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C24",
+      "scene": "08",
+      "sceneTitle": "Model Answer",
+      "summary": "TRIBE favored Video A across hook, peak, regions",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "lr",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C24-nano-1k.png",
+      "framesDir": "frames/C24",
+      "preGenFrameCount": 45,
+      "startFrame": 4983,
+      "endFrame": 5306,
+      "durationFrames": 323,
+      "beats": [
+        {
+          "id": "08C",
+          "narration": "TRIBE-style signals favored Video A.",
+          "audioSrc": "source/audio/08C.mp3",
+          "audioDurationSec": 3.02,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 91,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "08D",
+          "narration": "Video A showed the stronger early hook.",
+          "audioSrc": "source/audio/08D.mp3",
+          "audioDurationSec": 2.18,
+          "startFrameInChunk": 100,
+          "endFrameInChunk": 165,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "08E",
+          "narration": "It showed stronger peak responses too.",
+          "audioSrc": "source/audio/08E.mp3",
+          "audioDurationSec": 2.34,
+          "startFrameInChunk": 174,
+          "endFrameInChunk": 244,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "08F",
+          "narration": "Several target regions also leaned higher for A.",
+          "audioSrc": "source/audio/08F.mp3",
+          "audioDurationSec": 2.02,
+          "startFrameInChunk": 253,
+          "endFrameInChunk": 314,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 1,
+      "wipeDirection": "lr",
+      "transition": "cut"
+    },
+    {
+      "id": "C25",
+      "scene": "08",
+      "sceneTitle": "Model Answer",
+      "summary": "if allowed to vote, TRIBE had opinions",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C25-nano-1k.png",
+      "framesDir": "frames/C25",
+      "preGenFrameCount": 45,
+      "startFrame": 5306,
+      "endFrame": 5430,
+      "durationFrames": 124,
+      "beats": [
+        {
+          "id": "08G",
+          "narration": "If the model had been allowed to cast a confident vote, it would have had opinions.",
+          "audioSrc": "source/audio/08G.mp3",
+          "audioDurationSec": 3.32,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 100,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 31,
+      "wipeSeed": 2,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C26",
+      "scene": "09",
+      "sceneTitle": "Market Answer",
+      "summary": "experiment gets useful \u2014 business result goes the other way",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C26-nano-1k.png",
+      "framesDir": "frames/C26",
+      "preGenFrameCount": 45,
+      "startFrame": 5430,
+      "endFrame": 5568,
+      "durationFrames": 138,
+      "beats": [
+        {
+          "id": "09A",
+          "narration": "And this is where the experiment became actually useful.",
+          "audioSrc": "source/audio/09A.mp3",
+          "audioDurationSec": 1.88,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 56,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "09B",
+          "narration": "Because the business result went the other way.",
+          "audioSrc": "source/audio/09B.mp3",
+          "audioDurationSec": 2.14,
+          "startFrameInChunk": 65,
+          "endFrameInChunk": 129,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 55,
+      "wipeOutFrames": 0,
+      "wipeSeed": 3,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C27",
+      "scene": "09",
+      "sceneTitle": "Market Answer",
+      "summary": "THE REVEAL \u2014 ROAS mismatch (Video B won in market)",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "proof",
+      "imageSrc": "source/artifacts/roi-comparison.svg",
+      "framesDir": "",
+      "preGenFrameCount": 0,
+      "startFrame": 5568,
+      "endFrame": 5876,
+      "durationFrames": 308,
+      "beats": [
+        {
+          "id": "09C",
+          "narration": "Video B had ROAS above three, while Video A was closer to two and a half.",
+          "audioSrc": "source/audio/09C.mp3",
+          "audioDurationSec": 4.48,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 134,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "show both bars as ROAS numbers are named",
+            "target": "center",
+            "zoom": "wide",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "09D",
+          "narration": "So the model favorite and the market winner were not the same thing.",
+          "audioSrc": "source/audio/09D.mp3",
+          "audioDurationSec": 3.18,
+          "startFrameInChunk": 143,
+          "endFrameInChunk": 238,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "emphasize the contrast between the two bars",
+            "target": "center",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 0.8
+          }
+        },
+        {
+          "id": "09E",
+          "narration": "The model-favored video lost in the market.",
+          "audioSrc": "source/audio/09E.mp3",
+          "audioDurationSec": 1.74,
+          "startFrameInChunk": 247,
+          "endFrameInChunk": 299,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "close on the gap for emphasis",
+            "target": "center",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 0.8
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 4,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C28",
+      "scene": "09",
+      "sceneTitle": "Market Answer",
+      "summary": "the mismatch is the real story",
+      "continuity": "callback-to-C25",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C28-nano-1k.png",
+      "framesDir": "frames/C28",
+      "preGenFrameCount": 45,
+      "startFrame": 5876,
+      "endFrame": 6059,
+      "durationFrames": 183,
+      "beats": [
+        {
+          "id": "09F",
+          "narration": "That does not mean the model output was nonsense.",
+          "audioSrc": "source/audio/09F.mp3",
+          "audioDurationSec": 2.32,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 70,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "09G",
+          "narration": "It means the mismatch is the real story.",
+          "audioSrc": "source/audio/09G.mp3",
+          "audioDurationSec": 2.68,
+          "startFrameInChunk": 79,
+          "endFrameInChunk": 159,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 73,
+      "wipeOutFrames": 46,
+      "wipeSeed": 5,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C29",
+      "scene": "10",
+      "sceneTitle": "What The Mismatch Means",
+      "summary": "not 'can it produce' \u2014 'what kind of output'",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C29-nano-1k.png",
+      "framesDir": "frames/C29",
+      "preGenFrameCount": 45,
+      "startFrame": 6059,
+      "endFrame": 6296,
+      "durationFrames": 237,
+      "beats": [
+        {
+          "id": "10A",
+          "narration": "Because now the question is not can this model produce output.",
+          "audioSrc": "source/audio/10A.mp3",
+          "audioDurationSec": 2.72,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 82,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "10B",
+          "narration": "Clearly it can.",
+          "audioSrc": "source/audio/10B.mp3",
+          "audioDurationSec": 0.94,
+          "startFrameInChunk": 91,
+          "endFrameInChunk": 119,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "10C",
+          "narration": "The more important question is what kind of output this actually is.",
+          "audioSrc": "source/audio/10C.mp3",
+          "audioDurationSec": 2.84,
+          "startFrameInChunk": 143,
+          "endFrameInChunk": 228,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 0,
+      "wipeSeed": 0,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C30",
+      "scene": "10",
+      "sceneTitle": "What The Mismatch Means",
+      "summary": "useful as research/interpretation layer, not winner picker",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "lr",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C30-nano-1k.png",
+      "framesDir": "frames/C30",
+      "preGenFrameCount": 45,
+      "startFrame": 6296,
+      "endFrame": 6552,
+      "durationFrames": 256,
+      "beats": [
+        {
+          "id": "10D",
+          "narration": "TRIBE looks more useful as a research and interpretation layer,",
+          "audioSrc": "source/audio/10D.mp3",
+          "audioDurationSec": 3.32,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 100,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "10E",
+          "narration": "something that surfaces structured differences between creatives,",
+          "audioSrc": "source/audio/10E.mp3",
+          "audioDurationSec": 2.72,
+          "startFrameInChunk": 109,
+          "endFrameInChunk": 191,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "10F",
+          "narration": "and helps produce better hypotheses.",
+          "audioSrc": "source/audio/10F.mp3",
+          "audioDurationSec": 1.58,
+          "startFrameInChunk": 200,
+          "endFrameInChunk": 247,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 4,
+      "wipeDirection": "lr",
+      "transition": "cut"
+    },
+    {
+      "id": "C31",
+      "scene": "10",
+      "sceneTitle": "What The Mismatch Means",
+      "summary": "not a standalone winner picker",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C31-nano-1k.png",
+      "framesDir": "frames/C31",
+      "preGenFrameCount": 45,
+      "startFrame": 6552,
+      "endFrame": 6655,
+      "durationFrames": 103,
+      "beats": [
+        {
+          "id": "10G",
+          "narration": "That is not the same thing as a standalone winner picker.",
+          "audioSrc": "source/audio/10G.mp3",
+          "audioDurationSec": 2.64,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 79,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 26,
+      "wipeSeed": 5,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C32",
+      "scene": "11",
+      "sceneTitle": "Runtime Reality",
+      "summary": "local fragile, Colab limited",
+      "continuity": "callback-to-C17",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C32-nano-1k.png",
+      "framesDir": "frames/C32",
+      "preGenFrameCount": 45,
+      "startFrame": 6655,
+      "endFrame": 6984,
+      "durationFrames": 329,
+      "beats": [
+        {
+          "id": "11A",
+          "narration": "And the runtime had opinions too.",
+          "audioSrc": "source/audio/11A.mp3",
+          "audioDurationSec": 1.18,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 35,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "11B",
+          "narration": "Running the stack locally on a sixteen-gigabyte MacBook was slow and fragile.",
+          "audioSrc": "source/audio/11B.mp3",
+          "audioDurationSec": 4.62,
+          "startFrameInChunk": 44,
+          "endFrameInChunk": 183,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "11C",
+          "narration": "Running it in Colab on a Tesla T4 worked, but only in a limited sense.",
+          "audioSrc": "source/audio/11C.mp3",
+          "audioDurationSec": 4.28,
+          "startFrameInChunk": 192,
+          "endFrameInChunk": 320,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 0,
+      "wipeSeed": 0,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C33",
+      "scene": "11",
+      "sceneTitle": "Runtime Reality",
+      "summary": "3.5 hours per short clip",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "proof",
+      "imageSrc": "source/artifacts/runtime-summary.svg",
+      "framesDir": "",
+      "preGenFrameCount": 0,
+      "startFrame": 6984,
+      "endFrame": 7087,
+      "durationFrames": 103,
+      "beats": [
+        {
+          "id": "11D",
+          "narration": "Each short clip still took about three and a half hours to encode.",
+          "audioSrc": "source/audio/11D.mp3",
+          "audioDurationSec": 3.14,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 94,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 1,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C34",
+      "scene": "11",
+      "sceneTitle": "Runtime Reality",
+      "summary": "not a quick scoring pass \u2014 'rest of day has plans'",
+      "continuity": "callback-to-C32",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C34-nano-1k.png",
+      "framesDir": "frames/C34",
+      "preGenFrameCount": 45,
+      "startFrame": 7087,
+      "endFrame": 7268,
+      "durationFrames": 181,
+      "beats": [
+        {
+          "id": "11E",
+          "narration": "So this was less quick scoring pass,",
+          "audioSrc": "source/audio/11E.mp3",
+          "audioDurationSec": 1.78,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 53,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "11F",
+          "narration": "and more excellent, the rest of the day has made other plans.",
+          "audioSrc": "source/audio/11F.mp3",
+          "audioDurationSec": 3.68,
+          "startFrameInChunk": 62,
+          "endFrameInChunk": 172,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 72,
+      "wipeOutFrames": 0,
+      "wipeSeed": 2,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C35",
+      "scene": "11",
+      "sceneTitle": "Runtime Reality",
+      "summary": "practical tools need to be usable \u2014 this isn't",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C35-nano-1k.png",
+      "framesDir": "frames/C35",
+      "preGenFrameCount": 45,
+      "startFrame": 7268,
+      "endFrame": 7520,
+      "durationFrames": 252,
+      "beats": [
+        {
+          "id": "11G",
+          "narration": "Practical tools do not only need to be smart. They need to be usable.",
+          "audioSrc": "source/audio/11G.mp3",
+          "audioDurationSec": 3.82,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 115,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "11H",
+          "narration": "And this workflow is not ready to behave like a casual product feature.",
+          "audioSrc": "source/audio/11H.mp3",
+          "audioDurationSec": 3.48,
+          "startFrameInChunk": 124,
+          "endFrameInChunk": 228,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 60,
+      "wipeSeed": 3,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C36",
+      "scene": "12",
+      "sceneTitle": "Product Reality",
+      "summary": "not laptop, not low-cost VPS \u2014 needs dedicated GPU",
+      "continuity": "standalone",
+      "reveal_direction": "lr",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C36-nano-1k.png",
+      "framesDir": "frames/C36",
+      "preGenFrameCount": 45,
+      "startFrame": 7520,
+      "endFrame": 7861,
+      "durationFrames": 341,
+      "beats": [
+        {
+          "id": "12A",
+          "narration": "So if something like this ever becomes a real tool,",
+          "audioSrc": "source/audio/12A.mp3",
+          "audioDurationSec": 2.38,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 71,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "introduce the three hardware options",
+            "target": "center",
+            "zoom": "wide",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "12B",
+          "narration": "it is not running on a laptop.",
+          "audioSrc": "source/audio/12B.mp3",
+          "audioDurationSec": 2.72,
+          "startFrameInChunk": 80,
+          "endFrameInChunk": 162,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "focus on laptop option as named (crossed out)",
+            "target": "left-third",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 0.5
+          }
+        },
+        {
+          "id": "12C",
+          "narration": "it is not living on a low-cost VPS.",
+          "audioSrc": "source/audio/12C.mp3",
+          "audioDurationSec": 2.74,
+          "startFrameInChunk": 171,
+          "endFrameInChunk": 253,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "focus on cheap-VPS option as named (crossed out)",
+            "target": "center",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 0.5
+          }
+        },
+        {
+          "id": "12D",
+          "narration": "It needs a dedicated GPU-backed path.",
+          "audioSrc": "source/audio/12D.mp3",
+          "audioDurationSec": 2.32,
+          "startFrameInChunk": 262,
+          "endFrameInChunk": 332,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "focus on GPU option as named (the viable path)",
+            "target": "right-third",
+            "zoom": "tight",
+            "zoomValue": 2.2,
+            "transitionSec": 0.5
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 0,
+      "wipeSeed": 4,
+      "wipeDirection": "lr",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C37",
+      "scene": "12",
+      "sceneTitle": "Product Reality",
+      "summary": "operational takeaway as important as the model takeaway",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C37-nano-1k.png",
+      "framesDir": "frames/C37",
+      "preGenFrameCount": 45,
+      "startFrame": 7861,
+      "endFrame": 8110,
+      "durationFrames": 249,
+      "beats": [
+        {
+          "id": "12E",
+          "narration": "And definitely not a workflow pretending this is some light little background check you run before lunch.",
+          "audioSrc": "source/audio/12E.mp3",
+          "audioDurationSec": 3.98,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 119,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "12F",
+          "narration": "That makes the operational takeaway almost as important as the model takeaway.",
+          "audioSrc": "source/audio/12F.mp3",
+          "audioDurationSec": 3.24,
+          "startFrameInChunk": 128,
+          "endFrameInChunk": 225,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 60,
+      "wipeSeed": 5,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C38",
+      "scene": "13",
+      "sceneTitle": "License Constraint",
+      "summary": "TRIBE v2 is non-commercial license",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C38-nano-1k.png",
+      "framesDir": "frames/C38",
+      "preGenFrameCount": 45,
+      "startFrame": 8110,
+      "endFrame": 8490,
+      "durationFrames": 380,
+      "beats": [
+        {
+          "id": "13A",
+          "narration": "There is one more constraint sitting quietly on top of all of that.",
+          "audioSrc": "source/audio/13A.mp3",
+          "audioDurationSec": 2.72,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 82,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "13B",
+          "narration": "TRIBE v2 is under a non-commercial license.",
+          "audioSrc": "source/audio/13B.mp3",
+          "audioDurationSec": 2.58,
+          "startFrameInChunk": 91,
+          "endFrameInChunk": 168,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "13C",
+          "narration": "So even if the workflow were faster, this exact model still is not something you casually drop into a product and call finished.",
+          "audioSrc": "source/audio/13C.mp3",
+          "audioDurationSec": 5.98,
+          "startFrameInChunk": 177,
+          "endFrameInChunk": 356,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 60,
+      "wipeSeed": 0,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C39",
+      "scene": "14",
+      "sceneTitle": "Conclusion",
+      "summary": "back to the original question",
+      "continuity": "callback-to-C7",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C39-nano-1k.png",
+      "framesDir": "frames/C39",
+      "preGenFrameCount": 45,
+      "startFrame": 8490,
+      "endFrame": 8661,
+      "durationFrames": 171,
+      "beats": [
+        {
+          "id": "14A",
+          "narration": "Which brings us back to the original question.",
+          "audioSrc": "source/audio/14A.mp3",
+          "audioDurationSec": 1.82,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 55,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "14B",
+          "narration": "Can this help judge whether a video ad is good or bad?",
+          "audioSrc": "source/audio/14B.mp3",
+          "audioDurationSec": 2.78,
+          "startFrameInChunk": 64,
+          "endFrameInChunk": 147,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 68,
+      "wipeOutFrames": 0,
+      "wipeSeed": 1,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C40",
+      "scene": "14",
+      "sceneTitle": "Conclusion",
+      "summary": "structured signals \u2014 worth studying, not trusting alone",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C40-nano-1k.png",
+      "framesDir": "frames/C40",
+      "preGenFrameCount": 45,
+      "startFrame": 8661,
+      "endFrame": 8919,
+      "durationFrames": 258,
+      "beats": [
+        {
+          "id": "14C",
+          "narration": "It can produce structured signals that are interesting enough to study,",
+          "audioSrc": "source/audio/14C.mp3",
+          "audioDurationSec": 3.54,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 106,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "14D",
+          "narration": "but not reliable enough to trust on their own, and not cheap enough to treat like a normal scoring layer.",
+          "audioSrc": "source/audio/14D.mp3",
+          "audioDurationSec": 4.48,
+          "startFrameInChunk": 115,
+          "endFrameInChunk": 249,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 5,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C41",
+      "scene": "14",
+      "sceneTitle": "Conclusion",
+      "summary": "not a clean cinematic success \u2014 but a real answer",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C41-nano-1k.png",
+      "framesDir": "frames/C41",
+      "preGenFrameCount": 45,
+      "startFrame": 8919,
+      "endFrame": 9143,
+      "durationFrames": 224,
+      "beats": [
+        {
+          "id": "14E",
+          "narration": "That is not the clean cinematic success story people usually want from this kind of experiment.",
+          "audioSrc": "source/audio/14E.mp3",
+          "audioDurationSec": 4.42,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 133,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "14F",
+          "narration": "It is, however, a real answer.",
+          "audioSrc": "source/audio/14F.mp3",
+          "audioDurationSec": 2.42,
+          "startFrameInChunk": 142,
+          "endFrameInChunk": 215,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 0,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C42",
+      "scene": "14",
+      "sceneTitle": "Conclusion",
+      "summary": "the gap between model and market \u2014 the real lesson",
+      "continuity": "standalone",
+      "reveal_direction": "lr",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C42-nano-1k.png",
+      "framesDir": "frames/C42",
+      "preGenFrameCount": 45,
+      "startFrame": 9143,
+      "endFrame": 9348,
+      "durationFrames": 205,
+      "beats": [
+        {
+          "id": "14G",
+          "narration": "And in some ways it is the better answer, because the gap between model reward and market reward is the part worth taking seriously.",
+          "audioSrc": "source/audio/14G.mp3",
+          "audioDurationSec": 6.04,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 181,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 82,
+      "wipeOutFrames": 51,
+      "wipeSeed": 1,
+      "wipeDirection": "lr",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C43",
+      "scene": "15",
+      "sceneTitle": "Closing Questions",
+      "summary": "the gap is where useful questions begin",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C43-nano-1k.png",
+      "framesDir": "frames/C43",
+      "preGenFrameCount": 45,
+      "startFrame": 9348,
+      "endFrame": 9558,
+      "durationFrames": 210,
+      "beats": [
+        {
+          "id": "15A",
+          "narration": "That gap is where the useful questions begin.",
+          "audioSrc": "source/audio/15A.mp3",
+          "audioDurationSec": 2.14,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 64,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "15B",
+          "narration": "What exactly is it seeing?",
+          "audioSrc": "source/audio/15B.mp3",
+          "audioDurationSec": 1.22,
+          "startFrameInChunk": 73,
+          "endFrameInChunk": 110,
+          "pauseFrames": 15,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "15C",
+          "narration": "What is it missing, and when does that difference matter?",
+          "audioSrc": "source/audio/15C.mp3",
+          "audioDurationSec": 2.32,
+          "startFrameInChunk": 125,
+          "endFrameInChunk": 195,
+          "pauseFrames": 15,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "cut",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 0,
+      "wipeSeed": 2,
+      "wipeDirection": "",
+      "transition": "cut"
+    },
+    {
+      "id": "C44",
+      "scene": "15",
+      "sceneTitle": "Closing Questions",
+      "summary": "better place to end than a fake victory lap",
+      "continuity": "standalone",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C44-nano-1k.png",
+      "framesDir": "frames/C44",
+      "preGenFrameCount": 45,
+      "startFrame": 9558,
+      "endFrame": 9722,
+      "durationFrames": 164,
+      "beats": [
+        {
+          "id": "15D",
+          "narration": "That is a much better place for an experiment to end than a fake victory lap.",
+          "audioSrc": "source/audio/15D.mp3",
+          "audioDurationSec": 4.68,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 140,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 66,
+      "wipeOutFrames": 41,
+      "wipeSeed": 3,
+      "wipeDirection": "",
+      "transition": "eraser-wipe"
+    }
+  ]
+}

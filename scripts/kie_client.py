@@ -53,6 +53,56 @@ class KieError(RuntimeError):
     pass
 
 
+# ---- per-model input shape ---------------------------------------------
+
+def build_input_for_model(
+    model: str,
+    *,
+    prompt: str,
+    image_refs: Sequence[str] = (),
+    aspect_ratio: str = "16:9",
+    quality: str = "basic",  # "basic" (~2K) or "high" (~4K)
+    output_format: str = "png",
+) -> dict[str, Any]:
+    """Return the `input` dict shape for the given kie.ai model.
+
+    Different kie models require different field names:
+    - seedream/5-lite-text-to-image: prompt, aspect_ratio, quality (no image refs)
+    - seedream/5-lite-image-to-image: prompt, image_urls, aspect_ratio, quality
+    - nano-banana-2 / nano-banana-pro / wan: prompt, image_input, aspect_ratio,
+      resolution, output_format
+
+    The `quality` arg uses seedream's `basic`/`high` vocabulary and is mapped
+    to nano-banana's `2K`/`4K` resolution for the nano-banana family.
+    """
+    if model == "seedream/5-lite-text-to-image":
+        return {
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "quality": quality,
+        }
+    if model == "seedream/5-lite-image-to-image":
+        return {
+            "prompt": prompt,
+            "image_urls": list(image_refs),
+            "aspect_ratio": aspect_ratio,
+            "quality": quality,
+        }
+    # Default: nano-banana family (nano-banana-2, nano-banana-pro), wan, etc.
+    # Accept either seedream-style ("basic"/"high") or explicit ("1K"/"2K"/"4K").
+    if quality in ("1K", "2K", "4K"):
+        nano_res = quality
+    else:
+        nano_res = {"basic": "2K", "high": "4K"}.get(quality, "2K")
+    return {
+        "prompt": prompt,
+        "image_input": list(image_refs),
+        "aspect_ratio": aspect_ratio,
+        "resolution": nano_res,
+        "output_format": output_format,
+    }
+
+
 # ---- client ------------------------------------------------------------
 
 class KieClient:
@@ -84,26 +134,20 @@ class KieClient:
         self,
         *,
         model: str,
-        prompt: str,
-        image_input: Sequence[str] = (),
-        aspect_ratio: str = "16:9",
-        resolution: str = "2K",
-        output_format: str = "png",
-        extra_input: dict[str, Any] | None = None,
+        input_dict: dict[str, Any],
+        callback_url: str | None = None,
     ) -> str:
-        """Submit an image generation task. Returns task_id."""
+        """Submit a task with a raw `input` dict. Returns task_id.
+
+        Callers should build `input_dict` via `build_input_for_model` (or
+        manually if using a model not yet in the builder).
+        """
         body: dict[str, Any] = {
             "model": model,
-            "input": {
-                "prompt": prompt,
-                "image_input": list(image_input),
-                "aspect_ratio": aspect_ratio,
-                "resolution": resolution,
-                "output_format": output_format,
-            },
+            "input": input_dict,
         }
-        if extra_input:
-            body["input"].update(extra_input)
+        if callback_url:
+            body["callBackUrl"] = callback_url
 
         url = f"{self.base_url}{SUBMIT_PATH}"
         resp = self._session.post(url, data=json.dumps(body))
@@ -192,26 +236,21 @@ class KieClient:
         self,
         *,
         model: str,
-        prompt: str,
+        input_dict: dict[str, Any],
         dest_path: Path,
-        image_input: Sequence[str] = (),
-        aspect_ratio: str = "16:9",
-        resolution: str = "2K",
-        output_format: str = "png",
-        extra_input: dict[str, Any] | None = None,
+        callback_url: str | None = None,
         poll_interval_seconds: float = POLL_INTERVAL_SECONDS,
         poll_timeout_seconds: float = POLL_TIMEOUT_SECONDS,
     ) -> KieResult:
         """Submit, poll, and download in one call. Returns the KieResult
-        with local_path set on success."""
+        with local_path set on success.
+
+        `input_dict` should be built via `build_input_for_model(model, ...)`.
+        """
         task_id = self.submit_task(
             model=model,
-            prompt=prompt,
-            image_input=image_input,
-            aspect_ratio=aspect_ratio,
-            resolution=resolution,
-            output_format=output_format,
-            extra_input=extra_input,
+            input_dict=input_dict,
+            callback_url=callback_url,
         )
         result = self.poll_task(
             task_id,
@@ -275,12 +314,16 @@ def _smoke_test() -> None:
 
     client = KieClient()
     print(f"[kie] submitting: model={args.model} prompt={args.prompt!r}")
+    input_dict = build_input_for_model(
+        args.model,
+        prompt=args.prompt,
+        aspect_ratio=args.aspect_ratio,
+        quality="basic" if args.resolution in ("2K", "basic") else "high",
+    )
     result = client.submit_and_download(
         model=args.model,
-        prompt=args.prompt,
+        input_dict=input_dict,
         dest_path=Path(args.out),
-        aspect_ratio=args.aspect_ratio,
-        resolution=args.resolution,
     )
     print(f"[kie] success: task_id={result.task_id}")
     print(f"[kie] result_url={result.result_urls[0]}")

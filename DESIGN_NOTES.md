@@ -80,15 +80,15 @@ Reason: Already set up, working, supports all the models we want to try (nano-ba
 
 ### Script extraction (source-to-script stage) is externally owned
 
-Rule source: `WORKFLOW_RULES.md` (Stage 1: Source-to-Script). When `SCRIPT_EXTRACTION_RULES.md` is written, that becomes the primary reference.
+Rule source: `SCRIPT_EXTRACTION_RULES.md` (primary) and `WORKFLOW_RULES.md` (Stage 1: Source-to-Script).
 
 Reason: Turning a raw session package into a screenplay, scene plan, and shot list is an editorially-driven stage, not a mechanical one. It requires judgment about story arc, turning points, what to cut and keep, where humor lands without becoming gimmicky, and how dense to make the narration.
 
-An earlier pass (Codex executing the brief in `spoolcast-content/shared/video-generation-skill-spec.md`) produced high-quality output because of that judgment, not because the process was rigorous. The brief exists; the "how" does not.
+An earlier pass (Codex executing the brief in `spoolcast-content/shared/video-generation-skill-spec.md`) produced high-quality output because of that judgment, not because the process was rigorous. Codex then self-documented the actual method as `SCRIPT_EXTRACTION_RULES.md`, which is now the canonical reference.
 
-Decision: this stage is owned by a capable agent with the full session package in context — typically Codex or Claude in a dedicated session with the raw transcript and logs loaded. The spoolcast repo provides the brief and the output contract, not the code. A more detailed `SCRIPT_EXTRACTION_RULES.md` will be written by the agent who actually ran the stage, as a self-documentation pass.
+Decision: this stage is owned by a capable agent with the full session package in context — typically Codex or Claude in a dedicated session with the raw transcript and logs loaded. The spoolcast repo provides the method (`SCRIPT_EXTRACTION_RULES.md`) and the output contract, not automation code.
 
-If you are tempted to "automate" script extraction with a general-purpose LLM loop: don't, yet. Mechanized script-writing is how spoolcast becomes AI slop. The quality bar is "feel like following real work" — that comes from judgment on the raw material, not from a pipeline.
+If you are tempted to "automate" script extraction with a general-purpose LLM loop: don't, yet. Mechanized script-writing is how spoolcast becomes AI slop. The quality bar is "feel like following real work" — that comes from judgment on the raw material, not from a pipeline. The rules in `SCRIPT_EXTRACTION_RULES.md` are a method for an agent to apply, not an algorithm for a script to execute.
 
 ### Rule files live in the repo; session content lives in the content dir
 
@@ -139,3 +139,6 @@ Original setup had tribe-specific media, data, and scripts in the repo. Made the
 - When a complex system has drift across layers (shot list / review / preview / render), the fix is usually fewer layers, not better sync.
 - Rule files written from a long working session always have gaps. The gaps surface when the rules are used or questioned — treat "don't we already have a system for X?" as a trigger to update, not as pushback. The questioner is usually right.
 - Editorial stages (story, voice, pacing, humor) are hard to mechanize without making everything feel generic. Leave them to agents with full context and judgment. Mechanize the downstream plumbing (images, preprocessor, render) where determinism helps quality.
+- **Same-turn codification**: any heuristic or rule agreed on in conversation must land in a rules file in the same turn — not "we'll write that down later." if it isn't written, the next decision reasons from scratch and re-breaks the rule. this was observed after an 8-beat chunk was created despite the agent having just argued for "smaller chunks, more pictures" earlier in the same session. the heuristic existed in chat; nobody wrote it down; it was forgotten within minutes.
+- Chunking failure modes: "group by long-pause markers" is a structural signal that can produce chunks with too many beats. Long-pause alone does not pass the visual-subject test. Always apply the stop-and-check heuristics in `WORKFLOW_RULES.md § 3. Chunking` before committing chunk boundaries.
+- Continuity concept: chunks relate to each other either as standalone or as part of a multi-chunk arc. Arcs emerge from consecutive `continues-from-prev` chunks — no separate data structure needed. Encoded per-chunk rather than as a top-level grouping.

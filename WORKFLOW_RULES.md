@@ -170,8 +170,8 @@ This stage is editorially-driven. Its quality depends on judgment about story ar
 
 Current default: handled by a capable agent (typically Codex or Claude in a dedicated session) with the raw session package in full context. Spoolcast's repo does not currently provide code for this stage.
 
-Brief: `spoolcast-content/shared/video-generation-skill-spec.md`.
-Detailed method (pending): `SCRIPT_EXTRACTION_RULES.md`. When this file is authored, this stage's rules expand and the brief becomes a secondary reference.
+Canonical method: `SCRIPT_EXTRACTION_RULES.md` (repo root). This is the primary reference for any agent running this stage — it captures the real editorial process that produced `tribe-session-001`, including the 10-stage pipeline, heuristics, quality tests, and rejection criteria.
+Original brief (now secondary): `spoolcast-content/shared/video-generation-skill-spec.md`.
 
 Canonical output locations:
 - `../spoolcast-content/sessions/<session-id>/script/` — screenplay, scene plan, voiceover
@@ -197,8 +197,41 @@ Input:
 
 Output:
 - shot list with `Chunk` column populated per beat (see `SHOT_LIST_SPEC.md`)
+- shot list with `Continuity` declared per chunk (see below)
 
 Each unique `Chunk` value corresponds to one illustration.
+
+#### Chunking Heuristics (Stop-And-Check Questions)
+
+Hard numeric rules ("max N beats per chunk") are not used — pacing is editorial judgment, not math. Instead, for every proposed chunk, stop and ask:
+
+1. **Visual subject test**: can ONE simple image honestly represent what's being narrated across all these lines? If the narration shifts from "analyst doing normal work" to "brain patterns," those are different visual worlds — split.
+2. **Pan-justification test**: would this chunk need more than 1-2 camera moves to stay coherent? If yes, it's probably too much for one image — split.
+3. **Time-on-screen soft cap**: any image sitting on screen longer than ~10 seconds needs to earn that hold (strong visual, intentional slow beat). Narration of 15s+ on a static image with no justification → split.
+4. **Visual economy**: if describing the image takes more than 2 short sentences, it's too complex for one illustration — split.
+
+Long-pause markers in the voiceover script (`pause_after: "long"`) are a hint, not a chunking rule. They help suggest boundaries but do not replace the four tests above.
+
+The real prevention of bad chunking is visual review of the shot list (xlsx) **before** any image is generated — merged-cell spans make over-large chunks visible at a glance.
+
+#### Chunk Continuity
+
+Chunks relate to each other in one of three ways. Every chunk declares its continuity explicitly:
+
+- `standalone` — new visual world; no obligation to carry character/setting from the prior chunk. Use when narration introduces a new idea.
+- `continues-from-prev` — same arc as the previous chunk. Use when narration is still inside one wider idea/mini-story. The image must visually relate to the previous chunk (same character, same setting, or shared motif).
+- `callback-to-<chunk-id>` — deliberately returns to a specific earlier chunk's world (for emphasis or narrative loop).
+
+Blank defaults to `standalone`.
+
+For `continues-from-prev` chunks, the generation step must:
+1. pass the previous chunk's image as `image_input` (for style + character/setting consistency)
+2. state the shared thread explicitly in the prompt ("same stick figure character at the same desk")
+3. focus the new prompt on what CHANGED, not what stayed the same
+
+For `callback-to-<chunk-id>` chunks, do the same but with the specific earlier chunk's image as reference.
+
+Arcs (multi-chunk mini-stories) emerge implicitly from consecutive `continues-from-prev` chunks. No separate arc data structure is needed.
 
 ### 4. Scene Generation
 
