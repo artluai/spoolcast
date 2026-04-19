@@ -17,11 +17,11 @@
       "sceneTitle": "Cold Open",
       "summary": "ad-saturated world",
       "continuity": "standalone",
-      "reveal_direction": "",
+      "reveal_direction": "auto",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C1-nano-1k.png",
       "framesDir": "frames/C1",
-      "preGenFrameCount": 60,
+      "preGenFrameCount": 45,
       "startFrame": 0,
       "endFrame": 150,
       "durationFrames": 150,
@@ -64,7 +64,7 @@
       "wipeInFrames": 60,
       "wipeOutFrames": 0,
       "wipeSeed": 2,
-      "wipeDirection": "",
+      "wipeDirection": "auto",
       "transition": "eraser-wipe"
     },
     {
@@ -363,9 +363,9 @@
           "endFrameInChunk": 74,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -379,11 +379,11 @@
           "endFrameInChunk": 174,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -395,11 +395,11 @@
           "endFrameInChunk": 305,
           "pauseFrames": 24,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -491,9 +491,9 @@
           "endFrameInChunk": 58,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -507,11 +507,11 @@
           "endFrameInChunk": 206,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -523,11 +523,11 @@
           "endFrameInChunk": 252,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -539,11 +539,11 @@
           "endFrameInChunk": 334,
           "pauseFrames": 9,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -659,9 +659,9 @@
           "endFrameInChunk": 103,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -675,11 +675,11 @@
           "endFrameInChunk": 192,
           "pauseFrames": 15,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -691,11 +691,11 @@
           "endFrameInChunk": 229,
           "pauseFrames": 24,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -867,9 +867,9 @@
           "endFrameInChunk": 47,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -883,11 +883,11 @@
           "endFrameInChunk": 112,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -899,11 +899,11 @@
           "endFrameInChunk": 273,
           "pauseFrames": 24,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -939,9 +939,9 @@
           "endFrameInChunk": 73,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -955,11 +955,11 @@
           "endFrameInChunk": 216,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -971,11 +971,11 @@
           "endFrameInChunk": 277,
           "pauseFrames": 9,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -1011,9 +1011,9 @@
           "endFrameInChunk": 88,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1027,11 +1027,11 @@
           "endFrameInChunk": 252,
           "pauseFrames": 24,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -1123,9 +1123,9 @@
           "endFrameInChunk": 89,
           "pauseFrames": 9,
           "camera": {
-            "reason": "show the full chart as narrator introduces the measurements",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1139,11 +1139,11 @@
           "endFrameInChunk": 130,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus on hook strength as named",
-            "target": "top-left",
-            "zoom": "tight",
-            "zoomValue": 2.2,
-            "transitionSec": 0.6
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -1155,11 +1155,11 @@
           "endFrameInChunk": 237,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus on response metrics as named",
-            "target": "center",
-            "zoom": "tight",
-            "zoomValue": 2.2,
-            "transitionSec": 0.6
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -1171,11 +1171,11 @@
           "endFrameInChunk": 269,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus on peak timing as named",
-            "target": "center",
-            "zoom": "tight",
-            "zoomValue": 2.2,
-            "transitionSec": 0.5
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -1187,11 +1187,11 @@
           "endFrameInChunk": 490,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus on cortical regions as named",
-            "target": "right-third",
-            "zoom": "tight",
-            "zoomValue": 2.2,
-            "transitionSec": 0.7
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         }
       ],
@@ -1451,9 +1451,9 @@
           "endFrameInChunk": 91,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1467,11 +1467,11 @@
           "endFrameInChunk": 165,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -1483,11 +1483,11 @@
           "endFrameInChunk": 244,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -1499,11 +1499,11 @@
           "endFrameInChunk": 314,
           "pauseFrames": 9,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -1635,9 +1635,9 @@
           "endFrameInChunk": 134,
           "pauseFrames": 9,
           "camera": {
-            "reason": "show both bars as ROAS numbers are named",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1651,11 +1651,11 @@
           "endFrameInChunk": 238,
           "pauseFrames": 9,
           "camera": {
-            "reason": "emphasize the contrast between the two bars",
-            "target": "center",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 0.8
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -1667,11 +1667,11 @@
           "endFrameInChunk": 299,
           "pauseFrames": 9,
           "camera": {
-            "reason": "close on the gap for emphasis",
-            "target": "center",
-            "zoom": "tight",
-            "zoomValue": 2.2,
-            "transitionSec": 0.8
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         }
       ],
@@ -1835,9 +1835,9 @@
           "endFrameInChunk": 100,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1851,11 +1851,11 @@
           "endFrameInChunk": 191,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -1867,11 +1867,11 @@
           "endFrameInChunk": 247,
           "pauseFrames": 9,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -1947,9 +1947,9 @@
           "endFrameInChunk": 35,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1963,11 +1963,11 @@
           "endFrameInChunk": 183,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -1979,11 +1979,11 @@
           "endFrameInChunk": 320,
           "pauseFrames": 9,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -2115,9 +2115,9 @@
           "endFrameInChunk": 115,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -2131,11 +2131,11 @@
           "endFrameInChunk": 228,
           "pauseFrames": 24,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -2171,7 +2171,7 @@
           "endFrameInChunk": 71,
           "pauseFrames": 9,
           "camera": {
-            "reason": "introduce the three hardware options",
+            "reason": "establish \u2014 wide",
             "target": "center",
             "zoom": "wide",
             "zoomValue": 1.0,
@@ -2187,11 +2187,11 @@
           "endFrameInChunk": 162,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus on laptop option as named (crossed out)",
+            "reason": "focus on left cluster",
             "target": "left-third",
-            "zoom": "tight",
-            "zoomValue": 2.2,
-            "transitionSec": 0.5
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -2203,11 +2203,11 @@
           "endFrameInChunk": 253,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus on cheap-VPS option as named (crossed out)",
+            "reason": "pull back \u2014 wide",
             "target": "center",
-            "zoom": "tight",
-            "zoomValue": 2.2,
-            "transitionSec": 0.5
+            "zoom": "wide",
+            "zoomValue": 1.0,
+            "transitionSec": 1.0
           }
         },
         {
@@ -2219,11 +2219,11 @@
           "endFrameInChunk": 332,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus on GPU option as named (the viable path)",
+            "reason": "shift right",
             "target": "right-third",
-            "zoom": "tight",
-            "zoomValue": 2.2,
-            "transitionSec": 0.5
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         }
       ],
@@ -2259,9 +2259,9 @@
           "endFrameInChunk": 119,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -2275,11 +2275,11 @@
           "endFrameInChunk": 225,
           "pauseFrames": 24,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -2315,9 +2315,9 @@
           "endFrameInChunk": 82,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -2331,11 +2331,11 @@
           "endFrameInChunk": 168,
           "pauseFrames": 9,
           "camera": {
-            "reason": "focus \u2014 medium",
-            "target": "upper-middle",
-            "zoom": "medium",
-            "zoomValue": 1.4,
-            "transitionSec": 1.0
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
           }
         },
         {
@@ -2347,11 +2347,11 @@
           "endFrameInChunk": 356,
           "pauseFrames": 24,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],
@@ -2443,9 +2443,9 @@
           "endFrameInChunk": 106,
           "pauseFrames": 9,
           "camera": {
-            "reason": "establish \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -2459,11 +2459,11 @@
           "endFrameInChunk": 249,
           "pauseFrames": 9,
           "camera": {
-            "reason": "pull back \u2014 wide",
-            "target": "center",
-            "zoom": "wide",
+            "reason": "",
+            "target": "",
+            "zoom": "",
             "zoomValue": 1.0,
-            "transitionSec": 1.0
+            "transitionSec": 0.0
           }
         }
       ],

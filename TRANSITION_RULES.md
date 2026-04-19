@@ -54,16 +54,27 @@ and forcing it makes the reveal read as a sweep.
 
 ## Picking which chapters get chalkboard
 
-Not all chapter boundaries are equal. Evaluate each and keep chalkboard
-only for the ~5-6 most significant:
+Not all chapter boundaries are equal. Chalkboard is reserved for the
+~5-6 most significant chapter boundaries. To qualify, a chunk must
+satisfy **BOTH**:
 
-- **Video opener** — the very first chunk always gets chalkboard.
+**(1) Narrative significance** — at least one of:
+- **Video opener** — the very first chunk
 - **Core-concept introduction** — where the main thesis/subject is
-  first named.
-- **Major register shift** — switching from story to methodology, or
-  methodology to findings, or findings to takeaways.
-- **Big pivot moments** — where the narrative turns (e.g. "we studied
-  X → here's what we found").
+  first named
+- **Major register shift** — story → methodology, methodology →
+  findings, findings → takeaways
+- **Big pivot moments** — narrative turns (e.g. "we studied X → here's
+  what we found")
+
+**(2) Image-content veto (CRITICAL)** — image must be a single subject
+or clear composition with breathing room. Chaos / many-equal-elements
+images (ad walls, crowds, icon grids, dense scenes) **NEVER get
+chalkboard**, even if they qualify on narrative significance. The
+chalkboard reveal pattern needs negative space to read; on dense
+content it just looks like a sweep through visual noise.
+
+If (1) passes but (2) fails → use **paint-auto** instead.
 
 Every other chapter boundary: paint (center-out for single-subject
 chapters, auto for busy ones).
@@ -97,6 +108,20 @@ These values keep the breath without stalling.
 Default: no per-beat camera moves — the subtle 1.0→1.08 push-in carries
 short chunks just fine.
 
+**Continues-from-prev / callback exception (CRITICAL)**: chunks with
+`continuity == continues-from-prev` or `continuity == callback-to-*`
+must NOT have the default subtle push-in. They hold steady at zoom 1.0.
+
+Why: the default push-in goes 1.0 → 1.08 over the chunk's duration. On
+a cut between two visually-similar/continuing chunks, each independent
+push-in causes the camera to "rewind" from 1.08 back to 1.0 at every
+cut, which reads as a jarring tiny zoom-out. Holding steady on
+continues-from-prev keeps cuts seamless.
+
+Implemented in `Composition.tsx` `computeCamera()`: continues /
+callback chunks return `{zoom: 1.0}` when no per-beat camera is set.
+Standalone chunks still get the subtle push-in.
+
 Add per-beat camera moves when **either** of these triggers:
 
 - **Chunk duration ≥ 8 seconds** — the image needs to feel alive over
@@ -119,6 +144,16 @@ When adding moves:
 - **Zones available**: center, left-third, right-third, top-third,
   bottom-third, upper-middle, lower-middle, top-left, top-right,
   bottom-left, bottom-right, left, right, top, bottom.
+
+**DO NOT auto-apply a generic camera template** (like wide → upper-middle
+medium → wide) to every long chunk. The target zone must match the
+image's actual focal content. A blanket `upper-middle medium` works
+only when the image has real content there. For images with content
+elsewhere, the zoom looks like it's panning to nothing.
+
+If you can't pick a specific zone based on the image content, do NOT
+add camera moves. The default subtle push-in is safer than a wrong
+target.
 
 ## Reveal direction (chalkboard only)
 

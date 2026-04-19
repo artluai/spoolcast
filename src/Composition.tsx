@@ -77,6 +77,7 @@ type Chunk = {
   imageSrc: string;
   startFrame: number;
   durationFrames: number;
+  continuity?: string;
   entrance?: string;
   exit?: string;
   wipeInFrames?: number;
@@ -123,7 +124,14 @@ function computeCamera(
   const anySet = beatCameras.some((c) => c !== null);
 
   if (!anySet) {
-    // Default: subtle push-in from 1.0 to 1.08 over the chunk duration
+    // continues-from-prev / callbacks: hold steady at 1.0. Cuts between
+    // similar/continuing images get jarring when each chunk independently
+    // pushes in from 1.0 — the camera "rewinds" on every cut.
+    const cont = chunk.continuity || "standalone";
+    if (cont === "continues-from-prev" || cont.startsWith("callback")) {
+      return {x: 50, y: 50, zoom: 1.0};
+    }
+    // Standalone / new chunks: subtle push-in from 1.0 to 1.08
     const t = Math.max(0, Math.min(1, frameInChunk / Math.max(1, chunk.durationFrames)));
     return {x: 50, y: 50, zoom: 1.0 + 0.08 * t};
   }
