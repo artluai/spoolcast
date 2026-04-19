@@ -215,6 +215,59 @@ After Kie polling succeeds:
 - save it locally
 - write a manifest entry containing `task_id`, `result_url`, `local_path`, and the style anchor reference if used
 
+### Gotchas (learned the hard way — don't relearn these)
+
+**`resultJson` is a JSON-encoded STRING, not an object.** You must
+`json.loads()` it before reading `resultUrls`. Reading `data.resultJson.resultUrls`
+directly returns nothing and looks like the API failed when it didn't.
+Same trap applies to `data.param`.
+
+```python
+import json
+result_urls = json.loads(data["resultJson"]).get("resultUrls", [])
+```
+
+**`resultUrls` is camelCase, plural, and a list.** Not `result_url` /
+`result_urls` / `image_url`. The local `KieResult` dataclass exposes it
+as `result_urls` (snake_case Python convention) — pre-parsed from the
+nested JSON string. Use `result.result_urls`, not `result.image_url`.
+
+**Generated media URLs expire after 24 hours.** Hosted files retained
+~14 days but the URL stops resolving after 24h. Download immediately on
+poll success — don't store URLs and download later.
+
+**`--image-ref` must be a URL, not a local file path.** Kie validates
+the input shape and returns 422 "does not match format 'uri'" on local
+paths. The `generate_scene.py` script auto-pulls the session's
+`style_anchor` URL from the manifest if `--image-ref` is omitted — so
+the cleanest call is `generate_scene.py --session ... --chunk ...
+--narration ... --beat ...` with NO `--image-ref` flag.
+
+**Model name matters.** Use `nano-banana-2` (with the `-2` suffix), not
+`nano-banana`. The bare name returns 422 "model not supported".
+
+### Recovery procedure (when generation completes on kie.ai but local
+script was killed before downloading)
+
+If `generate_scene.py` is interrupted between submission and download
+(common when terminals close or processes get killed), the task is
+still completing on kie.ai's side. Recovery:
+
+1. Find the `taskId` in the kie.ai dashboard for that chunk.
+2. Poll directly:
+   ```bash
+   curl -s -H "Authorization: Bearer $KIE_API_KEY" \
+     "https://api.kie.ai/api/v1/jobs/recordInfo?taskId=<TASK_ID>"
+   ```
+3. Parse `data.resultJson` (JSON-decode it), pull the URL from `resultUrls[0]`,
+   and `curl -o <chunk>-nano-1k.png <URL>` it into
+   `sessions/<session>/source/generated-assets/scenes/`.
+4. Optionally update `manifests/scenes.manifest.json` with a new entry
+   for completeness (not strictly required for downstream rendering).
+
+Do this within 24 hours of submission or the URL will have expired and
+you'll need to re-bill the generation.
+
 ## Reuse Rules
 
 Reuse is preferred when:

@@ -7,18 +7,9 @@
   "fps": 30,
   "playbackRate": 1.2,
   "revealStyle": "brush-paint",
-  "totalFrames": 9722,
-  "chunkCount": 42,
-  "skipped": [
-    {
-      "chunk": "C21",
-      "reason": "image missing at source/generated-assets/scenes/C21-nano-1k.png"
-    },
-    {
-      "chunk": "C22",
-      "reason": "image missing at source/generated-assets/scenes/C22-nano-1k.png"
-    }
-  ],
+  "totalFrames": 10213,
+  "chunkCount": 44,
+  "skipped": [],
   "chunks": [
     {
       "id": "C1",
@@ -30,7 +21,7 @@
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C1-nano-1k.png",
       "framesDir": "frames/C1",
-      "preGenFrameCount": 45,
+      "preGenFrameCount": 60,
       "startFrame": 0,
       "endFrame": 150,
       "durationFrames": 150,
@@ -82,7 +73,7 @@
       "sceneTitle": "Cold Open",
       "summary": "analyst looks at normal ad metrics",
       "continuity": "standalone",
-      "reveal_direction": "center-out",
+      "reveal_direction": "",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C2-nano-1k.png",
       "framesDir": "frames/C2",
@@ -145,7 +136,7 @@
       "wipeInFrames": 90,
       "wipeOutFrames": 0,
       "wipeSeed": 3,
-      "wipeDirection": "center-out",
+      "wipeDirection": "",
       "transition": "eraser-wipe"
     },
     {
@@ -154,7 +145,7 @@
       "sceneTitle": "Cold Open",
       "summary": "analyst pivots \u2014 stranger question",
       "continuity": "continues-from-prev",
-      "reveal_direction": "bt",
+      "reveal_direction": "",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C3-nano-1k.png",
       "framesDir": "frames/C3",
@@ -217,7 +208,7 @@
       "wipeInFrames": 0,
       "wipeOutFrames": 0,
       "wipeSeed": 4,
-      "wipeDirection": "bt",
+      "wipeDirection": "",
       "transition": "cut"
     },
     {
@@ -226,7 +217,7 @@
       "sceneTitle": "Cold Open",
       "summary": "brain patterns, deadpan",
       "continuity": "continues-from-prev",
-      "reveal_direction": "center-out",
+      "reveal_direction": "",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C4-nano-1k.png",
       "framesDir": "frames/C4",
@@ -273,7 +264,7 @@
       "wipeInFrames": 0,
       "wipeOutFrames": 47,
       "wipeSeed": 5,
-      "wipeDirection": "center-out",
+      "wipeDirection": "",
       "transition": "cut"
     },
     {
@@ -282,7 +273,7 @@
       "sceneTitle": "What TRIBE Is",
       "summary": "TRIBE is not a chatbot",
       "continuity": "standalone",
-      "reveal_direction": "center-out",
+      "reveal_direction": "",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C5-nano-1k.png",
       "framesDir": "frames/C5",
@@ -345,7 +336,7 @@
       "wipeInFrames": 88,
       "wipeOutFrames": 0,
       "wipeSeed": 0,
-      "wipeDirection": "center-out",
+      "wipeDirection": "",
       "transition": "eraser-wipe"
     },
     {
@@ -354,7 +345,7 @@
       "sceneTitle": "What TRIBE Is",
       "summary": "video/audio/text \u2192 brain activity flow",
       "continuity": "standalone",
-      "reveal_direction": "lr",
+      "reveal_direction": "auto",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C6-nano-1k.png",
       "framesDir": "frames/C6",
@@ -372,9 +363,9 @@
           "endFrameInChunk": 74,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -388,11 +379,11 @@
           "endFrameInChunk": 174,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -404,11 +395,11 @@
           "endFrameInChunk": 305,
           "pauseFrames": 24,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -417,7 +408,7 @@
       "wipeInFrames": 90,
       "wipeOutFrames": 0,
       "wipeSeed": 1,
-      "wipeDirection": "lr",
+      "wipeDirection": "auto",
       "transition": "eraser-wipe"
     },
     {
@@ -426,7 +417,7 @@
       "sceneTitle": "What TRIBE Is",
       "summary": "so we tested it",
       "continuity": "callback-to-C2",
-      "reveal_direction": "center-out",
+      "reveal_direction": "",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C7-nano-1k.png",
       "framesDir": "frames/C7",
@@ -473,7 +464,7 @@
       "wipeInFrames": 77,
       "wipeOutFrames": 48,
       "wipeSeed": 2,
-      "wipeDirection": "center-out",
+      "wipeDirection": "",
       "transition": "eraser-wipe"
     },
     {
@@ -482,7 +473,7 @@
       "sceneTitle": "Why This Mattered",
       "summary": "Meta quiet in a noisy AI landscape",
       "continuity": "standalone",
-      "reveal_direction": "lr",
+      "reveal_direction": "auto",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C8-nano-1k.png",
       "framesDir": "frames/C8",
@@ -500,9 +491,9 @@
           "endFrameInChunk": 58,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -516,11 +507,11 @@
           "endFrameInChunk": 206,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -532,11 +523,11 @@
           "endFrameInChunk": 252,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -548,11 +539,11 @@
           "endFrameInChunk": 334,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -561,7 +552,7 @@
       "wipeInFrames": 90,
       "wipeOutFrames": 0,
       "wipeSeed": 3,
-      "wipeDirection": "lr",
+      "wipeDirection": "auto",
       "transition": "eraser-wipe"
     },
     {
@@ -650,7 +641,7 @@
       "sceneTitle": "The Real Question",
       "summary": "research vs workflow \u2014 two different standards",
       "continuity": "standalone",
-      "reveal_direction": "",
+      "reveal_direction": "center-out",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C11-nano-1k.png",
       "framesDir": "frames/C11",
@@ -668,9 +659,9 @@
           "endFrameInChunk": 103,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -684,11 +675,11 @@
           "endFrameInChunk": 192,
           "pauseFrames": 15,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -700,11 +691,11 @@
           "endFrameInChunk": 229,
           "pauseFrames": 24,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -713,7 +704,7 @@
       "wipeInFrames": 90,
       "wipeOutFrames": 0,
       "wipeSeed": 3,
-      "wipeDirection": "",
+      "wipeDirection": "center-out",
       "transition": "eraser-wipe"
     },
     {
@@ -762,7 +753,7 @@
       "sceneTitle": "The Real Question",
       "summary": "the plan \u2014 a simple A vs B experiment",
       "continuity": "standalone",
-      "reveal_direction": "",
+      "reveal_direction": "center-out",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C13-nano-1k.png",
       "framesDir": "frames/C13",
@@ -809,7 +800,7 @@
       "wipeInFrames": 86,
       "wipeOutFrames": 54,
       "wipeSeed": 5,
-      "wipeDirection": "",
+      "wipeDirection": "center-out",
       "transition": "eraser-wipe"
     },
     {
@@ -876,9 +867,9 @@
           "endFrameInChunk": 47,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -892,11 +883,11 @@
           "endFrameInChunk": 112,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -908,11 +899,11 @@
           "endFrameInChunk": 273,
           "pauseFrames": 24,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -948,9 +939,9 @@
           "endFrameInChunk": 73,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -964,11 +955,11 @@
           "endFrameInChunk": 216,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -980,11 +971,11 @@
           "endFrameInChunk": 277,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -1020,9 +1011,9 @@
           "endFrameInChunk": 88,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1036,11 +1027,11 @@
           "endFrameInChunk": 252,
           "pauseFrames": 24,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -1058,11 +1049,11 @@
       "sceneTitle": "Experiment Design",
       "summary": "setup over, experiment begins",
       "continuity": "standalone",
-      "reveal_direction": "lr",
+      "reveal_direction": "",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C18-nano-1k.png",
       "framesDir": "frames/C18",
-      "preGenFrameCount": 45,
+      "preGenFrameCount": 60,
       "startFrame": 3849,
       "endFrame": 4071,
       "durationFrames": 222,
@@ -1105,7 +1096,7 @@
       "wipeInFrames": 89,
       "wipeOutFrames": 0,
       "wipeSeed": 4,
-      "wipeDirection": "lr",
+      "wipeDirection": "",
       "transition": "eraser-wipe"
     },
     {
@@ -1218,7 +1209,7 @@
       "sceneTitle": "Experiment Design",
       "summary": "plain english \u2014 which video gets stronger attention?",
       "continuity": "standalone",
-      "reveal_direction": "",
+      "reveal_direction": "center-out",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C20-nano-1k.png",
       "framesDir": "frames/C20",
@@ -1249,8 +1240,136 @@
       "wipeInFrames": 83,
       "wipeOutFrames": 52,
       "wipeSeed": 3,
-      "wipeDirection": "",
+      "wipeDirection": "center-out",
       "transition": "eraser-wipe"
+    },
+    {
+      "id": "C21",
+      "scene": "07",
+      "sceneTitle": "Guardrail",
+      "summary": "not mind-reading \u2014 not reading real brains",
+      "continuity": "standalone",
+      "reveal_direction": "center-out",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C21-nano-1k.png",
+      "framesDir": "frames/C21",
+      "preGenFrameCount": 45,
+      "startFrame": 4778,
+      "endFrame": 5011,
+      "durationFrames": 233,
+      "beats": [
+        {
+          "id": "07A",
+          "narration": "Not in a mystical way.",
+          "audioSrc": "source/audio/07A.mp3",
+          "audioDurationSec": 2.18,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 65,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "07B",
+          "narration": "Not in a literal mind-reading way.",
+          "audioSrc": "source/audio/07B.mp3",
+          "audioDurationSec": 2.04,
+          "startFrameInChunk": 74,
+          "endFrameInChunk": 135,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "07C",
+          "narration": "TRIBE is not reading a real person's brain.",
+          "audioSrc": "source/audio/07C.mp3",
+          "audioDurationSec": 2.68,
+          "startFrameInChunk": 144,
+          "endFrameInChunk": 224,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "eraser-wipe",
+      "exit": "cut",
+      "wipeInFrames": 90,
+      "wipeOutFrames": 0,
+      "wipeSeed": 4,
+      "wipeDirection": "center-out",
+      "transition": "eraser-wipe"
+    },
+    {
+      "id": "C22",
+      "scene": "07",
+      "sceneTitle": "Guardrail",
+      "summary": "predicting patterns from video content",
+      "continuity": "continues-from-prev",
+      "reveal_direction": "",
+      "imageSource": "generated",
+      "imageSrc": "source/generated-assets/scenes/C22-nano-1k.png",
+      "framesDir": "",
+      "preGenFrameCount": 0,
+      "startFrame": 5011,
+      "endFrame": 5269,
+      "durationFrames": 258,
+      "beats": [
+        {
+          "id": "07D",
+          "narration": "It is predicting response patterns from the content of the video.",
+          "audioSrc": "source/audio/07D.mp3",
+          "audioDurationSec": 3.62,
+          "startFrameInChunk": 0,
+          "endFrameInChunk": 109,
+          "pauseFrames": 9,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        },
+        {
+          "id": "07E",
+          "narration": "That distinction matters, because otherwise this turns into fake sci-fi very quickly.",
+          "audioSrc": "source/audio/07E.mp3",
+          "audioDurationSec": 3.88,
+          "startFrameInChunk": 118,
+          "endFrameInChunk": 234,
+          "pauseFrames": 24,
+          "camera": {
+            "reason": "",
+            "target": "",
+            "zoom": "",
+            "zoomValue": 1.0,
+            "transitionSec": 0.0
+          }
+        }
+      ],
+      "entrance": "cut",
+      "exit": "eraser-wipe",
+      "wipeInFrames": 0,
+      "wipeOutFrames": 60,
+      "wipeSeed": 5,
+      "wipeDirection": "",
+      "transition": "cut"
     },
     {
       "id": "C23",
@@ -1263,8 +1382,8 @@
       "imageSrc": "source/generated-assets/scenes/C23-nano-1k.png",
       "framesDir": "frames/C23",
       "preGenFrameCount": 45,
-      "startFrame": 4778,
-      "endFrame": 4983,
+      "startFrame": 5269,
+      "endFrame": 5474,
       "durationFrames": 205,
       "beats": [
         {
@@ -1314,13 +1433,13 @@
       "sceneTitle": "Model Answer",
       "summary": "TRIBE favored Video A across hook, peak, regions",
       "continuity": "continues-from-prev",
-      "reveal_direction": "lr",
+      "reveal_direction": "",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C24-nano-1k.png",
       "framesDir": "frames/C24",
       "preGenFrameCount": 45,
-      "startFrame": 4983,
-      "endFrame": 5306,
+      "startFrame": 5474,
+      "endFrame": 5797,
       "durationFrames": 323,
       "beats": [
         {
@@ -1332,9 +1451,9 @@
           "endFrameInChunk": 91,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1348,11 +1467,11 @@
           "endFrameInChunk": 165,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -1364,11 +1483,11 @@
           "endFrameInChunk": 244,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -1380,11 +1499,11 @@
           "endFrameInChunk": 314,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -1393,7 +1512,7 @@
       "wipeInFrames": 0,
       "wipeOutFrames": 0,
       "wipeSeed": 1,
-      "wipeDirection": "lr",
+      "wipeDirection": "",
       "transition": "cut"
     },
     {
@@ -1407,8 +1526,8 @@
       "imageSrc": "source/generated-assets/scenes/C25-nano-1k.png",
       "framesDir": "frames/C25",
       "preGenFrameCount": 45,
-      "startFrame": 5306,
-      "endFrame": 5430,
+      "startFrame": 5797,
+      "endFrame": 5921,
       "durationFrames": 124,
       "beats": [
         {
@@ -1442,13 +1561,13 @@
       "sceneTitle": "Market Answer",
       "summary": "experiment gets useful \u2014 business result goes the other way",
       "continuity": "standalone",
-      "reveal_direction": "",
+      "reveal_direction": "center-out",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C26-nano-1k.png",
       "framesDir": "frames/C26",
       "preGenFrameCount": 45,
-      "startFrame": 5430,
-      "endFrame": 5568,
+      "startFrame": 5921,
+      "endFrame": 6059,
       "durationFrames": 138,
       "beats": [
         {
@@ -1489,7 +1608,7 @@
       "wipeInFrames": 55,
       "wipeOutFrames": 0,
       "wipeSeed": 3,
-      "wipeDirection": "",
+      "wipeDirection": "center-out",
       "transition": "eraser-wipe"
     },
     {
@@ -1503,8 +1622,8 @@
       "imageSrc": "source/artifacts/roi-comparison.svg",
       "framesDir": "",
       "preGenFrameCount": 0,
-      "startFrame": 5568,
-      "endFrame": 5876,
+      "startFrame": 6059,
+      "endFrame": 6367,
       "durationFrames": 308,
       "beats": [
         {
@@ -1575,8 +1694,8 @@
       "imageSrc": "source/generated-assets/scenes/C28-nano-1k.png",
       "framesDir": "frames/C28",
       "preGenFrameCount": 45,
-      "startFrame": 5876,
-      "endFrame": 6059,
+      "startFrame": 6367,
+      "endFrame": 6550,
       "durationFrames": 183,
       "beats": [
         {
@@ -1630,9 +1749,9 @@
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C29-nano-1k.png",
       "framesDir": "frames/C29",
-      "preGenFrameCount": 45,
-      "startFrame": 6059,
-      "endFrame": 6296,
+      "preGenFrameCount": 60,
+      "startFrame": 6550,
+      "endFrame": 6787,
       "durationFrames": 237,
       "beats": [
         {
@@ -1698,13 +1817,13 @@
       "sceneTitle": "What The Mismatch Means",
       "summary": "useful as research/interpretation layer, not winner picker",
       "continuity": "continues-from-prev",
-      "reveal_direction": "lr",
+      "reveal_direction": "",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C30-nano-1k.png",
       "framesDir": "frames/C30",
       "preGenFrameCount": 45,
-      "startFrame": 6296,
-      "endFrame": 6552,
+      "startFrame": 6787,
+      "endFrame": 7043,
       "durationFrames": 256,
       "beats": [
         {
@@ -1716,9 +1835,9 @@
           "endFrameInChunk": 100,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1732,11 +1851,11 @@
           "endFrameInChunk": 191,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -1748,11 +1867,11 @@
           "endFrameInChunk": 247,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -1761,7 +1880,7 @@
       "wipeInFrames": 0,
       "wipeOutFrames": 0,
       "wipeSeed": 4,
-      "wipeDirection": "lr",
+      "wipeDirection": "",
       "transition": "cut"
     },
     {
@@ -1775,8 +1894,8 @@
       "imageSrc": "source/generated-assets/scenes/C31-nano-1k.png",
       "framesDir": "frames/C31",
       "preGenFrameCount": 45,
-      "startFrame": 6552,
-      "endFrame": 6655,
+      "startFrame": 7043,
+      "endFrame": 7146,
       "durationFrames": 103,
       "beats": [
         {
@@ -1815,8 +1934,8 @@
       "imageSrc": "source/generated-assets/scenes/C32-nano-1k.png",
       "framesDir": "frames/C32",
       "preGenFrameCount": 45,
-      "startFrame": 6655,
-      "endFrame": 6984,
+      "startFrame": 7146,
+      "endFrame": 7475,
       "durationFrames": 329,
       "beats": [
         {
@@ -1828,9 +1947,9 @@
           "endFrameInChunk": 35,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -1844,11 +1963,11 @@
           "endFrameInChunk": 183,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -1860,11 +1979,11 @@
           "endFrameInChunk": 320,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -1887,8 +2006,8 @@
       "imageSrc": "source/artifacts/runtime-summary.svg",
       "framesDir": "",
       "preGenFrameCount": 0,
-      "startFrame": 6984,
-      "endFrame": 7087,
+      "startFrame": 7475,
+      "endFrame": 7578,
       "durationFrames": 103,
       "beats": [
         {
@@ -1927,8 +2046,8 @@
       "imageSrc": "source/generated-assets/scenes/C34-nano-1k.png",
       "framesDir": "frames/C34",
       "preGenFrameCount": 45,
-      "startFrame": 7087,
-      "endFrame": 7268,
+      "startFrame": 7578,
+      "endFrame": 7759,
       "durationFrames": 181,
       "beats": [
         {
@@ -1983,8 +2102,8 @@
       "imageSrc": "source/generated-assets/scenes/C35-nano-1k.png",
       "framesDir": "frames/C35",
       "preGenFrameCount": 45,
-      "startFrame": 7268,
-      "endFrame": 7520,
+      "startFrame": 7759,
+      "endFrame": 8011,
       "durationFrames": 252,
       "beats": [
         {
@@ -1996,9 +2115,9 @@
           "endFrameInChunk": 115,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -2012,11 +2131,11 @@
           "endFrameInChunk": 228,
           "pauseFrames": 24,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -2034,13 +2153,13 @@
       "sceneTitle": "Product Reality",
       "summary": "not laptop, not low-cost VPS \u2014 needs dedicated GPU",
       "continuity": "standalone",
-      "reveal_direction": "lr",
+      "reveal_direction": "auto",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C36-nano-1k.png",
       "framesDir": "frames/C36",
       "preGenFrameCount": 45,
-      "startFrame": 7520,
-      "endFrame": 7861,
+      "startFrame": 8011,
+      "endFrame": 8352,
       "durationFrames": 341,
       "beats": [
         {
@@ -2113,7 +2232,7 @@
       "wipeInFrames": 90,
       "wipeOutFrames": 0,
       "wipeSeed": 4,
-      "wipeDirection": "lr",
+      "wipeDirection": "auto",
       "transition": "eraser-wipe"
     },
     {
@@ -2127,8 +2246,8 @@
       "imageSrc": "source/generated-assets/scenes/C37-nano-1k.png",
       "framesDir": "frames/C37",
       "preGenFrameCount": 45,
-      "startFrame": 7861,
-      "endFrame": 8110,
+      "startFrame": 8352,
+      "endFrame": 8601,
       "durationFrames": 249,
       "beats": [
         {
@@ -2140,9 +2259,9 @@
           "endFrameInChunk": 119,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -2156,11 +2275,11 @@
           "endFrameInChunk": 225,
           "pauseFrames": 24,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -2182,9 +2301,9 @@
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C38-nano-1k.png",
       "framesDir": "frames/C38",
-      "preGenFrameCount": 45,
-      "startFrame": 8110,
-      "endFrame": 8490,
+      "preGenFrameCount": 60,
+      "startFrame": 8601,
+      "endFrame": 8981,
       "durationFrames": 380,
       "beats": [
         {
@@ -2196,9 +2315,9 @@
           "endFrameInChunk": 82,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -2212,11 +2331,11 @@
           "endFrameInChunk": 168,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
-            "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "reason": "focus \u2014 medium",
+            "target": "upper-middle",
+            "zoom": "medium",
+            "zoomValue": 1.4,
+            "transitionSec": 1.0
           }
         },
         {
@@ -2228,11 +2347,11 @@
           "endFrameInChunk": 356,
           "pauseFrames": 24,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -2255,8 +2374,8 @@
       "imageSrc": "source/generated-assets/scenes/C39-nano-1k.png",
       "framesDir": "frames/C39",
       "preGenFrameCount": 45,
-      "startFrame": 8490,
-      "endFrame": 8661,
+      "startFrame": 8981,
+      "endFrame": 9152,
       "durationFrames": 171,
       "beats": [
         {
@@ -2311,8 +2430,8 @@
       "imageSrc": "source/generated-assets/scenes/C40-nano-1k.png",
       "framesDir": "frames/C40",
       "preGenFrameCount": 45,
-      "startFrame": 8661,
-      "endFrame": 8919,
+      "startFrame": 9152,
+      "endFrame": 9410,
       "durationFrames": 258,
       "beats": [
         {
@@ -2324,9 +2443,9 @@
           "endFrameInChunk": 106,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "establish \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
             "transitionSec": 0.0
           }
@@ -2340,11 +2459,11 @@
           "endFrameInChunk": 249,
           "pauseFrames": 9,
           "camera": {
-            "reason": "",
-            "target": "",
-            "zoom": "",
+            "reason": "pull back \u2014 wide",
+            "target": "center",
+            "zoom": "wide",
             "zoomValue": 1.0,
-            "transitionSec": 0.0
+            "transitionSec": 1.0
           }
         }
       ],
@@ -2367,8 +2486,8 @@
       "imageSrc": "source/generated-assets/scenes/C41-nano-1k.png",
       "framesDir": "frames/C41",
       "preGenFrameCount": 45,
-      "startFrame": 8919,
-      "endFrame": 9143,
+      "startFrame": 9410,
+      "endFrame": 9634,
       "durationFrames": 224,
       "beats": [
         {
@@ -2418,13 +2537,13 @@
       "sceneTitle": "Conclusion",
       "summary": "the gap between model and market \u2014 the real lesson",
       "continuity": "standalone",
-      "reveal_direction": "lr",
+      "reveal_direction": "center-out",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C42-nano-1k.png",
       "framesDir": "frames/C42",
       "preGenFrameCount": 45,
-      "startFrame": 9143,
-      "endFrame": 9348,
+      "startFrame": 9634,
+      "endFrame": 9839,
       "durationFrames": 205,
       "beats": [
         {
@@ -2449,7 +2568,7 @@
       "wipeInFrames": 82,
       "wipeOutFrames": 51,
       "wipeSeed": 1,
-      "wipeDirection": "lr",
+      "wipeDirection": "center-out",
       "transition": "eraser-wipe"
     },
     {
@@ -2463,8 +2582,8 @@
       "imageSrc": "source/generated-assets/scenes/C43-nano-1k.png",
       "framesDir": "frames/C43",
       "preGenFrameCount": 45,
-      "startFrame": 9348,
-      "endFrame": 9558,
+      "startFrame": 9839,
+      "endFrame": 10049,
       "durationFrames": 210,
       "beats": [
         {
@@ -2530,13 +2649,13 @@
       "sceneTitle": "Closing Questions",
       "summary": "better place to end than a fake victory lap",
       "continuity": "standalone",
-      "reveal_direction": "",
+      "reveal_direction": "center-out",
       "imageSource": "generated",
       "imageSrc": "source/generated-assets/scenes/C44-nano-1k.png",
       "framesDir": "frames/C44",
       "preGenFrameCount": 45,
-      "startFrame": 9558,
-      "endFrame": 9722,
+      "startFrame": 10049,
+      "endFrame": 10213,
       "durationFrames": 164,
       "beats": [
         {
@@ -2561,7 +2680,7 @@
       "wipeInFrames": 66,
       "wipeOutFrames": 41,
       "wipeSeed": 3,
-      "wipeDirection": "",
+      "wipeDirection": "center-out",
       "transition": "eraser-wipe"
     }
   ]
