@@ -38,6 +38,7 @@ The current canonical header set is:
 17. `Tone Job`
 18. `Asset To Find`
 19. `Priority`
+20. `Chunk`
 
 ## Removed Columns Rule
 
@@ -304,6 +305,26 @@ Allowed values:
 
 Do not use ad hoc labels unless the system is updated to support them.
 
+### `Chunk`
+Required grouping identifier.
+
+A chunk groups one or more adjacent shot-list rows under a single AI-generated illustration.
+
+Format expectation:
+- short stable id
+- examples: `C1`, `C2`, `C3`, or descriptive labels like `C1-hook`, `C2-question`
+
+Rules:
+- beats with the same `Chunk` value share one illustration
+- chunks must be contiguous in the shot list — do not skip rows and return to the same chunk later unless the narrative explicitly calls for reuse
+- a chunk should be short enough that one image can represent what is being said across all its beats
+- if a chunk intentionally reuses a prior chunk's illustration, the shot list must say so explicitly (e.g. `reuse of C1`)
+
+Used by:
+- scene generation — one illustration per unique chunk
+- preprocessor — one frame folder per unique chunk
+- render — chunks are the timeline scheduling unit
+
 ## Required Fields For A Valid Beat
 
 At minimum, a beat must have:
@@ -316,6 +337,7 @@ At minimum, a beat must have:
 - `Interaction`
 - `Camera`
 - `Tone Job`
+- `Chunk`
 
 ## Background Rules
 
@@ -361,7 +383,14 @@ Example valid beat:
 - `Beat`
 - `Background Visual`
 
-### Asset sourcing uses:
+### Scene generation uses:
+- `Chunk`
+- `Script / Narration` (combined across the chunk's beats)
+- `Beat` (combined across the chunk's beats)
+- `Tone Job`
+- `Background Visual` (for intent, when present)
+
+### Asset sourcing (alternate mode) uses:
 - `Background Visual`
 - `Tone Job`
 - `Asset To Find`
@@ -369,17 +398,16 @@ Example valid beat:
 
 ### Preview-data generation uses:
 - `Shot`
+- `Chunk`
 - `Duration`
 - `Script / Narration`
-- `Background Visual`
 - `Movement`
-- `Interaction`
 - `Camera`
 
 ### Render uses:
 - `Shot`
+- `Chunk`
 - `Duration`
-- `Background Visual`
 - `Movement`
 - `Camera`
 

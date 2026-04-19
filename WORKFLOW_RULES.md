@@ -2,7 +2,7 @@
 
 ## Purpose
 
-These are the global system rules for any agent or app working on this project.
+These are the global system rules for any agent or app working on spoolcast.
 
 This file defines:
 - the system model
@@ -14,21 +14,22 @@ This file defines:
 - failure conditions
 
 This file is generic.
-It must not depend on any specific video.
+It must not depend on any specific session.
 
 ## System Goal
 
-Turn a shot list into:
+Turn a session — a chat, a build, a conversation, an idea — into:
 
-1. a reviewable HTML board
-2. a renderable preview
-3. a reliable final video pipeline
+1. a shot list that structures narration into beats and chunks
+2. one AI-generated illustration per chunk in a per-session locked visual style
+3. a deterministic reveal of each illustration (via the preprocessor)
+4. a reliable final video rendered by Remotion against narration audio
 
 The system should minimize:
 - stale data
 - arbitrary visual decisions
 - hidden assumptions
-- unnecessary AI generation
+- renderer improvisation
 
 When something is important across chats or tools:
 - write it into the repo docs
@@ -36,29 +37,32 @@ When something is important across chats or tools:
 
 ## Source Of Truth
 
-The shot list is the source of truth.
+Two per-session sources of truth coexist:
 
-The workbook is one implementation of the shot list.
+- **Shot list** is the source of truth for structure: chapters, beats, chunks, narration text, timing, visual intent.
+- **Session config** is the source of truth for style, image provider, reveal behavior, and AI budget (see `SESSION_CONFIG_SPEC.md`).
 
 Downstream artifacts may include:
-- asset manifests
+- scene manifests
+- generated scene illustrations
+- preprocessor frame sequences
 - review-board HTML
-- generated preview-data files
+- preview-data files
 - Remotion render output
 
-None of those may silently override the shot list.
+None of those may silently override the shot list or the session config.
 
 Shared documentation should avoid absolute local paths unless a path is truly required for a working local setup.
 
 ## Global Visual Model
 
-All videos use one visual layer per beat: the background.
+All videos use one visual layer per frame: the illustrated scene.
 
 That means:
-- each beat is represented by one background visual
-- emphasis comes from changing the background between beats
-- vertical source media should be treated as full-height backgrounds
-- returning to a prior background later is allowed
+- each narration chunk is represented by one AI-generated full-frame illustration
+- the illustration is the whole scene; no overlays, no compositing
+- emphasis comes from moving to the next illustration on the next chunk
+- returning to a prior illustration later is allowed
 
 This system does not use a second visual layer.
 
@@ -85,10 +89,11 @@ The repo root contains:
 
 The content root contains:
 - shot lists
+- session configs
 - source media
-- fetched assets
-- generated AI assets
-- manifests
+- generated scene illustrations
+- preprocessor frame sequences
+- scene manifests
 - review boards
 - renders
 - working notes
@@ -97,34 +102,39 @@ The content root contains:
 
 Per-session content should follow this structure:
 
-1. `../spoolcast-content/sessions/<session-id>/shot-list/`
-2. `../spoolcast-content/sessions/<session-id>/source/`
-3. `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
-4. `../spoolcast-content/sessions/<session-id>/source/generated-assets/`
-5. `../spoolcast-content/sessions/<session-id>/manifests/`
-6. `../spoolcast-content/sessions/<session-id>/review/`
-7. `../spoolcast-content/sessions/<session-id>/renders/`
-8. `../spoolcast-content/sessions/<session-id>/working/`
+1. `../spoolcast-content/sessions/<session-id>/session.json`
+2. `../spoolcast-content/sessions/<session-id>/shot-list/`
+3. `../spoolcast-content/sessions/<session-id>/source/`
+4. `../spoolcast-content/sessions/<session-id>/source/generated-assets/scenes/`
+5. `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
+6. `../spoolcast-content/sessions/<session-id>/frames/<chunk-id>/`
+7. `../spoolcast-content/sessions/<session-id>/manifests/`
+8. `../spoolcast-content/sessions/<session-id>/review/`
+9. `../spoolcast-content/sessions/<session-id>/renders/`
+10. `../spoolcast-content/sessions/<session-id>/working/`
 
 Expected contents:
+- `session.json`: per-session config (see `SESSION_CONFIG_SPEC.md`)
 - `shot-list/`: workbook or canonical shot-list file
 - `source/`: source media, audio, approved references
-- `source/fetched-assets/`: externally sourced media copied locally
-- `source/generated-assets/`: AI-generated media copied locally
-- `manifests/`: asset manifests and other deterministic generated metadata
+- `source/generated-assets/scenes/`: per-chunk AI-generated illustration PNGs
+- `source/fetched-assets/`: externally sourced media when running the alternate stock mode
+- `frames/<chunk-id>/`: preprocessor output — numbered PNG sequences per chunk
+- `manifests/`: scene manifests and other deterministic generated metadata
 - `review/`: HTML review boards and local preview media
 - `renders/`: MP4 outputs
 - `working/`: temporary planning artifacts that should not become source of truth
 
 ## Pipeline Stages
 
-The workflow has five separate stages:
+The workflow has six separate stages:
 
 1. shot-list editing
-2. asset sourcing and validation
-3. review-board generation
-4. preview-data generation
-5. video rendering
+2. chunking (group shot-list rows into illustration units)
+3. scene generation (one AI illustration per chunk)
+4. scene preprocessing (reveal frame sequences per chunk)
+5. review-board generation (human check)
+6. preview-data generation and video rendering
 
 Each stage must have:
 - a known input
@@ -149,25 +159,47 @@ Output:
 Canonical output location:
 - `../spoolcast-content/sessions/<session-id>/shot-list/`
 
-### 2. Asset Sourcing And Validation
+### 2. Chunking
 Input:
-- shot list
-- source links
-- local media files
+- shot list with narration per beat
 
 Output:
-- verified local/previewable assets
-- asset manifest
+- shot list with `Chunk` column populated per beat (see `SHOT_LIST_SPEC.md`)
 
-Canonical output locations:
-- `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
-- `../spoolcast-content/sessions/<session-id>/source/generated-assets/`
-- `../spoolcast-content/sessions/<session-id>/manifests/`
+Each unique `Chunk` value corresponds to one illustration.
 
-### 3. Review-Board Generation
+### 3. Scene Generation
 Input:
 - shot list
-- verified asset manifest
+- session config
+- per-chunk prompt derived from narration + beat descriptions
+
+Output:
+- one illustration PNG per chunk
+- scene manifest
+
+Canonical output locations:
+- `../spoolcast-content/sessions/<session-id>/source/generated-assets/scenes/<chunk-id>.png`
+- `../spoolcast-content/sessions/<session-id>/manifests/scenes.manifest.json`
+
+### 4. Scene Preprocessing
+Input:
+- generated scene PNG per chunk
+- reveal parameters from session config
+
+Output:
+- per-chunk frame sequence folder
+
+Canonical output location:
+- `../spoolcast-content/sessions/<session-id>/frames/<chunk-id>/`
+
+See `PREPROCESSOR_RULES.md`.
+
+### 5. Review-Board Generation
+Input:
+- shot list
+- scene manifest
+- generated scene illustrations
 
 Output:
 - HTML review board
@@ -175,29 +207,20 @@ Output:
 Canonical output location:
 - `../spoolcast-content/sessions/<session-id>/review/`
 
-### 4. Preview-Data Generation
+### 6. Preview-Data Generation And Rendering
 Input:
 - shot list
-- validated asset manifest
+- scene manifest
+- frame sequences
 - audio timing data
 
 Output:
-- generated preview-data file(s) for the renderer
+- generated preview-data file for the renderer
+- rendered MP4
 
-Canonical output location:
-- repo `src/data/` or another renderer-owned generated-data directory
-
-### 5. Video Rendering
-Input:
-- preview-data file(s)
-- renderer/composition code
-- validated media
-
-Output:
-- rendered preview or final video
-
-Canonical output location:
-- `../spoolcast-content/sessions/<session-id>/renders/`
+Canonical locations:
+- preview data: repo `src/data/` or another renderer-owned generated-data directory
+- render: `../spoolcast-content/sessions/<session-id>/renders/`
 
 ## Regeneration Rule
 
@@ -205,17 +228,22 @@ When an upstream source changes, every affected downstream artifact must be rege
 
 Examples:
 
-- If the shot list changes:
-  - regenerate asset resolution if asset references changed
+- If the shot list narration changes:
+  - regenerate any affected scene illustration
+  - regenerate preprocessor frames for that chunk
   - regenerate review board
-  - regenerate preview-data files
+  - regenerate preview-data
   - rerender video output
 
-- If assets change:
-  - regenerate asset manifest
+- If the session config changes reveal params:
+  - regenerate preprocessor frames for all chunks
+  - regenerate preview-data
+  - rerender video output
+
+- If a scene illustration is regenerated:
+  - regenerate preprocessor frames for that chunk
   - regenerate review board
-  - regenerate preview-data files if asset references changed
-  - rerender video if the render depends on those assets
+  - rerender video output
 
 Do not assume one rebuilt layer updates the rest.
 
@@ -229,9 +257,11 @@ Before regenerating an output layer:
 - confirm downstream code is not still pointing at old paths
 
 At minimum, treat these as stale-sensitive:
+- generated scene PNGs
+- preprocessor frame folders
 - HTML review boards
 - generated preview-data files
-- asset manifests
+- scene manifests
 - rendered MP4s
 
 ## Long-Running Job Rule
@@ -243,20 +273,20 @@ For long-running jobs:
 
 Applies to:
 - renders
-- asset fetches
 - AI image generation
+- preprocessor batch runs
 
 ## Reviewability Rule
 
-If an asset cannot be visibly reviewed, it is not done.
+If a scene illustration cannot be visibly reviewed, it is not done.
 
 This rule applies before render trust.
 
-An asset is not done if:
-- it only exists as a page link
+A scene is not done if:
+- it only exists as a task ID
 - it cannot be previewed on the review board
-- it fails fetch validation
-- it is stale compared with the shot list
+- the local file is missing or corrupt
+- it is stale compared with the current shot list
 
 When building anything meant for external review:
 - optimize for proof and clarity over flavor text
@@ -268,34 +298,42 @@ The renderer must not improvise:
 - how large it is
 - when it appears
 - why it appears
+- how it reveals
 
 If a visual decision matters, it must come from:
 - the shot list
-- or a deterministic system rule
+- the session config
+- the preprocessor output
+- or another deterministic system rule
 
 ## Failure Conditions
 
 A task is not complete if any of these are true:
 
 - the shot list is not correct
+- the session config is invalid (see `SESSION_CONFIG_SPEC.md` validation rules)
+- any chunk is missing a generated scene illustration
+- any chunk is missing a valid preprocessor frame folder
 - the review board does not match the shot list
 - the preview-data file does not match the shot list
 - the render is based on stale preview data
 - deleted columns still influence downstream output
-- the asset manifest contains unresolved required assets
-- a background run resets when it should be continuous
+- the scene manifest contains unresolved required scenes
 - content files were written into the repo when they belong in the content root
+- the renderer applies any reveal effect on top of preprocessor frames
 
 ## Validation Checklist
 
 Before saying a state is correct, verify:
 
-1. shot list reflects intended plan
-2. asset layer reflects shot list
-3. review board reflects shot list
-4. preview-data files reflect shot list
-5. render output reflects current preview-data files
-6. file locations match the directory contract
+1. shot list reflects intended plan and has `Chunk` populated
+2. session config is valid
+3. every chunk has a generated illustration
+4. every chunk has a valid preprocessor frame folder
+5. review board reflects shot list + current illustrations
+6. preview-data file reflects shot list + current frame folders
+7. render output reflects current preview-data
+8. file locations match the directory contract
 
 If any one layer is stale:
 - the work is not done
@@ -307,7 +345,8 @@ Use a known-good local render environment.
 Render reliability matters more than clever background execution tricks.
 
 Prefer:
-- a stable local Node/runtime setup
+- a stable local Node/runtime setup (Node 22 — see `RENDER_RULES.md`)
+- a stable Python environment for the preprocessor
 - direct user-terminal render commands when needed
 
 Avoid:

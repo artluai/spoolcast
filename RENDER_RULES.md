@@ -31,79 +31,79 @@ If render/build fails with Rspack native-binding errors:
 ## Canonical Render Inputs
 
 The renderer should read:
-- current generated preview-data file
-- current local media
-- current audio metadata
+- the current generated preview-data file
+- the current scene manifest
+- the current preprocessor frame folders
+- the current audio metadata
 
 It must not read:
 - stale review-board HTML
 - stale deleted preview-data files
 - removed legacy columns
+- raw scene PNGs directly (reveal is the preprocessor's job — see `PREPROCESSOR_RULES.md`)
 
 ## Required Render Behavior
 
 The preview should:
-- use real video backgrounds when available
-- use image backgrounds when video is not available
-- use full scene/chapter audio correctly
+- play each chunk's preprocessor frame sequence synced to its narration audio
+- hold the final frame for the remainder of the chunk after the reveal completes
+- advance to the next chunk's frame sequence on chunk change
+- use full session audio correctly
 - remove debug text from frame
-- reflect the current shot list exactly
+- reflect the current shot list and session config exactly
 
 ## Preview-Data Schema
 
-Generated preview-data for each beat must contain:
-- `shot`
-- `chapter`
-- `durationSeconds`
-- `durationFrames`
-- `script`
-- `beat`
-- `background`
-- `movement`
-- `camera`
-- `toneJob`
+Generated preview-data for each session must contain:
+- `sessionId`
+- `fps`
+- `chunks` — ordered array of chunk objects
 
-Required `background` child fields:
-- `kind` (`image` or `video`)
-- `src`
-- `aspectRatio`
-- `isVertical`
-- `previewSrc` (optional)
+Each chunk object must contain:
+- `chunkId`
+- `beats` — array of shot ids that fall under this chunk
+- `framesDir` — path to the preprocessor output folder for this chunk
+- `frameCount`
+- `revealDurationSeconds`
+- `chunkDurationSeconds` — total time this chunk occupies in the timeline
+- `startFrame` — global frame index at which this chunk begins
+- `endFrame` — global frame index at which this chunk ends
+- `narrationAudioSrc` — path to the audio used for this chunk
+- `narrationStartSeconds` — offset into `narrationAudioSrc`
+- `narrationEndSeconds`
 
-Optional audio fields:
-- `audioSrc`
-- `audioStartSeconds`
-- `audioEndSeconds`
+Optional per-chunk fields:
+- `cameraMotion` — optional light motion applied on top of the frame playback (see Motion Mapping below)
+- `holdFrameIndex` — which frame to hold after reveal completes (default: last frame)
 
-## Background Run Schema
+## Chunk Timeline Rule
 
-Adjacent beats using the same background should be grouped into one run.
+The chunk is the unit of timeline scheduling.
 
-Each background run must contain:
-- `runId`
-- `backgroundSrc`
-- `startBeatIndex`
-- `endBeatIndex`
-- `startFrame`
-- `endFrame`
-- `cameraMode`
+- frames within a chunk come from the preprocessor, nothing else
+- chunk boundaries align with chunk changes in the shot list
+- adjacent chunks using the same illustration should be represented as one chunk in the shot list first, not stitched at render time
 
-The run is the unit of background playback and background motion.
+## Reveal Rule
+
+The reveal animation is owned entirely by the preprocessor.
+
+The renderer must:
+- play the PNG sequence as-is
+- hold the final frame after the sequence completes
+- not re-time the sequence
+- not apply fade, scale, or blur on top
+
+If a different reveal is needed, update the session config and rerun the preprocessor.
 
 ## Background Rules
 
-Backgrounds are the only visual layer.
+The illustrated scene is the only visual layer.
 
-If adjacent beats use the same background:
-- treat them as one continuous background run
-- do not restart the media
-- do not restart the camera move
-
-One reused background run should feel like one shot.
-
-If the source media is vertical:
-- render it as a full-height background
-- do not turn it into a floating element
+If the session switches to the alternate stock/sourced mode (see `ASSET_RULES.md`):
+- backgrounds are still the only visual layer
+- vertical source media must be rendered as full-height backgrounds
+- adjacent beats that share a background should be grouped into one chunk upstream, not stitched at render time
 
 ## Removed Columns Rule
 
@@ -119,82 +119,65 @@ If a legacy shot list still contains those columns:
 ### `Shot`
 Used for:
 - debug identification
-- run grouping
 - review labeling
+
+### `Chunk`
+Used for:
+- grouping beats into illustration units
+- driving the render timeline
 
 ### `Duration`
 Used for:
-- frame allocation
+- frame allocation inside a chunk
 
 ### `Script / Narration`
 Used for:
-- optional subtitle or timing alignment logic
+- narration audio alignment
 - debug only when explicitly enabled
-
-### `Background Visual`
-Used for:
-- actual image/video source selection
 
 ### `Movement`
 Used for:
-- shot-level change intent
+- optional per-chunk camera motion on top of the frame playback
 
 ### `Camera`
 Used for:
-- actual background transform behavior
+- optional per-chunk camera behavior
 
-### `Tone Job`
-Used for:
-- sanity-checking asset choice, not direct transform logic
+Note: prior visual-intent fields (`Tone Job`, `Background Visual`, `Asset To Find`, `Priority`) are primarily used by the scene generation stage, not the render stage.
 
 ## Motion Mapping
 
-Approved mappings:
+Camera motion is optional and applied on top of the preprocessor frame playback.
 
-- `Static` or `Hold`
-  - no camera movement
+Default:
+- `Static` or `Hold` — no camera motion
 
-- `Slow push` or `Slow push in`
-  - gentle scale-in across the whole beat or run
-
-- `Slow push out`
-  - gentle scale-out across the whole beat or run
-
-- `Gentle pan left`
-  - slow horizontal translation left across the whole beat or run
-
-- `Gentle pan right`
-  - slow horizontal translation right across the whole beat or run
-
-- `Lateral pan`
-  - wider gentle horizontal move across the whole beat or run
-
-- `Continuous run move`
-  - one continuous transform across the full grouped run
-
-- `Cut`
-  - no interpolation between prior and next beat
+Allowed on top of frame playback:
+- `Slow push in` — gentle scale-in across the chunk
+- `Slow push out` — gentle scale-out across the chunk
+- `Gentle pan left` — slow horizontal translation left across the chunk
+- `Gentle pan right` — slow horizontal translation right across the chunk
 
 Not allowed by default:
 - impact shake
 - micro zoom on impact
 - arbitrary camera pops
-- repeated reset motion on reused backgrounds
-- decorative transitions between every beat
+- decorative transitions between chunks
+- reveal effects overlaid on frame playback
 
 ## Audio Contract
 
 The render pipeline must know:
 - where audio lives
-- whether timing is beat-level or chapter-level
+- whether timing is chunk-level or session-level
 - start and end offsets for playback
 
-If audio is chapter-level:
-- attach it once at chapter scope
-- do not accidentally play only the first beat
+If audio is session-level:
+- attach it once at session scope with mapped offsets per chunk
+- do not accidentally play only the first chunk
 
-If audio is beat-level:
-- each beat must define its own audio segment explicitly
+If audio is chunk-level:
+- each chunk must define its own audio segment explicitly
 
 ## Visual Effect Rules
 
@@ -203,16 +186,20 @@ Do not apply global visual effects by default that darken or stylize the whole f
 Disallowed by default:
 - global gradient overlays
 - decorative darkening layers that are not explicitly needed
+- any effect applied on top of preprocessor frames
 
 ## Preview-Data Rules
 
 Preview-data generation must:
 - read from the current shot list
-- read from current validated asset data
+- read from the current session config
+- read from the current scene manifest
+- read from the current preprocessor frame folders
 - export only the layers allowed by the current system
 
 Current rule:
-- preview data must contain background-only beats
+- preview data must contain one-chunk-per-entry with frame sequence references
+- no foreground layer entries
 
 ## Render Commands
 
@@ -220,8 +207,9 @@ Typical local render flow:
 
 1. go to repo root
 2. confirm Node 22
-3. regenerate preview data if upstream changed
-4. run the render from the repo root
+3. confirm scene manifest and frame folders exist for every chunk
+4. regenerate preview data if upstream changed
+5. run the render from the repo root
 
 The exact render command can vary, but it must:
 - use the current composition entry
@@ -230,8 +218,10 @@ The exact render command can vary, but it must:
 ## Render Regeneration Rule
 
 When any of these change:
-- shot list
-- asset resolution
+- shot list (including `Chunk` values)
+- session config
+- scene illustrations
+- preprocessor frame folders
 - preview-data generation logic
 - composition logic
 
@@ -247,7 +237,10 @@ Before rerender:
 The render fails if:
 - it shows deleted elements
 - it uses stale preview data
-- reused backgrounds reset when they should be continuous
+- a chunk plays a frame folder whose scene does not match the current scene manifest
+- any chunk's frame count does not match its preview-data entry
+- reveal timing is modified inside the renderer
+- reused illustrations play with fresh reveal when they should hold
 - audio plays incorrectly across the planned duration
 - motion is arbitrary or visually distracting
 
