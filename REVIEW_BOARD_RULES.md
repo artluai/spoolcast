@@ -18,7 +18,7 @@ Optimize for proof and clarity over flavor text.
 ## Canonical Output Location
 
 Write review boards to:
-- `../session-to-video-content/sessions/<session-id>/review/`
+- `../spoolcast-content/sessions/<session-id>/review/`
 
 Preferred filenames:
 - `shot-review.html`

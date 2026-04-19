@@ -54,16 +54,16 @@ An asset is not valid if it is:
 ## Canonical Asset Output Locations
 
 Fetched external assets:
-- `../session-to-video-content/sessions/<session-id>/source/fetched-assets/`
+- `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
 
 AI-generated assets:
-- `../session-to-video-content/sessions/<session-id>/source/generated-assets/`
+- `../spoolcast-content/sessions/<session-id>/source/generated-assets/`
 
 Asset manifests:
-- `../session-to-video-content/sessions/<session-id>/manifests/`
+- `../spoolcast-content/sessions/<session-id>/manifests/`
 
 Review thumbnails:
-- `../session-to-video-content/sessions/<session-id>/review/`
+- `../spoolcast-content/sessions/<session-id>/review/`
 
 ## Asset Manifest Contract
 

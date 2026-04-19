@@ -73,8 +73,8 @@ Two roots exist:
 2. content root
 
 Canonical roots:
-- repo root: `session-to-video/`
-- content root: `../session-to-video-content/`
+- repo root: `spoolcast/`
+- content root: `../spoolcast-content/`
 
 The repo root contains:
 - renderer code
@@ -97,14 +97,14 @@ The content root contains:
 
 Per-session content should follow this structure:
 
-1. `../session-to-video-content/sessions/<session-id>/shot-list/`
-2. `../session-to-video-content/sessions/<session-id>/source/`
-3. `../session-to-video-content/sessions/<session-id>/source/fetched-assets/`
-4. `../session-to-video-content/sessions/<session-id>/source/generated-assets/`
-5. `../session-to-video-content/sessions/<session-id>/manifests/`
-6. `../session-to-video-content/sessions/<session-id>/review/`
-7. `../session-to-video-content/sessions/<session-id>/renders/`
-8. `../session-to-video-content/sessions/<session-id>/working/`
+1. `../spoolcast-content/sessions/<session-id>/shot-list/`
+2. `../spoolcast-content/sessions/<session-id>/source/`
+3. `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
+4. `../spoolcast-content/sessions/<session-id>/source/generated-assets/`
+5. `../spoolcast-content/sessions/<session-id>/manifests/`
+6. `../spoolcast-content/sessions/<session-id>/review/`
+7. `../spoolcast-content/sessions/<session-id>/renders/`
+8. `../spoolcast-content/sessions/<session-id>/working/`
 
 Expected contents:
 - `shot-list/`: workbook or canonical shot-list file
@@ -147,7 +147,7 @@ Output:
 - updated shot list
 
 Canonical output location:
-- `../session-to-video-content/sessions/<session-id>/shot-list/`
+- `../spoolcast-content/sessions/<session-id>/shot-list/`
 
 ### 2. Asset Sourcing And Validation
 Input:
@@ -160,9 +160,9 @@ Output:
 - asset manifest
 
 Canonical output locations:
-- `../session-to-video-content/sessions/<session-id>/source/fetched-assets/`
-- `../session-to-video-content/sessions/<session-id>/source/generated-assets/`
-- `../session-to-video-content/sessions/<session-id>/manifests/`
+- `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
+- `../spoolcast-content/sessions/<session-id>/source/generated-assets/`
+- `../spoolcast-content/sessions/<session-id>/manifests/`
 
 ### 3. Review-Board Generation
 Input:
@@ -173,7 +173,7 @@ Output:
 - HTML review board
 
 Canonical output location:
-- `../session-to-video-content/sessions/<session-id>/review/`
+- `../spoolcast-content/sessions/<session-id>/review/`
 
 ### 4. Preview-Data Generation
 Input:
@@ -197,7 +197,7 @@ Output:
 - rendered preview or final video
 
 Canonical output location:
-- `../session-to-video-content/sessions/<session-id>/renders/`
+- `../spoolcast-content/sessions/<session-id>/renders/`
 
 ## Regeneration Rule
 

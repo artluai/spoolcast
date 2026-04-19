@@ -10,7 +10,7 @@ import {
 export const RemotionRoot: React.FC = () => {
   return (
     <Composition
-      id="session-to-video-template"
+      id="spoolcast-template"
       component={MyComposition}
       durationInFrames={TEMPLATE_DURATION_IN_FRAMES}
       fps={TEMPLATE_FPS}

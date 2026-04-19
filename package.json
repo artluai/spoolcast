@@ -1,7 +1,7 @@
 {
-  "name": "session-to-video",
+  "name": "spoolcast",
   "version": "1.0.0",
-  "description": "Workflow and Remotion scaffold for turning sessions into videos",
+  "description": "Turn chat, content, and ideas into illustrated video. Workflow and Remotion scaffold.",
   "repository": {},
   "license": "UNLICENSED",
   "private": true,

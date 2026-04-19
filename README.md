@@ -14,7 +14,7 @@ This repository does not contain:
 - generated review artifacts or renders
 
 Keep session-specific content in the separate content directory, for example:
-- `../session-to-video-content/`
+- `../spoolcast-content/`
 
 ## Commands
 
@@ -39,13 +39,13 @@ npm run build
 Render the template composition:
 
 ```bash
-npx remotion render session-to-video-template renders/session-to-video-template.mp4
+npx remotion render spoolcast-template renders/spoolcast-template.mp4
 ```
 
 Render a still for inspection:
 
 ```bash
-npx remotion still session-to-video-template renders/frame.png --frame=0
+npx remotion still spoolcast-template renders/frame.png --frame=0
 ```
 
 ## Project Shape
@@ -53,7 +53,7 @@ npx remotion still session-to-video-template renders/frame.png --frame=0
 - `src/` = Remotion renderer scaffold
 - `scripts/` = placeholder location for project-specific tooling
 - `rules.md` + `*_RULES.md` = workflow specification
-- `../session-to-video-content/` = source material, planning docs, generated media, review boards, and renders
+- `../spoolcast-content/` = source material, planning docs, generated media, review boards, and renders
 
 ## Working Rule
 
