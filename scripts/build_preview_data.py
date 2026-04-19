@@ -81,6 +81,19 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
 
     canvas = shot_list.get("canvas", {})
     fps_value = fps or canvas.get("fps") or 30
+    # Resolve canvas dimensions from aspect_ratio. session.json may
+    # override; defaults assume 1080-line full HD.
+    aspect = canvas.get("aspect_ratio", "16:9")
+    aspect_dims = {
+        "16:9": (1920, 1080),
+        "9:16": (1080, 1920),  # mobile / shorts / Reels
+        "1:1":  (1080, 1080),  # square / IG feed
+        "4:5":  (1080, 1350),  # IG portrait
+        "21:9": (2520, 1080),  # ultra-wide
+    }
+    width, height = aspect_dims.get(aspect, (1920, 1080))
+    width = int(session_cfg.get("width", width))
+    height = int(session_cfg.get("height", height))
 
     chunks_out: list[dict[str, Any]] = []
     skipped: list[tuple[str, str]] = []
@@ -240,6 +253,8 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
     return {
         "sessionId": session_id,
         "canvas": canvas,
+        "width": width,
+        "height": height,
         "fps": fps_value,
         "playbackRate": playback_rate,
         "revealStyle": reveal_style,

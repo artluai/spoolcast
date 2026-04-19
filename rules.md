@@ -24,6 +24,7 @@ Read these files in this exact order:
 7. [TRANSITION_RULES.md](./TRANSITION_RULES.md)
 8. [REVIEW_BOARD_RULES.md](./REVIEW_BOARD_RULES.md)
 9. [RENDER_RULES.md](./RENDER_RULES.md)
+10. [PUBLISHING_RULES.md](./PUBLISHING_RULES.md)
 
 If you are about to challenge or change a rule, also read [DESIGN_NOTES.md](./DESIGN_NOTES.md) — it captures the reasoning behind current decisions and what was tried and abandoned. The rule files tell you what to do; design notes tell you why.
 
@@ -132,6 +133,28 @@ If a real conflict still remains:
 - do not guess
 - report the conflict clearly
 - stop before making a silent assumption
+
+### Diagnostic anti-pattern: pipe-buffering
+
+Do NOT pipe long-running commands through `head` / `tail` / `grep` when
+you need to see progress. These tools buffer their input until the
+upstream process exits (or until N lines accumulate, in head's case).
+A working process can look completely hung because no output reaches
+your terminal until it finishes.
+
+This caused ~30 minutes of false debugging where a working API wrapper
+was repeatedly killed mid-flight under the false belief it was hanging.
+
+If you need progress visibility on a long command:
+- Run it without any pipe: `python -u script.py` (the `-u` flag is also
+  important — disables Python's own stdout buffering)
+- If filtering is needed, use `tee file.log | head -30` so the full
+  output is captured to disk while head shows the truncated view
+- For background tasks, read the output file directly without piping
+
+If you're sure a command is hanging (no output for >2x expected time),
+verify with `ps aux | grep <name>` to check if the process is alive
+and consuming CPU before killing it.
 
 ### User request vs existing rule
 

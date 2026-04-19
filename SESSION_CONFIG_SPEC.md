@@ -69,12 +69,43 @@ Known working models are listed in `ASSET_RULES.md` — Kie Provider Spec.
   "reveal_style": "fade",
   "reveal_duration_seconds": 1.5,
   "scene_fps": 30,
-  "resolution": "2K",
+  "resolution": "1K",
   "aspect_ratio": "16:9",
   "output_format": "png",
   "notes": "first reference case for illustrated pipeline"
 }
 ```
+
+## Resolution + Aspect Ratio + Canvas Dimensions
+
+`resolution` controls image generation quality (kie.ai value). Allowed:
+`1K` (project default — kept low for cost), `2K`, `4K`. Project standard
+is `1K`; never silently default to anything else.
+
+`aspect_ratio` controls both:
+1. The aspect of generated illustrations (passed to kie.ai)
+2. The Remotion composition's canvas dimensions
+
+Canvas dimension mapping (resolved in `build_preview_data.py`,
+overridable via explicit `width` / `height` in session.json):
+
+| aspect_ratio | width × height | use case |
+|---|---|---|
+| `16:9` | 1920 × 1080 | YouTube, landscape video |
+| `9:16` | 1080 × 1920 | Shorts, Reels, TikTok |
+| `1:1`  | 1080 × 1080 | IG feed, square posts |
+| `4:5`  | 1080 × 1350 | IG portrait |
+| `21:9` | 2520 × 1080 | ultra-wide |
+
+For mobile-first (`9:16`) or square (`1:1`) sessions:
+- Image prompts must compose vertically (TOP/BOTTOM thinking, not LEFT/RIGHT)
+- Camera zone vocabulary still works (uses percentages) but `left-third`/
+  `right-third` become very narrow strips on portrait — prefer
+  `upper-middle`/`lower-middle` for portrait sessions
+- Reveal scripts (chalkboard, paint) work on any aspect — no changes needed
+
+To override canvas dims explicitly, add `width` and `height` ints to
+session.json. Otherwise they're derived from `aspect_ratio`.
 
 ## Validation Rules
 
@@ -86,3 +117,6 @@ A session is invalid if:
 - `preferred_model` is missing
 - neither `style_reference` nor `default_style_prompt` is set
 - `reveal_style` is set to a value not allowed by `PREPROCESSOR_RULES.md`
+- `resolution` is set to a value other than `1K`/`2K`/`4K`
+- `aspect_ratio` is set to a value not in the canvas-dimension table
+  AND no explicit `width`+`height` provided

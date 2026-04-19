@@ -215,6 +215,27 @@ After Kie polling succeeds:
 - save it locally
 - write a manifest entry containing `task_id`, `result_url`, `local_path`, and the style anchor reference if used
 
+### Calling kie from new scripts (rule)
+
+Any new script that submits a kie task **MUST** use one of:
+
+1. **`generate_scene.py`** — for normal per-chunk illustrations (preferred)
+2. **`build_input_from_session(session_id, prompt=..., ...)`** from
+   `kie_client.py` — for one-off images that bypass per-chunk style mixing
+   (e.g. thumbnails, marketing assets)
+
+**Forbidden**: calling `build_input_for_model()` directly in a one-off
+script. Doing so bypasses the session config and can silently ship at
+the wrong resolution. As of the kie_client update, `build_input_for_model()`
+also requires `quality` with no default — so a missing arg is a hard
+error, not a silent wrong value.
+
+Why: a thumbnail script previously called `build_input_for_model()` and
+omitted `quality`, which used the function's default ("basic" → "2K")
+instead of the session config's "1K". Combined with kie_client having no
+HTTP timeout, the bad-resolution request hung forever with no error
+message. Cost ~30 minutes of debugging.
+
 ### Gotchas (learned the hard way — don't relearn these)
 
 **`resultJson` is a JSON-encoded STRING, not an object.** You must

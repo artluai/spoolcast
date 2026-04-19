@@ -35,6 +35,11 @@ TERMINAL_STATES = {"success", "fail"}
 POLL_INTERVAL_SECONDS = 3
 POLL_TIMEOUT_SECONDS = 300  # 5 minutes per task
 
+# HTTP request timeout per single API call. Without this, hung connections
+# never surface — wrappers sit forever instead of erroring. 60s is generous
+# for an async-submit POST; image downloads override with a longer value.
+REQUEST_TIMEOUT_SECONDS = 60
+
 
 # ---- types -------------------------------------------------------------
 
@@ -53,15 +58,62 @@ class KieError(RuntimeError):
     pass
 
 
+# ---- session-aware helper ---------------------------------------------
+
+def build_input_from_session(
+    session_id: str,
+    *,
+    prompt: str,
+    image_refs: Sequence[str] = (),
+    model_override: str | None = None,
+) -> tuple[str, dict[str, Any]]:
+    """Build (model, input_dict) for a kie call, using session.json defaults.
+
+    PREFERRED entrypoint for any one-off image generation. Reads:
+    - resolution (mapped to nano-banana resolution / seedream quality)
+    - aspect_ratio
+    - output_format
+    - preferred_model (unless overridden)
+
+    from `<content-root>/sessions/<session_id>/session.json`.
+
+    This exists to prevent a class of bug where ad-hoc scripts call
+    `build_input_for_model` directly and silently get wrong defaults
+    (e.g. 2K when the project standard is 1K).
+    """
+    # CONTENT_ROOT mirrors the convention used in generate_scene.py
+    repo_root = Path(__file__).resolve().parent.parent
+    content_root = repo_root.parent / "spoolcast-content"
+    cfg_path = content_root / "sessions" / session_id / "session.json"
+    if not cfg_path.exists():
+        raise KieError(f"session config not found: {cfg_path}")
+    cfg = json.loads(cfg_path.read_text())
+
+    model = model_override or cfg.get("preferred_model") or "nano-banana-2"
+    quality = cfg.get("resolution") or "1K"  # "1K"/"2K"/"4K"
+    aspect_ratio = cfg.get("aspect_ratio") or "16:9"
+    output_format = cfg.get("output_format") or "png"
+
+    input_dict = build_input_for_model(
+        model,
+        prompt=prompt,
+        quality=quality,
+        image_refs=image_refs,
+        aspect_ratio=aspect_ratio,
+        output_format=output_format,
+    )
+    return model, input_dict
+
+
 # ---- per-model input shape ---------------------------------------------
 
 def build_input_for_model(
     model: str,
     *,
     prompt: str,
+    quality: str,  # REQUIRED — no default. Force callers to think about it.
     image_refs: Sequence[str] = (),
     aspect_ratio: str = "16:9",
-    quality: str = "basic",  # "basic" (~2K) or "high" (~4K)
     output_format: str = "png",
 ) -> dict[str, Any]:
     """Return the `input` dict shape for the given kie.ai model.
@@ -72,8 +124,14 @@ def build_input_for_model(
     - nano-banana-2 / nano-banana-pro / wan: prompt, image_input, aspect_ratio,
       resolution, output_format
 
-    The `quality` arg uses seedream's `basic`/`high` vocabulary and is mapped
-    to nano-banana's `2K`/`4K` resolution for the nano-banana family.
+    The `quality` arg uses seedream's `basic`/`high` vocabulary OR explicit
+    nano-banana `1K`/`2K`/`4K`. For the nano-banana family it maps to
+    `resolution`; for seedream it passes through as `quality`.
+
+    `quality` is REQUIRED with no default because silent defaults caused a
+    bug where one-off scripts shipped at 2K instead of the project's 1K
+    convention. Always pass session config's `resolution` value (read it
+    via `build_input_from_session()` for safety).
     """
     if model == "seedream/5-lite-text-to-image":
         return {
@@ -93,7 +151,7 @@ def build_input_for_model(
     if quality in ("1K", "2K", "4K"):
         nano_res = quality
     else:
-        nano_res = {"basic": "2K", "high": "4K"}.get(quality, "2K")
+        nano_res = {"basic": "2K", "high": "4K"}.get(quality, "1K")
     return {
         "prompt": prompt,
         "image_input": list(image_refs),
@@ -150,7 +208,9 @@ class KieClient:
             body["callBackUrl"] = callback_url
 
         url = f"{self.base_url}{SUBMIT_PATH}"
-        resp = self._session.post(url, data=json.dumps(body))
+        resp = self._session.post(
+            url, data=json.dumps(body), timeout=REQUEST_TIMEOUT_SECONDS
+        )
         _raise_for_kie(resp, context=f"submit {model}")
 
         payload = resp.json()
@@ -174,7 +234,7 @@ class KieClient:
         poll_url = f"{self.base_url}{POLL_PATH}?{urlencode({'taskId': task_id})}"
 
         while True:
-            resp = self._session.get(poll_url)
+            resp = self._session.get(poll_url, timeout=REQUEST_TIMEOUT_SECONDS)
             _raise_for_kie(resp, context=f"poll {task_id}")
             payload = resp.json()
             data = payload.get("data") or {}
@@ -309,7 +369,7 @@ def _smoke_test() -> None:
     )
     parser.add_argument("--out", default="kie-smoke.png")
     parser.add_argument("--aspect-ratio", default="16:9")
-    parser.add_argument("--resolution", default="2K")
+    parser.add_argument("--resolution", default="1K", help="1K|2K|4K (or basic|high)")
     args = parser.parse_args()
 
     client = KieClient()
@@ -318,7 +378,7 @@ def _smoke_test() -> None:
         args.model,
         prompt=args.prompt,
         aspect_ratio=args.aspect_ratio,
-        quality="basic" if args.resolution in ("2K", "basic") else "high",
+        quality=args.resolution,  # passed through directly; build_input_for_model handles it
     )
     result = client.submit_and_download(
         model=args.model,

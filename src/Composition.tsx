@@ -28,6 +28,12 @@ export const SPOOLCAST_DURATION_IN_FRAMES: number = Math.max(
   1,
   previewData.totalFrames
 );
+// Canvas dimensions resolved from session config + aspect_ratio in
+// build_preview_data.py. Defaults to 1920x1080 if not present (legacy data).
+export const SPOOLCAST_WIDTH: number =
+  (previewData as {width?: number}).width ?? 1920;
+export const SPOOLCAST_HEIGHT: number =
+  (previewData as {height?: number}).height ?? 1080;
 
 // Zone vocabulary → (x, y) center of frame to focus on, as percentages
 const ZONES: Record<string, {x: number; y: number}> = {

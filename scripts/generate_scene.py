@@ -195,7 +195,7 @@ def generate(
         prompt=prompt,
         image_refs=image_input,
         aspect_ratio=cfg.get("aspect_ratio", "16:9"),
-        quality=cfg.get("resolution", "2K"),
+        quality=cfg.get("resolution", "1K"),
         output_format=cfg.get("output_format", "png"),
     )
 
@@ -221,7 +221,7 @@ def generate(
         "mime_type": "image/png",
         "status": "success",
         "aspect_ratio": cfg.get("aspect_ratio", "16:9"),
-        "resolution": cfg.get("resolution", "2K"),
+        "resolution": cfg.get("resolution", "1K"),
         "output_format": cfg.get("output_format", "png"),
         "image_input": list(image_input),
     }
