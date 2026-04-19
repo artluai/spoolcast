@@ -8,6 +8,7 @@ This file defines:
 - the system model
 - the pipeline stages
 - the source of truth
+- the directory contract
 - regeneration rules
 - validation rules
 - failure conditions
@@ -64,6 +65,57 @@ This system does not use a second visual layer.
 If a legacy sheet still contains removed columns from an older model:
 - delete those columns before doing any other work
 
+## Canonical Directory Contract
+
+Two roots exist:
+
+1. repo root
+2. content root
+
+Canonical roots:
+- repo root: `session-to-video/`
+- content root: `../session-to-video-content/`
+
+The repo root contains:
+- renderer code
+- scripts
+- rules docs
+- templates
+- generated preview-data code when needed by the renderer
+
+The content root contains:
+- shot lists
+- source media
+- fetched assets
+- generated AI assets
+- manifests
+- review boards
+- renders
+- working notes
+
+## Canonical Content Layout
+
+Per-session content should follow this structure:
+
+1. `../session-to-video-content/sessions/<session-id>/shot-list/`
+2. `../session-to-video-content/sessions/<session-id>/source/`
+3. `../session-to-video-content/sessions/<session-id>/source/fetched-assets/`
+4. `../session-to-video-content/sessions/<session-id>/source/generated-assets/`
+5. `../session-to-video-content/sessions/<session-id>/manifests/`
+6. `../session-to-video-content/sessions/<session-id>/review/`
+7. `../session-to-video-content/sessions/<session-id>/renders/`
+8. `../session-to-video-content/sessions/<session-id>/working/`
+
+Expected contents:
+- `shot-list/`: workbook or canonical shot-list file
+- `source/`: source media, audio, approved references
+- `source/fetched-assets/`: externally sourced media copied locally
+- `source/generated-assets/`: AI-generated media copied locally
+- `manifests/`: asset manifests and other deterministic generated metadata
+- `review/`: HTML review boards and local preview media
+- `renders/`: MP4 outputs
+- `working/`: temporary planning artifacts that should not become source of truth
+
 ## Pipeline Stages
 
 The workflow has five separate stages:
@@ -94,6 +146,9 @@ Input:
 Output:
 - updated shot list
 
+Canonical output location:
+- `../session-to-video-content/sessions/<session-id>/shot-list/`
+
 ### 2. Asset Sourcing And Validation
 Input:
 - shot list
@@ -104,6 +159,11 @@ Output:
 - verified local/previewable assets
 - asset manifest
 
+Canonical output locations:
+- `../session-to-video-content/sessions/<session-id>/source/fetched-assets/`
+- `../session-to-video-content/sessions/<session-id>/source/generated-assets/`
+- `../session-to-video-content/sessions/<session-id>/manifests/`
+
 ### 3. Review-Board Generation
 Input:
 - shot list
@@ -111,6 +171,9 @@ Input:
 
 Output:
 - HTML review board
+
+Canonical output location:
+- `../session-to-video-content/sessions/<session-id>/review/`
 
 ### 4. Preview-Data Generation
 Input:
@@ -121,6 +184,9 @@ Input:
 Output:
 - generated preview-data file(s) for the renderer
 
+Canonical output location:
+- repo `src/data/` or another renderer-owned generated-data directory
+
 ### 5. Video Rendering
 Input:
 - preview-data file(s)
@@ -129,6 +195,9 @@ Input:
 
 Output:
 - rendered preview or final video
+
+Canonical output location:
+- `../session-to-video-content/sessions/<session-id>/renders/`
 
 ## Regeneration Rule
 
@@ -149,6 +218,21 @@ Examples:
   - rerender video if the render depends on those assets
 
 Do not assume one rebuilt layer updates the rest.
+
+## Stale Output Cleanup Rule
+
+Regeneration is not enough if stale files can still be read.
+
+Before regenerating an output layer:
+- identify the old output file(s)
+- overwrite them or delete them
+- confirm downstream code is not still pointing at old paths
+
+At minimum, treat these as stale-sensitive:
+- HTML review boards
+- generated preview-data files
+- asset manifests
+- rendered MP4s
 
 ## Long-Running Job Rule
 
@@ -200,6 +284,7 @@ A task is not complete if any of these are true:
 - deleted columns still influence downstream output
 - the asset manifest contains unresolved required assets
 - a background run resets when it should be continuous
+- content files were written into the repo when they belong in the content root
 
 ## Validation Checklist
 
@@ -210,6 +295,7 @@ Before saying a state is correct, verify:
 3. review board reflects shot list
 4. preview-data files reflect shot list
 5. render output reflects current preview-data files
+6. file locations match the directory contract
 
 If any one layer is stale:
 - the work is not done

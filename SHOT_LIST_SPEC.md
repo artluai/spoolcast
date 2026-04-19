@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This file defines what the shot list is, which fields it must contain, what each field means, and how those fields are used downstream.
+This file defines what the shot list is, which fields it must contain, what each field means, what values are allowed, and how those fields are used downstream.
 
 The shot list is the source of truth.
 
@@ -55,6 +55,49 @@ Do not leave them blank.
 Do not preserve them for compatibility.
 Delete them.
 
+## Time Format Rules
+
+### `Start`
+Accepted formats:
+- `00:00`
+- `00:00.0`
+- `00:00.00`
+- `0:00`
+
+Meaning:
+- elapsed time from chapter or sequence start
+
+### `End`
+Accepted formats:
+- `00:00`
+- `00:00.0`
+- `00:00.00`
+- `0:00`
+
+Meaning:
+- elapsed time from chapter or sequence start
+
+### `Duration`
+Accepted formats:
+- `4s`
+- `4.0s`
+- `4.25s`
+
+Do not use:
+- bare integers like `4`
+- words like `four seconds`
+
+### `Pause After`
+Accepted formats:
+- blank
+- `0s`
+- `0.5s`
+- `1.0s`
+
+Do not use prose like:
+- `small pause`
+- `tiny beat`
+
 ## Field Meanings
 
 ### `#`
@@ -65,12 +108,17 @@ Used only for human reference.
 Human-readable chapter grouping.
 Used for grouping shots into sections.
 
+Format expectation:
+- `01`
+- `02`
+- or short stable chapter label
+
 ### `Shot`
 Required unique shot/beat identifier.
 
 Format expectation:
 - short stable id
-- usually includes chapter prefix and shot sequence
+- chapter prefix + shot sequence
 
 Examples:
 - `01A`
@@ -81,31 +129,6 @@ Used by:
 - review board
 - preview-data generation
 - render debugging
-
-### `Start`
-Expected start time of the beat in the current edit plan.
-
-Used by:
-- review board display
-- human checking
-
-### `End`
-Expected end time of the beat in the current edit plan.
-
-Used by:
-- review board display
-- human checking
-
-### `Duration`
-Beat duration.
-
-Used by:
-- shot planning
-- preview-data timing allocation
-
-Format:
-- seconds string such as `4.0s`
-- or another deterministic duration format that downstream tools know how to parse
 
 ### `Section Summary`
 Short summary of what this beat is doing in the larger chapter.
@@ -129,12 +152,13 @@ Used by:
 - preview-data generation
 - render timing context
 
-### `Pause After`
-Optional pause or spacing note after the beat.
+This field should contain:
+- the exact spoken line
+- one beat-level unit of narration
 
-Used by:
-- pacing logic
-- voiceover planning
+Do not put:
+- multiple unrelated beats in one cell
+- production notes instead of narration
 
 ### `Beat`
 Required concise visual/narrative beat description.
@@ -146,6 +170,14 @@ Used by:
 - planning
 - debugging visual intent
 
+Good:
+- `normal metrics frame gets established`
+- `the story pivots from normal metrics to a stranger question`
+
+Bad:
+- `make this cool`
+- `something interesting`
+
 ### `Background Visual`
 Required current visual for the beat.
 
@@ -156,6 +188,7 @@ Allowed contents:
 - hyperlink formula
 - short descriptive label for a reused/known background
 - local file URL if appropriate
+- explicit reuse markers such as `same as 01B`
 
 In the current system:
 - this field is the visual driver
@@ -167,15 +200,24 @@ Required shot-motion description.
 
 This describes how the beat should feel visually.
 
-Examples:
-- `Slow push`
+Allowed values:
 - `Static`
+- `Hold`
+- `Slow push`
+- `Slow push in`
+- `Slow push out`
+- `Gentle pan left`
+- `Gentle pan right`
 - `Lateral pan`
-- `Background changes to a tighter proof image`
+- `Return to prior background`
+- `Background changes`
+- `Background tightens`
+- `Background widens`
 
-Used by:
-- render interpretation
-- motion mapping
+Do not use vague values such as:
+- `better`
+- `dynamic`
+- `whatever feels right`
 
 ### `Interaction`
 Required explanation of what the visual change is doing narratively.
@@ -184,9 +226,11 @@ This answers:
 - why this beat changes
 - what the audience should feel or understand
 
-Used by:
-- render interpretation
-- planning validation
+Use sentence form.
+
+Good:
+- `The frame shifts from ordinary ad analysis into visible overload.`
+- `This background change makes the format feel more suspicious.`
 
 ### `Extras / Notes`
 Optional human notes.
@@ -201,15 +245,22 @@ Do not rely on this field for core required behavior if a proper field exists.
 ### `Camera`
 Required camera behavior note.
 
-Examples:
-- `Slow push`
+Allowed values:
 - `Static`
+- `Hold`
+- `Slow push`
+- `Slow push in`
+- `Slow push out`
+- `Gentle pan left`
+- `Gentle pan right`
 - `Lateral pan`
+- `Continuous run move`
+- `Cut`
 
-Used by:
-- render motion mapping
-
-Avoid vague decorative instructions.
+Not allowed:
+- `Impact shake`
+- `Micro zoom on impact`
+- `Random motion`
 
 ### `Tone Job`
 Required description of what kind of visual source should be used.
@@ -218,6 +269,7 @@ Examples:
 - `stock ad-collage montage`
 - `brain heatmap / MRI / lab background`
 - `official product explainer background`
+- `generated surreal ad overload background`
 
 Used by:
 - sourcing
@@ -228,14 +280,33 @@ Optional sourcing to-do field.
 
 Use when the background visual is not yet resolved.
 
+Accepted values:
+- blank
+- exact search term
+- exact source needed
+- exact replacement needed
+
+Examples:
+- `pexels crowd billboard montage`
+- `official product explainer still`
+- `google images mri heatmap`
+
 ### `Priority`
 Optional urgency/need field.
 
-Use when sourcing or production needs prioritization.
+Allowed values:
+- blank
+- `need-stock`
+- `graphic`
+- `reuse`
+- `nice-to-have`
+- `approved`
+
+Do not use ad hoc labels unless the system is updated to support them.
 
 ## Required Fields For A Valid Beat
 
-At minimum, a beat should have:
+At minimum, a beat must have:
 - `Shot`
 - `Duration`
 - `Script / Narration`
@@ -265,12 +336,60 @@ If a beat intentionally reuses a background:
 - the shot list should make that obvious
 - the downstream system should not interpret it as a brand-new visual unless the source actually changes
 
+Preferred reuse markers:
+- `same as 01B`
+- `return to 02A background`
+- same hyperlink/local path as prior beat
+
+## Canonical Example Row
+
+Example valid beat:
+
+| Shot | Start | End | Duration | Script / Narration | Beat | Background Visual | Movement | Interaction | Camera | Tone Job | Asset To Find | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 01C | 00:08.0 | 00:12.0 | 4.0s | Which means everybody is trying to make theirs work better. | ad pile becomes visibly crowded | https://example.com/ad-collage.mp4 | Background changes | The frame becomes intentionally too busy before any analysis starts. | Slow push | stock sponsored-post / banner / inbox ad collage | pexels ad collage night billboard | need-stock |
+
+## Downstream Field Mapping
+
+### Review board uses:
+- `Shot`
+- `Start`
+- `End`
+- `Duration`
+- `Section Summary`
+- `Script / Narration`
+- `Beat`
+- `Background Visual`
+
+### Asset sourcing uses:
+- `Background Visual`
+- `Tone Job`
+- `Asset To Find`
+- `Priority`
+
+### Preview-data generation uses:
+- `Shot`
+- `Duration`
+- `Script / Narration`
+- `Background Visual`
+- `Movement`
+- `Interaction`
+- `Camera`
+
+### Render uses:
+- `Shot`
+- `Duration`
+- `Background Visual`
+- `Movement`
+- `Camera`
+
 ## What The Shot List Must Not Do
 
 The shot list must not:
 - depend on hidden agent memory
 - assume a renderer will improvise layouts
 - preserve removed columns from the old two-layer model
+- use vague timing or motion language that requires guessing
 
 ## Validation Rules
 
@@ -279,3 +398,4 @@ The shot list fails validation if:
 - removed legacy columns are still present
 - two downstream artifacts contradict the shot list
 - background intent is ambiguous enough that the renderer would need to guess
+- any required field uses a non-supported format

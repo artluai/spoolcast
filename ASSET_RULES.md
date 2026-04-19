@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This file defines how agents and apps should source, validate, reuse, fetch, and budget assets.
+This file defines how agents and apps should source, validate, reuse, fetch, manifest, and budget assets.
 
 ## Global Asset Rule
 
@@ -51,6 +51,74 @@ An asset is not valid if it is:
 - a fetch that returned HTML instead of media
 - a stale asset no longer referenced by the shot list
 
+## Canonical Asset Output Locations
+
+Fetched external assets:
+- `../session-to-video-content/sessions/<session-id>/source/fetched-assets/`
+
+AI-generated assets:
+- `../session-to-video-content/sessions/<session-id>/source/generated-assets/`
+
+Asset manifests:
+- `../session-to-video-content/sessions/<session-id>/manifests/`
+
+Review thumbnails:
+- `../session-to-video-content/sessions/<session-id>/review/`
+
+## Asset Manifest Contract
+
+Every sourcing run should write one manifest.
+
+Allowed manifest format:
+- JSON
+
+Expected manifest filename:
+- `<run-name>.manifest.json`
+- or `manifest.json` inside a run folder
+
+Required top-level fields:
+- `run_name`
+- `session_id`
+- `created_at`
+- `source_type`
+- `items`
+
+Required per-item fields:
+- `id`
+- `shot`
+- `role`
+- `source_kind`
+- `source_url`
+- `local_path`
+- `preview_path`
+- `mime_type`
+- `status`
+
+Optional per-item fields:
+- `model`
+- `task_id`
+- `result_url`
+- `prompt`
+- `notes`
+
+Allowed `role` values:
+- `background`
+
+Allowed `source_kind` values:
+- `real`
+- `stock-video`
+- `stock-image`
+- `google-video`
+- `google-image`
+- `youtube`
+- `reuse`
+- `ai`
+
+Allowed `status` values:
+- `success`
+- `failed`
+- `stale`
+
 ## Asset Fetch Pipeline
 
 Asset fetching must be script-based and deterministic.
@@ -61,8 +129,9 @@ Required steps:
 2. verify the fetched file type
 3. if it is a video, create a preview thumbnail
 4. if fetch fails, mark it clearly as failed
-5. only use verified previews in the review board
-6. replace failed assets, do not hide them
+5. write the manifest entry
+6. only use verified previews in the review board
+7. replace failed assets, do not hide them
 
 ## Fetch Rules
 
@@ -77,6 +146,18 @@ It must reject:
 - fake media previews
 - assets that cannot be shown visibly
 
+## Thumbnail Rules
+
+If the asset is a video:
+- keep the video file
+- generate a thumbnail still
+- store both
+- the review board can use the thumbnail, but the renderer must use the real video
+
+Expected naming:
+- `asset-01.mp4`
+- `asset-01-thumb.jpg`
+
 ## Search Rules
 
 When sourcing from Google or broader web search:
@@ -85,6 +166,17 @@ When sourcing from Google or broader web search:
 - prefer assets that are easy to preview and reuse
 
 Do not search for overly similar replacements if the goal is contrast between beats.
+
+## Provenance Rules
+
+Every non-local asset should record:
+- original source URL
+- source kind
+- local saved path
+- preview path if generated
+
+If provenance is missing:
+- the asset stage is incomplete
 
 ## AI Rules
 
@@ -106,6 +198,93 @@ At minimum:
 - track which beats are consuming it
 
 Do not exceed the budget casually.
+
+## Kie Provider Spec
+
+Current image-generation provider:
+- Kie
+
+Current env var:
+- `KIE_API_KEY`
+
+Base URL:
+- `https://api.kie.ai`
+
+Submit endpoint:
+- `POST /api/v1/jobs/createTask`
+
+Polling endpoint:
+- `GET /api/v1/jobs/recordInfo?taskId=<taskId>`
+
+Auth:
+- `Authorization: Bearer <KIE_API_KEY>`
+
+Current known working models used in this project:
+- `nano-banana-pro`
+- `nano-banana-2`
+- `seedream/5-lite-text-to-image`
+- `wan 2.7 image`
+
+Canonical request body shape:
+
+```json
+{
+  "model": "nano-banana-2",
+  "callBackUrl": "https://your-domain.com/api/callback",
+  "input": {
+    "prompt": "your prompt here",
+    "image_input": [],
+    "aspect_ratio": "16:9",
+    "resolution": "2K",
+    "output_format": "png"
+  }
+}
+```
+
+For image-reference jobs:
+- put source image URLs in `input.image_input`
+
+Initial response shape:
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "taskId": "task_nano-banana-2_1765178625768"
+  }
+}
+```
+
+Polling response shape:
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "taskId": "task_12345678",
+    "model": "nano-banana-2",
+    "state": "success",
+    "param": "{\"model\":\"...\",\"input\":{\"prompt\":\"...\"}}",
+    "resultJson": "{\"resultUrls\":[\"https://example.com/generated-content.jpg\"]}",
+    "failCode": "",
+    "failMsg": ""
+  }
+}
+```
+
+Known task states:
+- `waiting`
+- `queuing`
+- `generating`
+- `success`
+- `fail`
+
+After Kie polling succeeds:
+- download the result immediately
+- save it locally
+- write a manifest entry containing `task_id`, `result_url`, and `local_path`
 
 ## Asset Failure Rules
 
@@ -133,6 +312,8 @@ Before considering the asset stage complete:
 
 1. every required beat has a visible background asset
 2. every asset can be previewed
-3. failed fetches are clearly marked
-4. duplicates have been intentionally reused where appropriate
-5. AI has only been used where justified
+3. every non-local asset has provenance
+4. every asset run wrote a manifest
+5. failed fetches are clearly marked
+6. duplicates have been intentionally reused where appropriate
+7. AI has only been used where justified

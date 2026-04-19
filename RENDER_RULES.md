@@ -13,6 +13,33 @@ It should not act like:
 - a diagnostics page
 - a review board converted directly into a video
 
+## Runtime Requirements
+
+Current known-good setup:
+- Node 22
+
+Known issue:
+- Node 24 caused repeated Rspack / Remotion native-binding failures on this machine
+
+If render/build fails with Rspack native-binding errors:
+
+1. switch to Node 22
+2. remove `node_modules`
+3. reinstall dependencies
+4. retry render
+
+## Canonical Render Inputs
+
+The renderer should read:
+- current generated preview-data file
+- current local media
+- current audio metadata
+
+It must not read:
+- stale review-board HTML
+- stale deleted preview-data files
+- removed legacy columns
+
 ## Required Render Behavior
 
 The preview should:
@@ -21,6 +48,47 @@ The preview should:
 - use full scene/chapter audio correctly
 - remove debug text from frame
 - reflect the current shot list exactly
+
+## Preview-Data Schema
+
+Generated preview-data for each beat must contain:
+- `shot`
+- `chapter`
+- `durationSeconds`
+- `durationFrames`
+- `script`
+- `beat`
+- `background`
+- `movement`
+- `camera`
+- `toneJob`
+
+Required `background` child fields:
+- `kind` (`image` or `video`)
+- `src`
+- `aspectRatio`
+- `isVertical`
+- `previewSrc` (optional)
+
+Optional audio fields:
+- `audioSrc`
+- `audioStartSeconds`
+- `audioEndSeconds`
+
+## Background Run Schema
+
+Adjacent beats using the same background should be grouped into one run.
+
+Each background run must contain:
+- `runId`
+- `backgroundSrc`
+- `startBeatIndex`
+- `endBeatIndex`
+- `startFrame`
+- `endFrame`
+- `cameraMode`
+
+The run is the unit of background playback and background motion.
 
 ## Background Rules
 
@@ -46,18 +114,66 @@ If a legacy shot list still contains those columns:
 - then regenerate preview data
 - then rerender
 
-## Motion Rules
+## Shot-List To Render Mapping
 
-Motion must be:
-- simple
-- justified
-- consistent with the shot list
+### `Shot`
+Used for:
+- debug identification
+- run grouping
+- review labeling
 
-Allowed:
-- hold
-- slow push
-- gentle pan
-- continuous run-level motion
+### `Duration`
+Used for:
+- frame allocation
+
+### `Script / Narration`
+Used for:
+- optional subtitle or timing alignment logic
+- debug only when explicitly enabled
+
+### `Background Visual`
+Used for:
+- actual image/video source selection
+
+### `Movement`
+Used for:
+- shot-level change intent
+
+### `Camera`
+Used for:
+- actual background transform behavior
+
+### `Tone Job`
+Used for:
+- sanity-checking asset choice, not direct transform logic
+
+## Motion Mapping
+
+Approved mappings:
+
+- `Static` or `Hold`
+  - no camera movement
+
+- `Slow push` or `Slow push in`
+  - gentle scale-in across the whole beat or run
+
+- `Slow push out`
+  - gentle scale-out across the whole beat or run
+
+- `Gentle pan left`
+  - slow horizontal translation left across the whole beat or run
+
+- `Gentle pan right`
+  - slow horizontal translation right across the whole beat or run
+
+- `Lateral pan`
+  - wider gentle horizontal move across the whole beat or run
+
+- `Continuous run move`
+  - one continuous transform across the full grouped run
+
+- `Cut`
+  - no interpolation between prior and next beat
 
 Not allowed by default:
 - impact shake
@@ -65,6 +181,20 @@ Not allowed by default:
 - arbitrary camera pops
 - repeated reset motion on reused backgrounds
 - decorative transitions between every beat
+
+## Audio Contract
+
+The render pipeline must know:
+- where audio lives
+- whether timing is beat-level or chapter-level
+- start and end offsets for playback
+
+If audio is chapter-level:
+- attach it once at chapter scope
+- do not accidentally play only the first beat
+
+If audio is beat-level:
+- each beat must define its own audio segment explicitly
 
 ## Visual Effect Rules
 
@@ -84,6 +214,19 @@ Preview-data generation must:
 Current rule:
 - preview data must contain background-only beats
 
+## Render Commands
+
+Typical local render flow:
+
+1. go to repo root
+2. confirm Node 22
+3. regenerate preview data if upstream changed
+4. run the render from the repo root
+
+The exact render command can vary, but it must:
+- use the current composition entry
+- write output into the content root `renders/` directory
+
 ## Render Regeneration Rule
 
 When any of these change:
@@ -95,6 +238,9 @@ When any of these change:
 Then the video must be rerendered.
 
 Do not trust an older MP4 if any upstream layer has changed.
+
+Before rerender:
+- overwrite or remove the prior MP4 if it shares the same output path
 
 ## Validation Rules
 
