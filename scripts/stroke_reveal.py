@@ -226,16 +226,29 @@ def generate_frames(
             return t
         return float(0.5 - 0.5 * np.cos(np.pi * t))
 
+    # Per-pixel fade duration (in normalized time units). Ramps each pixel's
+    # alpha from 0 → 1 over this window around its reveal_time, so fill
+    # regions that share similar reveal-times don't "pop" all at once in a
+    # single frame. ~3 frames of fade kills the 1-frame-pop artifact without
+    # visibly slowing the reveal.
+    FADE_FRAMES = 3
+    fade_t = FADE_FRAMES / max(num_frames, 1)
+
     for frame_idx in range(1, num_frames + 1):
         t = _ease(frame_idx / num_frames)
-        visible = (reveal_times <= t).astype(np.uint8) * 255
-        if stroke_dilate > 0:
-            visible = cv2.dilate(visible, kernel, iterations=1)
+        # Soft alpha: 0 before (reveal_time - fade), ramps linearly to 1 at
+        # reveal_time, stays at 1 after.
+        alpha = np.clip((t - reveal_times) / fade_t + 1.0, 0.0, 1.0).astype(np.float32)
 
-        # Compose: where visible, show original; else white
-        frame = np.full_like(original, 255)
-        m3 = (visible > 0)[:, :, None].astype(np.uint8)
-        frame = original * m3 + frame * (1 - m3)
+        if stroke_dilate > 0:
+            # Dilate alpha (grayscale) so thin strokes remain visible.
+            alpha_u8 = (alpha * 255.0).astype(np.uint8)
+            alpha_u8 = cv2.dilate(alpha_u8, kernel, iterations=1)
+            alpha = alpha_u8.astype(np.float32) / 255.0
+
+        # Alpha-composite original over white background per-pixel.
+        a3 = alpha[:, :, None]
+        frame = (original.astype(np.float32) * a3 + 255.0 * (1.0 - a3)).astype(np.uint8)
 
         cv2.imwrite(str(output_dir / f"frame_{frame_idx:04d}.png"), frame)
 
@@ -277,6 +290,29 @@ def _cli() -> None:
         labels, ordered, img.shape[:2], args.strategy,
         stagger_fraction=args.stagger, pixel_noise=args.noise,
     )
+
+    # Fill pixels (colored, non-outline, non-white) need reveal-times spread
+    # across the reveal — not stuck at t=1.0 where they cram into the last
+    # few frames. Assign them a position-gradient over [0.15, 0.6] so fills
+    # appear alongside outlines, gradually.
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    is_outline_px = binary > 0  # dark pixels (outlines)
+    is_background_px = gray >= 245  # near-white (paper background)
+    is_fill_px = (~is_outline_px) & (~is_background_px)
+    if is_fill_px.any():
+        H, W = img.shape[:2]
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        # Position gradient: top-left reveals first, bottom-right last.
+        pos_t = (xx / max(1.0, W - 1) + yy / max(1.0, H - 1)) / 2.0
+        # Spread across [FILL_MIN, FILL_MAX] — starts early, ends comfortably
+        # before the reveal completes so fills don't cram at the end.
+        FILL_MIN, FILL_MAX = 0.15, 0.60
+        fill_t = FILL_MIN + pos_t * (FILL_MAX - FILL_MIN)
+        # Only overwrite where current reveal is default (1.0) AND the pixel
+        # is a fill pixel. Outline-component reveal_times stay as-is.
+        overwrite_mask = is_fill_px & (reveal_times >= 0.99)
+        reveal_times[overwrite_mask] = fill_t[overwrite_mask]
+        print(f"[stroke-reveal] {int(is_fill_px.sum())} fill pixels assigned reveal-times in [{FILL_MIN}, {FILL_MAX}]")
     num_frames = max(1, int(args.fps * args.duration))
     generate_frames(img, reveal_times, num_frames, Path(args.output))
     print(f"[stroke-reveal] wrote {num_frames} frames to {args.output}")

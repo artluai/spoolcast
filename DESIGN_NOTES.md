@@ -459,6 +459,50 @@ observed in use, not speculation.
     section, with the session.json ↔ tracker-project name
     cross-reference convention.
 
+13. **Asset QA pass between external-asset production and
+    re-approval.** During V1's external-asset production run, the
+    batch sourced several brand logos from Google's favicon
+    service (Adobe, Descript) as fallbacks when higher-quality
+    sources weren't available, and a simpleicons SVG for
+    ElevenLabs came back suspiciously small (173 bytes).
+    Without a structured QA step, these could silently ship — the
+    viewer sees a blurry pixelated logo or a blank overlay box.
+    Fix: new "Asset QA pass" sub-section in `WORKFLOW_RULES.md`
+    Stage 4 ordering. Automated checks on every external asset
+    (file size, dimensions, SVG content, video duration, audio
+    amplitude); report surfaces ⚠️/❌ items to the user before
+    re-approval so the quality-limited assets are either re-sourced
+    or explicitly accepted. Prevents the failure mode where the
+    pipeline claims "assets produced" but some assets are
+    unusable.
+
+14b. **Never offload production work to the user as an option.**
+    During the external-asset production pass, the agent presented
+    options like *"(a) I capture terminal stdout, or (b) you do a
+    QuickTime recording"*. The user pushed back — the `(b)` option
+    is just the agent giving up disguised as choice. The agent was
+    hired specifically to not make the user do this work. Fix: new
+    "Don't Offload Production Work To The User" section in
+    `rules.md` alongside Substance-Before-Form. If the agent hits
+    a genuine limitation, name it honestly and propose alternatives
+    the agent itself can execute — not user labor disguised as a
+    second option. The `box/` folder remains a user-initiated drop
+    point, not an agent fallback.
+
+14. **Optional `box/` folder for user-supplied assets.** The
+    external-asset production also exposed that the user often has
+    the right asset on hand (a YouTube analytics screenshot, a
+    specific Zara chat recording, a brand press-kit download) but
+    has no clear place to drop it into the session. Fix: new
+    "Optional `box/` folder" sub-section in `WORKFLOW_RULES.md`.
+    Each session may have `source/box/` where the user drops any
+    files. The agent scans at the start of Stage 4, best-effort
+    guesses each file's purpose, and either auto-routes (confident
+    match) or surfaces to the user (*"is this for C4 or C44?"*).
+    Files the user says are unrelated stay in `box/` untouched.
+    Strictly additive — an empty `box/` never fails anything.
+    Reduces friction for user-contributed assets.
+
 **Noted but not mandated:** the payoff-preview pattern in the cold
 open (5-10 seconds of the actual output before any technical
 explanation). Observed to help once, not yet observed enough times
@@ -471,3 +515,127 @@ in a future `TRIGGER_RULES.md` once the Zara/Animabot integration
 is shipped. Logged here so it's not forgotten.
 
 **Brand-logo auto-insertion — PROMOTED from Deferred to Active (2026-04-20).** Now enabled by the overlay carve-out. When narration mentions a known brand ("Meta", "Tesla", "Google Cloud", "kie.ai", "OpenCV", "Remotion"), the pipeline identifies the word's timestamp from TTS metadata and inserts the brand logo as an explicitly-specified overlay per the shot-list schema. See `RENDER_RULES.md` Overlay Placement Schema and `ASSET_RULES.md` Overlay Sourcing for the contracts. See the "Reconsidered" subsection under "Killed: foreground overlays" above for the reasoning and constraints.
+
+### Lesson: image models hallucinate specific numbers on receipts / charts / UI (2026-04-20)
+
+During V1 review of `spoolcast-explainer`, the C23 "price of a coffee"
+receipt was generated as `TOTAL: $95.50` with invented line items
+($2.00, $5.50, $4.00). The narration says "price of a coffee" and the
+preceding chunk (C22) had already locked the breakdown as $2/$0/$0/$0.
+The image model reads "receipt with a total underlined" and confidently
+fills in plausible-looking but wrong specifics.
+
+Same failure mode observed in smaller doses:
+- C2's laptop screen shows "0 Views" — matches narration by luck, not
+  by design.
+- C24's bar chart axis labels (10/100/1000) happen to work for
+  "$500–$2000" only because log-scale is forgiving.
+
+Fix: new "Narration-Text Audit Rule" in `VISUALS.md § Assets` requires
+reading every legible number/label in every generated image against
+the actual narration before locking. Re-prompts must be explicit:
+`'TOTAL: $2'` not `"a receipt with a total"`. Vague prompts invite
+hallucinated specifics.
+
+Also added to the `VISUALS.md § Assets` Validation Checklist as step 8.
+This is the kind of failure that passes visual QA at a glance — the
+image looks great, the receipt looks like a receipt — and only gets
+caught when a human reads the audio and the pixels together.
+
+### Lesson: context at every transition, enforced by schema (2026-04-20)
+
+V1→V2 review of `spoolcast-explainer` surfaced four related pacing
+failures that all traced back to one root cause: the video treated
+every transition as equal weight.
+
+Observed failures:
+- **0:27 jarring jump.** Cold Open ended, Act 2 began, no signal. A
+  1-second broll fragment appeared with no setup, followed by the
+  "next seven minutes" promise — three conceptual frames inside ~3
+  seconds. Viewer had no scaffold.
+- **1A → 1B jarring.** Two adjacent ideas (production constraints
+  → distribution failure) had no bridge sentence connecting them.
+  Half-second pause between chunks was identical to within-chunk
+  beat pauses.
+- **3:00 four-layers preview rushed.** The chunk that frames the
+  rest of the video — THE roadmap preview — got the same pacing
+  as any beat. Four technical names flew by. Viewer didn't retain
+  the map.
+- **Broll played without viewer context.** C7 (0:27), C30 (3:48),
+  C32 (4:08) all played pilot-related clips with either no setup
+  or narration talking over the broll audio. C41 (5:05) was the
+  only broll that worked — it had explicit "watch this" prep.
+
+Root cause framing (user's diagnosis): *"there NEEDS TO BE CONTEXT
+AND REASON WHY THE ROLL IS BEING PLAYED AND IT NEEDS TO BE OBVIOUS
+TO THE VIEWER"* — generalized to every transition, not just broll.
+
+Fix: new Part 2 in `STORY.md` — "Pacing and Viewer Context." Four
+transition sizes (beat, chunk-continues, chunk-topic-shift, Act),
+each with its own required signal (tiny pause; small pause; bridge
+narration + longer pause; bumper + opener). Plus: `weight: high`
+flag for promises/previews/thesis/punchlines that need linger-and-
+silence regardless of slot size. Plus: six allowed forms of broll
+context (spoken setup / visual continuity / recognition / topical
+match / on-broll label / callback) with a required
+`context_justification` field on every broll chunk.
+
+Enforcement layered:
+1. **Schema-level** — three new required fields on the shot list
+   (`boundary_kind`, `weight`, `context_justification`) plus
+   `act_title` / `act_opener_line` where applicable. Pipeline
+   refuses to build preview-data without them.
+2. **Human review** — xlsx surfaces the fields; reviewer applies
+   the 2-second gut-check on every broll row.
+3. **Audio-first re-timing** — after TTS generates real mp3s, a
+   re-timing pass recomputes every pause from measured durations
+   and applies the pause tiers. Nothing is locked until real audio
+   exists.
+
+This is a durability fix, not a one-time patch. A future V1-of-some-
+other-video can't repeat these failures because the schema won't
+let you build it.
+
+The key insight the user pushed me toward: **pauses alone don't give
+context — pauses are just space. Context is the signal that fills
+the space.** A title card, a bridge sentence, a linger moment,
+a visual continuity — these are the mechanisms that let the viewer
+orient. The pause is only the breath that lets the mechanism land.
+
+### Lesson: rule-file consolidation (2026-04-20)
+
+Same day as the pacing rewrite, the 13 rule files collapsed to 6:
+- `rules.md` (kept — index + global agent rules)
+- `PIPELINE.md` (new — merges WORKFLOW + SESSION_CONFIG_SPEC +
+  SHOT_LIST_SPEC + RENDER_RULES)
+- `STORY.md` (new — merges SCRIPT_EXTRACTION_RULES + new PACING
+  content)
+- `VISUALS.md` (new — merges ASSET_RULES + PREPROCESSOR_RULES +
+  TRANSITION_RULES)
+- `SHIPPING.md` (new — merges REVIEW_BOARD_RULES + PUBLISHING_RULES)
+- `DESIGN_NOTES.md` (kept — this file, the why log)
+
+Why: 13 files meant mental overhead on every lookup ("which file
+is the right one?") and made it easy for related rules to drift
+apart across files. Six files with clear charters — procedural,
+editorial, visual, end-of-pipeline, why, index — match how
+authors actually think about the work.
+
+No content was trimmed in the merge. Every rule from every source
+file was preserved verbatim, just moved and demoted in heading
+level. Cross-references were rewritten to point to new sections
+(e.g., `ASSET_RULES.md § Style Anchor` → `VISUALS.md § Assets §
+Style Anchor`).
+
+The grouping logic:
+- **PIPELINE** = how you move through stages, plus the contracts
+  (session config, shot list, render) the stages produce/consume.
+  Specs live with the pipeline that uses them.
+- **STORY** = everything about what the video says and how it
+  lands. Script extraction and pacing are the same concern at
+  different altitudes.
+- **VISUALS** = everything on screen and how it animates. Assets,
+  preprocessor, transitions were always artificially split.
+- **SHIPPING** = the last mile. Review and publish together
+  because they're both "preparing the final artifact for a
+  specific audience."

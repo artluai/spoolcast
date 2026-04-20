@@ -1,6 +1,25 @@
+# Core deps used across scripts.
 requests>=2.31
 python-dotenv>=1.0
 pillow>=10.0
 numpy>=1.26
 openpyxl>=3.1
 mutagen>=1.47
+
+# stroke_reveal.py — per-pixel reveal-time math + image I/O.
+opencv-python>=4.9
+
+# tts_client.py — Google Cloud Chirp3-HD (though the script actually calls the
+# REST API directly with an API key, this is here for consistency if you want
+# to switch to the SDK).
+# google-cloud-texttospeech>=2.16
+
+# audit_narration.py — at least one LLM provider SDK. Install both if you want
+# to switch with --provider.
+anthropic>=0.42
+openai>=1.40
+
+# publish_youtube.py — Google APIs + OAuth 2.0.
+google-api-python-client>=2.150
+google-auth-oauthlib>=1.2
+google-auth-httplib2>=0.2

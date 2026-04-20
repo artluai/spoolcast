@@ -69,7 +69,13 @@ def main() -> None:
     if not result.result_urls:
         print(f"[thumb] FAILED: no URLs returned (failCode={result.fail_code} failMsg={result.fail_msg})", flush=True)
         sys.exit(1)
-    urllib.request.urlretrieve(result.result_urls[0], out_path)
+    # Kie CDN 403s urllib's default User-Agent — supply a browser UA.
+    req = urllib.request.Request(
+        result.result_urls[0],
+        headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
+    )
+    with urllib.request.urlopen(req) as resp, open(out_path, "wb") as out:
+        out.write(resp.read())
     print(f"[thumb] -> {out_path} ({out_path.stat().st_size} bytes)", flush=True)
 
 

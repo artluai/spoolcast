@@ -58,6 +58,9 @@ COLUMNS: list[tuple[str, str, str, int]] = [
     ("chunk_id",         "Chunk",            "chunk", 7),
     ("scene",            "Scene",            "chunk", 18),
     ("summary",          "Summary",          "chunk", 32),
+    ("boundary_kind",    "Boundary",         "chunk", 14),
+    ("weight",           "Weight",           "chunk", 8),
+    ("act_title",        "Act Title",        "chunk", 12),
     ("continuity",       "Continuity",       "chunk", 20),
     ("reveal_direction", "Reveal Direction", "chunk", 14),
     # Beat data + its visual job, adjacent for side-by-side review.
@@ -72,7 +75,10 @@ COLUMNS: list[tuple[str, str, str, int]] = [
     ("transition_s",     "Transition (s)",   "beat",  12),
     ("start_s",          "Start (s)",        "beat",  10),
     ("end_s",            "End (s)",          "beat",  10),
-    # Right: reference data. Full Prompt is hidden by default (see write_xlsx).
+    # Right: reference + pacing data.
+    ("context_justification", "Broll Context", "chunk", 42),
+    ("audit_bridge",     "Audit: Bridge",    "beat",  30),
+    ("audit_overweight", "Audit: Weight",    "beat",  24),
     ("full_prompt",      "Full Prompt",      "chunk", 60),
     ("image_source",     "Image Source",     "chunk", 14),
     ("image_path",       "Image Path",       "chunk", 36),
@@ -184,6 +190,32 @@ def write_xlsx(xlsx_path: Path, data: dict[str, Any]) -> None:
     # Compute timeline (fills start_s, end_s).
     _compute_timeline(session_id, chunks)
 
+    # Load latest narration-audit report, if present, and map findings onto
+    # beats/chunks so the xlsx surfaces them inline.
+    audit_bridge_by_pair: dict[tuple[str, str], str] = {}
+    audit_overweight_by_beat: dict[str, str] = {}
+    audit_report_path = (
+        CONTENT_ROOT / "sessions" / session_id / "working" / "narration-audit.json"
+    )
+    if audit_report_path.exists():
+        try:
+            with open(audit_report_path) as _f:
+                _audit = json.load(_f)
+            for _flag in _audit.get("bridge_flags", []):
+                key = (_flag.get("beat_n_id", ""), _flag.get("beat_n1_id", ""))
+                kind = _flag.get("connection_type") or _flag.get("verdict", "")
+                proposed = _flag.get("proposed_bridge") or ""
+                summary = f"[{kind}]"
+                if proposed:
+                    summary = f"{summary} {proposed}"
+                audit_bridge_by_pair[key] = summary
+            for _flag in _audit.get("overweight_flags", []):
+                audit_overweight_by_beat[_flag.get("beat_id", "")] = _flag.get(
+                    "proposed_fix", "overweight"
+                )
+        except (json.JSONDecodeError, OSError):
+            pass
+
     wb = Workbook()
     ws = wb.active
     ws.title = "shot-list"
@@ -240,6 +272,10 @@ def write_xlsx(xlsx_path: Path, data: dict[str, Any]) -> None:
             "chunk_id": chunk.get("id", ""),
             "scene": f"{chunk.get('scene', '')} — {chunk.get('scene_title', '')}".strip(" —"),
             "summary": chunk.get("summary", ""),
+            "boundary_kind": chunk.get("boundary_kind", ""),
+            "weight": chunk.get("weight", ""),
+            "act_title": chunk.get("act_title", ""),
+            "context_justification": chunk.get("context_justification", ""),
             "continuity": chunk.get("continuity", "standalone"),
             "reveal_direction": chunk.get("reveal_direction", ""),
             "image_source": image_source,
@@ -259,6 +295,18 @@ def write_xlsx(xlsx_path: Path, data: dict[str, Any]) -> None:
                     # (the JSON uses "id" per-beat).
                     if key == "beat_id":
                         value = beat.get("id", "")
+                    elif key == "audit_bridge":
+                        # Audit bridge flag lives on the pair (this beat, next beat).
+                        this_id = beat.get("id", "")
+                        next_id = beats[beat_idx + 1].get("id", "") if beat_idx + 1 < len(beats) else ""
+                        # If the next beat is in a later chunk, look up that chunk's first beat.
+                        if not next_id and chunk_idx + 1 < len(chunks):
+                            next_chunk_beats = chunks[chunk_idx + 1].get("beats") or []
+                            if next_chunk_beats:
+                                next_id = next_chunk_beats[0].get("id", "")
+                        value = audit_bridge_by_pair.get((this_id, next_id), "")
+                    elif key == "audit_overweight":
+                        value = audit_overweight_by_beat.get(beat.get("id", ""), "")
                     else:
                         value = beat.get(key, "")
                     # Normalize blank numeric fields to None so they don't
@@ -270,6 +318,14 @@ def write_xlsx(xlsx_path: Path, data: dict[str, Any]) -> None:
                 cell.fill = fill
                 cell.alignment = Alignment(vertical=v_align, wrap_text=True)
                 cell.font = Font(size=11)
+                # Red-tint bridge flag cells, orange-tint overweight cells so
+                # flagged rows pop at a glance.
+                if key == "audit_bridge" and value:
+                    cell.fill = PatternFill("solid", fgColor="FFCDD2")
+                    cell.font = Font(size=11, color="B71C1C")
+                elif key == "audit_overweight" and value:
+                    cell.fill = PatternFill("solid", fgColor="FFE0B2")
+                    cell.font = Font(size=11, color="E65100")
 
         # Merge chunk-level columns across this chunk's beats.
         if chunk_end > chunk_start:
@@ -305,8 +361,216 @@ def write_xlsx(xlsx_path: Path, data: dict[str, Any]) -> None:
     # --- freeze panes so header stays visible ---
     ws.freeze_panes = f"A{data_start_row}"
 
+    # --- second sheet: asset checklist / QA pass ---
+    _write_assets_sheet(wb, chunks, session_id)
+
     xlsx_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(xlsx_path)
+
+
+# ---- assets sheet (QA pass output) -------------------------------------
+
+ASSET_COLUMNS: list[tuple[str, int]] = [
+    ("Status",        8),
+    ("Asset Path",    58),
+    ("Type",          10),
+    ("Purpose",       18),
+    ("Used By",       22),
+    ("Size",          10),
+    ("Dims / Dur",    16),
+    ("Concern",       46),
+]
+
+
+def _probe_duration(p: Path) -> float | None:
+    import subprocess
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(p)],
+            capture_output=True, text=True, timeout=5,
+        )
+        return float(r.stdout.strip())
+    except Exception:
+        return None
+
+
+def _image_dims(p: Path) -> tuple[int, int] | None:
+    try:
+        from PIL import Image
+        with Image.open(p) as im:
+            return im.size
+    except Exception:
+        return None
+
+
+def _svg_has_geometry(p: Path) -> bool:
+    import re
+    try:
+        text = p.read_text(errors="ignore")
+    except Exception:
+        return False
+    return bool(re.search(r"<(path|g|polygon|rect|circle|ellipse)\b", text))
+
+
+def _classify_asset(path_str: str) -> str:
+    """Return asset type from extension."""
+    ext = Path(path_str).suffix.lower()
+    if ext in (".mp4", ".mov", ".webm", ".avi"): return "video"
+    if ext == ".svg": return "svg"
+    if ext in (".png", ".jpg", ".jpeg", ".webp", ".gif"): return "image"
+    if ext in (".mp3", ".wav", ".m4a", ".ogg"): return "audio"
+    return "other"
+
+
+def _gather_external_assets(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collect unique external asset paths from chunks + overlays."""
+    seen: dict[str, dict[str, Any]] = {}
+
+    def add(path_str: str, purpose: str, used_by: str):
+        if not path_str:
+            return
+        entry = seen.setdefault(path_str, {"path": path_str, "purposes": set(), "used_by": []})
+        entry["purposes"].add(purpose)
+        entry["used_by"].append(used_by)
+
+    for chunk in chunks:
+        src = chunk.get("image_source", "generated")
+        img = chunk.get("image_path", "")
+        # Only non-generated chunks contribute to the external-assets sheet.
+        if src != "generated" and img:
+            add(img, f"primary ({src})", chunk.get("id", ""))
+        for ov in chunk.get("overlays", []) or []:
+            ov_src = ov.get("source", "")
+            if ov_src:
+                add(ov_src, "overlay", chunk.get("id", ""))
+
+    return list(seen.values())
+
+
+def _write_assets_sheet(wb: "Workbook", chunks: list[dict[str, Any]], session_id: str) -> None:
+    from openpyxl import Workbook  # noqa
+    ws = wb.create_sheet("assets")
+
+    # Title + meta
+    total_cols = len(ASSET_COLUMNS)
+    ws.cell(row=1, column=1, value=f"external assets checklist — {session_id}")
+    ws.cell(row=1, column=1).font = Font(bold=True, size=16)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
+
+    # Gather assets
+    assets = _gather_external_assets(chunks)
+
+    # Paths in shot-list.json are relative to the SESSION root (where session.json
+    # and source/ live), NOT the shot-list/ subfolder. Cross-session refs use ../.
+    session_root = CONTENT_ROOT / "sessions" / session_id
+
+    # Meta line
+    meta = f"Session: {session_id}  ·  External asset count: {len(assets)}  ·  This sheet is regenerated every time the shot list is written."
+    ws.cell(row=2, column=1, value=meta)
+    ws.cell(row=2, column=1).font = Font(italic=True, color="666666")
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_cols)
+
+    # Headers at row 4
+    header_fill = PatternFill("solid", fgColor="D6D9DF")
+    thin = Side(border_style="thin", color="CCCCCC")
+    header_border = Border(top=thin, bottom=thin, left=thin, right=thin)
+    for col_idx, (label, _w) in enumerate(ASSET_COLUMNS, start=1):
+        cell = ws.cell(row=4, column=col_idx, value=label)
+        cell.font = Font(bold=True, size=11)
+        cell.fill = header_fill
+        cell.alignment = Alignment(vertical="center")
+        cell.border = header_border
+
+    # Data rows
+    OVERLAY_TARGET_PX = 200
+    ok_fill   = PatternFill("solid", fgColor="E8F5E9")
+    warn_fill = PatternFill("solid", fgColor="FFF3E0")
+    fail_fill = PatternFill("solid", fgColor="FFEBEE")
+
+    ok = warn = fail = 0
+
+    for row_i, entry in enumerate(assets, start=5):
+        rel = entry["path"]
+        purpose = ", ".join(sorted(entry["purposes"]))
+        used_by = ", ".join(dict.fromkeys(entry["used_by"]))  # dedupe preserving order
+        atype = _classify_asset(rel)
+
+        p = (session_root / rel).resolve() if not rel.startswith("/") else Path(rel)
+        if not p.exists():
+            status = "❌"
+            size_str = "MISSING"
+            dims_str = ""
+            concern = "file not on disk"
+        else:
+            sz = p.stat().st_size
+            size_str = f"{sz // 1024} KB" if sz >= 1024 else f"{sz} B"
+            concerns: list[str] = []
+            dims_str = ""
+
+            if atype == "image":
+                dims = _image_dims(p)
+                if dims is None:
+                    concerns.append("unreadable image")
+                else:
+                    w, h = dims
+                    dims_str = f"{w}x{h}"
+                    if "overlay" in purpose:
+                        if max(w, h) < OVERLAY_TARGET_PX:
+                            concerns.append(f"{max(w,h)}px < {OVERLAY_TARGET_PX}px overlay target")
+            elif atype == "svg":
+                dims_str = "svg"
+                if not _svg_has_geometry(p):
+                    concerns.append("no geometry found")
+            elif atype == "video":
+                dur = _probe_duration(p)
+                dims_str = f"{dur:.1f}s" if dur else "?"
+                if sz < 50_000:
+                    concerns.append(f"small file ({sz}B)")
+            elif atype == "audio":
+                dur = _probe_duration(p)
+                dims_str = f"{dur:.1f}s" if dur else "?"
+                if dur is not None and dur < 0.5:
+                    concerns.append("audio too short")
+
+            if concerns:
+                status = "⚠️"
+            else:
+                status = "✅"
+            concern = "; ".join(concerns) if concerns else "ok"
+
+        if status == "✅":   ok += 1;   row_fill = ok_fill
+        elif status == "⚠️": warn += 1; row_fill = warn_fill
+        else:                fail += 1; row_fill = fail_fill
+
+        values = [status, rel, atype, purpose, used_by, size_str, dims_str, concern]
+        for col_idx, val in enumerate(values, start=1):
+            cell = ws.cell(row=row_i, column=col_idx, value=val)
+            cell.fill = row_fill
+            cell.font = Font(size=11)
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    # Summary row at the bottom
+    summary_row = 5 + len(assets) + 1
+    total = ok + warn + fail
+    summary = f"SUMMARY: {ok} ✅   {warn} ⚠️   {fail} ❌   of {total} total"
+    ws.cell(row=summary_row, column=1, value=summary)
+    ws.cell(row=summary_row, column=1).font = Font(bold=True, size=12)
+    ws.merge_cells(start_row=summary_row, start_column=1, end_row=summary_row, end_column=total_cols)
+
+    # Column widths
+    for col_idx, (_label, width) in enumerate(ASSET_COLUMNS, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    # Row heights
+    ws.row_dimensions[1].height = 24
+    ws.row_dimensions[2].height = 18
+    ws.row_dimensions[4].height = 22
+    for r in range(5, 5 + len(assets)):
+        ws.row_dimensions[r].height = 28
+
+    # Freeze panes
+    ws.freeze_panes = "A5"
 
 
 # ---- xlsx reader -------------------------------------------------------

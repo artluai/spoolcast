@@ -1,101 +1,175 @@
-# Spoolcast
+# spoolcast
 
-Turn chat, content, and ideas into short illustrated video.
+Turn a script into a short illustrated video. Each narration sentence maps to one AI-generated scene, locked to a per-session visual style. A deterministic Python script paints the scene in stroke-by-stroke. Remotion renders everything headless into an mp4. No editor, no overlays, no renderer improvisation.
 
-Each narration chunk becomes one AI-generated scene in a per-session locked visual style. A deterministic preprocessor reveals each scene over time as a numbered PNG sequence. Remotion plays the sequences against narration audio. No overlays, no compositing, no renderer improvisation.
+## What it produces
 
-**First end-to-end pilot shipped 2026-04-20:** [https://youtu.be/hqbmHuEtayM](https://youtu.be/hqbmHuEtayM) — a 5-minute illustrated explainer on Meta's TRIBE brain-prediction AI, fully AI-generated (44 scenes, AI voice, OpenCV reveal animations, AI-written title/description/thumbnail) and rendered headless via Remotion.
+Watch an 8-minute example — [**I don't make videos. My AI pipeline does.**](https://artlu.ai/project/what-is-spoolcast) — fully rendered via this pipeline. ~$3 in generation costs, four Acts, 61 chunks, 14,686 frames.
 
-This repository contains:
-- reusable workflow rules
-- shot-list and session-config schemas
-- a Remotion scaffold
-- preprocessor and generation script locations
+Earlier 5-minute pilot: [https://youtu.be/hqbmHuEtayM](https://youtu.be/hqbmHuEtayM)
 
-This repository does not contain:
-- a finished video
-- session-specific media
-- session-specific working files
-- generated review artifacts or renders
+## Who it's for
 
-Keep session-specific content in the separate content directory:
-- `../spoolcast-content/`
+People who build things and don't want marketing to be a second job. If you ship code, write posts, or run a side project and want explainer-style videos that match the cadence of your work (not a weekend of editing per video), this is the pipeline.
 
-## How It Works
+## Repo layout
 
-1. Write a shot list with narration per beat.
-2. Group adjacent beats into chunks.
-3. Generate one illustration per chunk via the kie.ai provider, locked to a per-session style anchor.
-4. Run the preprocessor — each scene PNG becomes a numbered frame folder showing the reveal.
-5. Remotion plays the frame folders in chunk order, synced to narration audio.
-6. Output is an MP4 in the session's `renders/` directory.
+```
+spoolcast/                    # this repo — reusable pipeline
+├── rules.md                  # index — read first
+├── PIPELINE.md               # workflow, session config, shot-list schema, render
+├── STORY.md                  # script extraction + pacing + viewer context
+├── VISUALS.md                # asset generation + preprocessor + transitions
+├── SHIPPING.md               # review + publish
+├── DESIGN_NOTES.md           # why log — lessons learned, approaches killed
+├── src/                      # Remotion composition
+├── scripts/                  # pipeline scripts (generate, preprocess, render, audit, publish)
+└── public/                   # Remotion static-file mount (symlinks to the active session)
 
-## Commands
+../spoolcast-content/         # session content — kept in a separate directory
+└── sessions/
+    └── <session-id>/
+        ├── session.json      # per-session config (style, budget, voice, rate)
+        ├── shot-list/
+        │   └── shot-list.json   # the editorial artifact — one row per sentence
+        ├── source/
+        │   ├── audio/        # TTS mp3s per beat
+        │   ├── generated-assets/scenes/   # kie.ai-rendered PNGs per chunk
+        │   ├── external-assets/           # logos, memes, broll stills
+        │   └── box/          # optional drop folder for user-supplied files
+        ├── working/          # drafts, source analysis, audit reports
+        ├── frames/<chunk>/   # preprocessor-generated reveal frame sequences
+        ├── manifests/        # scene generation manifests (provenance)
+        └── renders/          # output mp4s
+```
 
-Install dependencies:
+The repo and content dirs are **separate** so the pipeline is portable across projects. One clone of `spoolcast/` can drive many sessions.
+
+## Prerequisites
+
+- **Node 22** (not 24 — native-binding failures with Remotion)
+- **Python 3.14+** (the venv at `scripts/.venv` handles dependencies)
+- **ffmpeg** (for Remotion render — `brew install ffmpeg`)
+- API keys (all loaded from `spoolcast/.env`):
+  - **`KIE_API_KEY`** — kie.ai image generation (required)
+  - **`GOOGLE_CLOUD_TTS_API_KEY`** — Google Cloud text-to-speech (required)
+  - **`OPENROUTER_API_KEY`** — optional, for the Qwen narration auditor path (~$0.03/run)
+  - **`ANTHROPIC_API_KEY`** — optional, for the Claude Haiku narration auditor path (~$0.25/run, cleaner output)
+  - **`YOUTUBE_CLIENT_SECRETS_PATH`** — optional, path to Google OAuth client_secret.json if you want to auto-upload to YouTube
+
+## Setup
 
 ```bash
+# 1. Clone the pipeline and create the sibling content directory
+git clone https://github.com/<you>/spoolcast.git
+mkdir spoolcast-content
+cd spoolcast
+
+# 2. Python venv + dependencies
+python3.14 -m venv scripts/.venv
+scripts/.venv/bin/pip install -r scripts/requirements.txt
+
+# 3. Node deps
 npm install
+
+# 4. Configure .env
+cp .env.example .env   # if available, else create from scratch
+# Add your API keys to .env
+
+# 5. Read the rules (at minimum rules.md + PIPELINE.md + STORY.md)
 ```
 
-Open Remotion Studio:
+## Your first video
 
 ```bash
+# 1. Scaffold a new session
+scripts/.venv/bin/python scripts/init_session.py --id my-video-v1 --activate
+
+# 2. Edit the shot-list — replace the example chunk with real narration
+open ../spoolcast-content/sessions/my-video-v1/shot-list/shot-list.json
+# Each chunk has one image and one or more beats (sentences).
+# See PIPELINE.md § Shot-List Spec for all fields.
+
+# 3. Generate illustrations (one per chunk) — costs ~$0.04 per image
+scripts/.venv/bin/python scripts/generate_scene.py \
+    --session my-video-v1 --chunk C1 \
+    --narration "<your first beat narration>"
+# ... repeat for each chunk
+
+# 4. Generate TTS (one per beat) — free within Google Cloud monthly tier
+scripts/.venv/bin/python scripts/tts_client.py \
+    --text "<beat narration>" \
+    --out ../spoolcast-content/sessions/my-video-v1/source/audio/01A.mp3 \
+    --voice Puck
+
+# 5. Preprocess reveal frames (one per chunk) — local, deterministic, free
+scripts/.venv/bin/python scripts/stroke_reveal.py \
+    --input ../spoolcast-content/sessions/my-video-v1/source/generated-assets/scenes/C1.png \
+    --output ../spoolcast-content/sessions/my-video-v1/frames/C1/ \
+    --fps 30 --duration 1.5 --strategy auto
+
+# 6. Build the Remotion preview data
+scripts/.venv/bin/python scripts/build_preview_data.py --session my-video-v1
+
+# 7. Preview in Remotion Studio
 npm run dev
+
+# 8. Render
+npx remotion render spoolcast-pilot \
+    ../spoolcast-content/sessions/my-video-v1/renders/my-video-v1.mp4
 ```
 
-Bundle the project:
+## Quality gates
 
+Two optional but recommended passes before render:
+
+**Narration audit** — LLM reviews every adjacent beat pair for missing bridges and every beat for overweight density.
 ```bash
-npm run build
+scripts/.venv/bin/python scripts/audit_narration.py \
+    --session my-video-v1 --provider openrouter   # or --provider anthropic
 ```
 
-Render the template composition:
-
+**Publish to YouTube** — once your video is rendered, upload + set thumbnail + description via one command.
 ```bash
-npx remotion render spoolcast-template renders/spoolcast-template.mp4
+scripts/.venv/bin/python scripts/publish_youtube.py \
+    --video ../spoolcast-content/sessions/my-video-v1/renders/my-video-v1.mp4 \
+    --title "..." \
+    --description-file ../spoolcast-content/sessions/my-video-v1/working/youtube-description.txt \
+    --thumbnail ../spoolcast-content/sessions/my-video-v1/source/generated-assets/thumbnail.png
 ```
+First run opens a browser for Google OAuth consent; the refresh token is cached so subsequent runs are silent.
 
-Render a still for inspection:
+## The rule files
 
-```bash
-npx remotion still spoolcast-template renders/frame.png --frame=0
-```
+Six files describe the whole pipeline. Read them in order:
 
-## Project Shape
+1. **[rules.md](rules.md)** — index + global agent rules (pre-pass, substance-before-form, no-offloading)
+2. **[PIPELINE.md](PIPELINE.md)** — workflow stages, session.json schema, shot-list schema, render config
+3. **[STORY.md](STORY.md)** — script extraction (Part 1) + pacing and viewer context (Part 2). This is where the editorial discipline lives: Acts, bumpers, bridge archetypes, reveal groups, overweight/underweight calibration.
+4. **[VISUALS.md](VISUALS.md)** — kie.ai generation, style anchor, preprocessor, reveal-animation math, transitions
+5. **[SHIPPING.md](SHIPPING.md)** — review contract, title/thumbnail rules (including the zero-prior-context and anti-self-hedge rules), description structure
+6. **[DESIGN_NOTES.md](DESIGN_NOTES.md)** — why log. What we tried and killed, lessons learned. Read this before challenging any rule.
 
-- `src/` — Remotion renderer scaffold
-- `scripts/` — project-specific tooling (kie.ai client, scene generator, preprocessor)
-- `rules.md` + `*_RULES.md` + `*_SPEC.md` — workflow specification
-- `../spoolcast-content/` — session configs, shot lists, generated scenes, frame sequences, review boards, renders
+## Agents & LLMs
 
-## Working Rule
+Any coding agent (Claude Code, Cursor, Windsurf, Codex) that walks into this repo should read `rules.md` first, then follow the per-file headers. The rules are written for agent consumption as much as human — explicit schema, explicit failure modes, explicit "do / don't" patterns.
 
-Keep shared repo docs path-agnostic when possible.
+The repo includes one LLM-driven quality-check script (`audit_narration.py`) that runs against the shot-list and reports pacing/density issues. All other scripts are deterministic.
 
-Use:
-- relative paths
-- generic folder names
-- workflow descriptions
+## Troubleshooting
 
-Avoid:
-- hardcoded personal local machine paths unless a path is truly required to make something work
+- **"ERROR: anthropic SDK not installed"** — run `scripts/.venv/bin/pip install anthropic`
+- **"ERROR: ANTHROPIC_API_KEY not set"** — either add the key to `.env`, or use `--provider openrouter` with `OPENROUTER_API_KEY`
+- **Remotion fails with native-binding errors** — verify `node --version` prints `v22.x`. Node 24 has Rspack/Remotion native-binding regressions.
+- **Kie.ai returns 403 on image download** — Kie's CDN blocks default Python-urllib User-Agent. `generate_scene.py` and `generate_thumbnail.py` both set a browser UA; if you wrote custom code, include `User-Agent: Mozilla/5.0 ...` on the download request.
+- **Composition.tsx shows "cannot find module preview-data.json"** — run `scripts/build_preview_data.py` first. The file is auto-generated and gitignored.
 
-## Runtime
+## Current state
 
-Node 22 is required. Node 24 has caused repeated Rspack / Remotion native-binding failures on development machines. See `RENDER_RULES.md`.
+Shipped: V1 pilot (Meta TRIBE explainer, 5 min) and V2 (*I don't make videos. My AI pipeline does.*, 8 min).
 
-## Current State
+The pipeline is in active use — see [DESIGN_NOTES.md](DESIGN_NOTES.md) for the rolling log of what we've learned and killed.
 
-The repo is a reusable scaffold:
+## Contributing
 
-- background-only illustrated-scene workflow defined across the rules files
-- Remotion template composition only (no bundled session example)
-- scripts directory ready for the kie.ai client and preprocessor
-
-## Next Work
-
-- implement the kie.ai client in `scripts/`
-- implement the scene preprocessor in `scripts/` (Python, deterministic, no AI tokens)
-- replace the template composition with a chunk-driven composition that plays preprocessor frame folders
-- generate the first end-to-end illustrated session
+This started as a personal pipeline, open-sourced so others can run it. If you use it, a link back is appreciated but not required. Issues and PRs welcome — especially rule-file clarifications and new narration auditor checks.
