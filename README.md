@@ -4,6 +4,8 @@ Turn chat, content, and ideas into short illustrated video.
 
 Each narration chunk becomes one AI-generated scene in a per-session locked visual style. A deterministic preprocessor reveals each scene over time as a numbered PNG sequence. Remotion plays the sequences against narration audio. No overlays, no compositing, no renderer improvisation.
 
+**First end-to-end pilot shipped 2026-04-20:** [https://youtu.be/hqbmHuEtayM](https://youtu.be/hqbmHuEtayM) — a 5-minute illustrated explainer on Meta's TRIBE brain-prediction AI, fully AI-generated (44 scenes, AI voice, OpenCV reveal animations, AI-written title/description/thumbnail) and rendered headless via Remotion.
+
 This repository contains:
 - reusable workflow rules
 - shot-list and session-config schemas

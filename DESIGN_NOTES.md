@@ -142,3 +142,90 @@ Original setup had tribe-specific media, data, and scripts in the repo. Made the
 - **Same-turn codification**: any heuristic or rule agreed on in conversation must land in a rules file in the same turn — not "we'll write that down later." if it isn't written, the next decision reasons from scratch and re-breaks the rule. this was observed after an 8-beat chunk was created despite the agent having just argued for "smaller chunks, more pictures" earlier in the same session. the heuristic existed in chat; nobody wrote it down; it was forgotten within minutes.
 - Chunking failure modes: "group by long-pause markers" is a structural signal that can produce chunks with too many beats. Long-pause alone does not pass the visual-subject test. Always apply the stop-and-check heuristics in `WORKFLOW_RULES.md § 3. Chunking` before committing chunk boundaries.
 - Continuity concept: chunks relate to each other either as standalone or as part of a multi-chunk arc. Arcs emerge from consecutive `continues-from-prev` chunks — no separate data structure needed. Encoded per-chunk rather than as a top-level grouping.
+
+## Lessons from the first ship (2026-04-20, pilot video shipped to YouTube)
+
+### Killed: chalkboard wipe as the chapter-boundary default
+
+Original `TRANSITION_RULES.md` rule: every chapter boundary gets
+chalkboard. Across 44 chunks that produced 10 chalkboards in a row —
+read as one repeated style, bored the viewer. Killed the
+chapter-boundary-implies-chalkboard rule. Now requires BOTH narrative
+significance AND single-subject/clear-composition. Chaos / many-equal-
+elements images skip chalkboard regardless. Final pilot ended at 5
+chalkboards / 4 paint-auto / 7 paint-center-out / 28 cut.
+
+### Killed: silent defaults in `build_input_for_model()`
+
+Function originally had `quality="basic"` default that mapped to "2K"
+for nano-banana-2 — but the pilot session config specifies `"resolution":
+"1K"`. A one-off thumbnail script called `build_input_for_model()`
+without passing `quality`, silently shipped at 2K, hung the kie API
+(combined with no HTTP timeout), 30 minutes wasted.
+
+Killed the default. `quality` is now required (no default → hard
+TypeError if missing). Added `build_input_from_session()` helper that
+reads session.json so callers can't drift from the project standard
+even if they want to. Direct calls to `build_input_for_model()` in
+new one-off scripts are now forbidden by `ASSET_RULES.md`.
+
+### Killed: auto-applied generic camera template on long chunks
+
+Tried auto-applying a wide → upper-middle medium → wide pan to all
+13 long multi-beat chunks. Most looked terrible — the camera was
+panning to "upper-middle" on images that had no content there, just
+zooming to nothing. Only 2 chunks (C2 manually crafted, C36 with
+content-justified left-third / right-third) worked.
+
+Killed the auto-template. Camera moves now must be content-justified
+per chunk. If you can't pick a specific zone based on the image, do
+NOT add camera moves — the default subtle push-in is safer than a
+wrong target.
+
+### Killed: independent push-in on continues-from-prev chunks
+
+Default subtle push-in (1.0 → 1.08 over chunk duration) was applied
+to every chunk. On cuts between continuing chunks (same character,
+same scene), each independent push-in caused the camera to "rewind"
+from 1.08 back to 1.0 at every cut — read as a jarring tiny zoom-out.
+
+Killed the default for continues-from-prev / callback chunks. Those
+hold steady at zoom 1.0. Only standalone chunks get the subtle
+push-in. Implemented in `Composition.tsx` `computeCamera()`.
+
+## More lessons learned
+
+- **Rules without a conflict-detection mechanism become snapshots, not constraints.**
+  Multiple times during the pilot ship, user requests contradicted
+  documented rules, and the rule got silently rewritten to match.
+  That defeats the point. Fix: rule-conflict protocol added to
+  `rules.md` — surface the conflict explicitly with options
+  (update / one-off / keep) before changing any rule.
+- **Image content vetoes narrative position.** Chalkboard wipe is
+  beautiful on single-subject images and ugly on chaos. The "chapter
+  boundary deserves a wipe" rule has to defer to the image — chaos
+  scenes always go paint-auto.
+- **One-off scripts MUST read session config.** The 2K vs 1K bug
+  proved that even when the wrapper has a "smart" default, ad-hoc
+  scripts that bypass session.json drift from the project standard.
+  Required helper (`build_input_from_session`) makes the right thing
+  the easy thing.
+- **No-default-arg is a real defense.** Removing the silent default
+  from `quality` made the bug surface as a hard TypeError instead of
+  a silent wrong value. Worth doing for every config-mirroring arg.
+- **HTTP requests need timeouts everywhere.** A `requests.Session`
+  with no timeout will hang indefinitely on a stuck connection or a
+  request the API can't process. 60s `REQUEST_TIMEOUT_SECONDS`
+  added to all kie POST/GET calls.
+- **Don't pipe long-running commands through head/tail/grep.** They
+  buffer until upstream exits. Working processes look hung; if you
+  kill them, you've created the bug you thought you found. Codified
+  in `rules.md` "Diagnostic anti-pattern: pipe-buffering."
+- **Read the script before titling.** Chunk titles, scene_title,
+  and beat_descriptions are visual scaffolding, not narrative
+  content. Titles and thumbnails generated from them tend to mis-sell
+  the video (sell the question instead of the answer). New
+  `PUBLISHING_RULES.md` mandates reading the full voiceover
+  narration before any title/description/thumbnail work.
+- **The shipped product is the strongest argument for the workflow.**
+  https://youtu.be/hqbmHuEtayM exists. Pipeline works end-to-end.
