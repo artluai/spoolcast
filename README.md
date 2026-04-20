@@ -79,7 +79,87 @@ cp .env.example .env   # if available, else create from scratch
 # 5. Read the rules (at minimum rules.md + PIPELINE.md + STORY.md)
 ```
 
-## Your first video
+## Real scenarios
+
+Most people don't start with a blank shot-list. The actual entry points are usually **"I have a long Claude conversation about something I built"** or **"I want to explain this repo"**. Both work the same way: give your coding agent raw source material + point it at the spoolcast rule files, and let it do the editorial stages before you touch production.
+
+### Scenario A: from a Claude Code / Cursor / chat session → video
+
+You just spent hours with an AI agent building something. You want a video that explains what you built + the decisions that went into it.
+
+```bash
+# 1. Scaffold a new session
+scripts/.venv/bin/python scripts/init_session.py --id my-project-explainer --activate
+
+# 2. Drop your raw source material in source/
+# For a Claude Code session, export the conversation:
+#   - copy the full chat transcript to source/transcript.md
+#   - grab any relevant commits: git log --patch > source/commits.txt
+#   - drop screenshots, diagrams, mockups in source/box/
+
+# 3. In your coding agent, point it at the rule files:
+#    "read spoolcast/rules.md, STORY.md Part 1, and PIPELINE.md.
+#     then read ../spoolcast-content/sessions/my-project-explainer/source/
+#     and do a source analysis per STORY.md § 3 (Jobs A–E).
+#     confirm the core message with me before writing anything."
+
+# 4. The agent proposes 2–3 candidate core messages. You pick one (or rephrase).
+#    From there, it drafts screenplay v1 (short version only — just the spine),
+#    you confirm, it writes the full prose, iterates through v2 + v3 with the
+#    viewer-orientation and concept-inventory gates from STORY.md.
+
+# 5. The agent converts the final screenplay into shot-list.json
+#    (one row per sentence the narrator says, grouped into chunks).
+
+# 6. Run the narration auditor before production:
+scripts/.venv/bin/python scripts/audit_narration.py \
+    --session my-project-explainer --provider openrouter
+# Fix any bridge/overweight flags the auditor surfaces.
+
+# 7. Production (same as the mechanical walkthrough below) — generate images,
+#    TTS, preprocess, render.
+```
+
+The editorial work (steps 3–5) is where the quality comes from, and it's what the rules in `STORY.md` Part 1 exist to guide. You're not asking the agent to summarize — you're asking it to **extract a story** from the session, with a declared core message, a specific turning point, and lines that can survive as independent narration beats.
+
+### Scenario B: from a codebase → "what is this repo?" video
+
+You have a repo (yours or someone else's) and want an explainer.
+
+```bash
+# 1. Scaffold a session
+scripts/.venv/bin/python scripts/init_session.py --id repo-explainer --activate
+
+# 2. Instead of a transcript, the source is the repo itself:
+#    - cp the README to source/readme.md
+#    - drop key source files / architecture diagrams in source/
+#    - git log --oneline --stat > source/commits.txt  (the evolution story)
+#    - any existing docs → source/
+
+# 3. Point your coding agent at spoolcast rules + the source/ dir:
+#    "read rules.md, STORY.md, PIPELINE.md. then read the source material in
+#     ../spoolcast-content/sessions/repo-explainer/source/. do a source analysis.
+#     find the practical question the repo answers. propose 2–3 candidate
+#     core messages. don't write anything until I confirm one."
+
+# 4. Same screenplay → shot-list → audit → production path as Scenario A.
+```
+
+**Meta-example:** the 8-minute video this repo ships with (*I don't make videos. My AI pipeline does.*) was itself produced this way — the "repo" was spoolcast itself, the core message was confirmed in chat, the screenplay iterated from the architecture and decisions documented in the rule files. See [`spoolcast-content/sessions/spoolcast-explainer/`](https://artlu.ai/project/ai-generated-video-what-is-spoolcast) for the actual working directory, or watch the build log at the same URL.
+
+### How the rules collaborate with the agent
+
+The key insight is that `STORY.md` and `PIPELINE.md` are written **for agent consumption**. Every rule is explicit, every anti-pattern is named, every archetype has examples. When you say "read STORY.md Part 1 then do a source analysis," the agent has a concrete procedure — not vibes.
+
+Two specific hooks:
+- **STORY.md § Review-Artifact Policy** — the agent only shows you two things: a short version in chat, and the final shot-list xlsx. Everything else (source-analysis.md, screenplay drafts) exists on disk for traceability but isn't handed to you for review. Saves you from reading prose drafts.
+- **STORY.md § 3 Job E** — the core message MUST be confirmed with you in chat before any writing starts. The agent proposes 2–3 candidates; you pick one (or rephrase). This is the most load-bearing editorial decision in the whole pipeline.
+
+---
+
+## Mechanical walkthrough — if you want to skip the editorial stages
+
+If you already have narration written (your own script, a blog post, a transcript you're using verbatim), you can go straight to production.
 
 ```bash
 # 1. Scaffold a new session
@@ -121,7 +201,7 @@ npx remotion render spoolcast-pilot \
 
 ## Quality gates
 
-Two optional but recommended passes before render:
+One optional but recommended pass before render:
 
 **Narration audit** — LLM reviews every adjacent beat pair for missing bridges and every beat for overweight density.
 ```bash
