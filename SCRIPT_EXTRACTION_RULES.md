@@ -176,6 +176,39 @@ The analysis also wrote down the anti-claims:
 
 Those constraints later saved the screenplay from hype.
 
+#### Job D-1: mark planned-vs-shipped for every system component
+
+Extension of Job D anti-claims. Every component the video describes must be clearly categorized as one of:
+
+- **Shipped and working** — already built, in use, can be claimed as-is.
+- **Designed and planned, not built yet** — the design exists but the code doesn't run. Must be marked explicitly in narration: *"still being built,"* *"the next piece,"* *"this is the plan,"* *"once it's wired up,"* *"designed to work this way."*
+- **Speculative / idea-stage** — not even fully designed. Either mark as speculative outright or cut from the video.
+
+Never imply a component does something it doesn't. Viewers can tell. Once one claim gets caught overreaching, every other claim in the video becomes suspect for the rest of the runtime.
+
+In source analysis, build a small table listing every component the video describes with its current status. Check the screenplay against it at v3.
+
+Concrete example from the spoolcast-explainer session: the Zara/agent layer is designed and partially built (Zara the chatbot exists and posts in a Matrix room; the spoolcast-integration piece is not yet wired). The V1 script uses language like *"still being built as of this video"* and *"once it's wired up, Zara will watch…"* instead of present-tense claims that would imply shipped behavior. Same content, honest framing.
+
+#### Job E: declare the core message — confirmed with the user, not guessed
+
+Name — in one sentence — the single thing the viewer must come away with. Not the story spine. Not the summary. Not the topic. The one message. Every section of the video either serves this message or it shouldn't be in the video. Section importance is *derived* from how much each section serves the core message, not declared independently.
+
+**The core message must be confirmed with the user before being written into the source analysis.** This is the most load-bearing editorial decision in the entire pipeline — every downstream decision (what to cut, what to expand, what to open on, what the ending answers, how the title is worded, what the thumbnail shows) is derived from it. A guessed core message that sounds plausible can lock in the wrong framing for the whole video; the user then spends iterations reacting to downstream effects without realizing the root cause.
+
+Required process:
+
+1. **Propose 2-3 candidate core messages** in plain language. Each takes a distinct angle — e.g. architecture-focused vs outcome-focused, audience-specific vs broad, abstract principle vs concrete promise.
+2. **Name the tradeoffs** for each — who it speaks to, what it assumes about the viewer, what it leaves out.
+3. **Wait for the user to pick, edit, or propose their own phrasing.** The user's own words usually land sharper than candidate proposals, because the user has lived with the project.
+4. **Only then write the confirmed core message into the source analysis §6.5 / Job E section.**
+
+Do not proceed to the story angle, screenplay drafting, or any downstream work until the core message is explicitly confirmed.
+
+Example from the spoolcast-explainer session: three candidates were proposed (architecture-thesis, outcome-focused, memorable-short-form). The user picked the outcome-focused candidate, then rephrased it in their own words. The final core message — *"Using AI video to get attention can be a passive process — and mostly automated — now"* — was materially sharper than any of the three proposals. Had the agent locked in its first guess instead of proposing and confirming, the video would have been pitched to the wrong audience.
+
+Without a declared core message, the agent has no north star for what to cut vs expand, what to define vs assume, what to open on, or what the ending should answer. Attention drifts to whichever section is currently on the page, not to the one that matters most.
+
 ### 4. Pick the story angle only after the source analysis is done
 
 Only after the source analysis existed was the story angle chosen.
@@ -382,6 +415,76 @@ It is a statement of how the narration should behave on screen.
 
 ---
 
+## Review-Artifact Policy (READ FIRST)
+
+Across the whole Stage 1 pipeline, only two things are presented to the user for review:
+
+1. **A short version in chat** — a tight summary block with core message, spine, what changed, flags. See "Screenplay File Format and Workflow" below for the required fields.
+2. **The shot list xlsx** — the final deliverable. Opened via `open <path>` when ready.
+
+Everything else — source analysis, screenplay v1/v2/v3 prose, scene plan, voiceover script — is a **working doc**. Working docs are written to disk for traceability, but are **not** linked to the user for review. The user should never have to open a markdown file to approve a stage.
+
+Why: reading prose drafts is the highest-cost form of review. The short version captures the substantive decisions cheaply; the xlsx captures the concrete output completely. Everything in between is scaffolding the user shouldn't have to parse.
+
+This applies to every review point in the pipeline. A stage is not "ready for review" unless the agent has (a) presented the short version directly in chat, and (b) — at the shot-list stage — produced the xlsx.
+
+## Screenplay File Format and Workflow
+
+Every screenplay version (v1, v2, v3, any rewrite) follows a two-step workflow. The short version is produced first, presented in chat, and confirmed by the user *before* the full prose gets drafted.
+
+### Required workflow (enforced, not optional)
+
+1. **Write the short version first, as its own artifact.** Not buried at the top of a long file the user may not open.
+2. **Present the short version directly in chat.** Not a file link, not "open the doc to see it" — paste the block into the chat message so the user reads it without any extra step.
+3. **Stop. Wait for the user to confirm, edit, or redirect.** Do not draft the full prose in the same turn as the short version. Do not assume silence or a short acknowledgment ("ok", "good", "processed") means proceed — explicit confirmation on the spine is required.
+4. **Only after explicit confirmation, draft the full prose.** Save the file with the short version at the top and the full draft below a `---` separator.
+
+### Required short-version fields
+
+- **Core message (confirmed)** — one line, the locked message from §3 Job E.
+- **Spine** — ordered list of sections with a one-line description and a target narration time for each. Running total at the bottom.
+- **What changed from the previous version** — bullet list of substantive changes (skip for v1).
+- **Flags for review** — anything the user should confirm, reject, or redirect before the next version. If none, say "none."
+
+Keep the short version under ~25 lines.
+
+### Why this workflow, not just the format
+
+Drafting a full screenplay takes real effort; reviewing one shouldn't. If the spine is wrong, the prose is wasted. Writing the full prose before the user has seen the spine defeats the entire reason the short version exists — the user ends up reviewing a finished draft instead of catching the wrong turn at the cheap moment.
+
+The failure mode this prevents: the agent writes a short version AND full prose in one shot, the user only sees the full prose in chat (short version is inside the file, unopened), the user reacts to prose-level issues that are actually spine-level issues, and the next draft is written against the wrong feedback layer.
+
+The test: if the user has not explicitly said "the spine looks right" (or equivalent) after reading the short version in chat, the full prose is not allowed to exist yet.
+
+This rule applies to every review point in the screenplay pipeline.
+
+---
+
+## Gates Between Versions
+
+These are concrete gates the screenplay must pass between draft versions. A draft that fails a gate isn't ready to move to the next version.
+
+### Viewer-orientation gate (v2 → v3)
+
+The cold open must explicitly answer four questions inside the first ~30 seconds of narration:
+
+- **What is this thing?** Name it.
+- **Who is it for?** Stake out the audience.
+- **Why should I keep watching?** Concrete pain or visible payoff.
+- **What am I about to see?** Enough preview that the rest of the video is orientation, not confusion.
+
+If any of these is only implicit, the cold open is not ready. This gate protects against the failure mode where the viewer is lost for the first 30-60 seconds because the script launched into concept before grounding them. Same failure mode observed in the TRIBE pilot's cold open.
+
+### Concept-inventory gate (v2 → v3)
+
+List every non-obvious term the script uses in its argument — project-specific (*beat*, *chunk*, *image-ref*), technical (*deterministic*, *headless*, *HTTP request*), domain-specific. For each: is it defined before first use? If not, define at first use or cut the usage.
+
+"Non-obvious" is judged relative to the target viewer implied by the core message. A developer audience doesn't need *HTTP request* defined; a general audience does. A reader of the spoolcast rules understands *chunk*; a first-time viewer does not.
+
+This gate protects against the failure mode where central concepts carry the thesis but remain undefined — the viewer nods along without actually following the argument.
+
+---
+
 ## Heuristics I Actually Used
 
 These are not abstract principles.
@@ -551,6 +654,83 @@ It was not strong enough to carry the main scene visually.
 Rule:
 - use proof inserts briefly to prove reality
 - use stronger concept visuals to carry the scene emotionally and editorially
+
+### 9a. Cold-open visual density
+
+The cold open — roughly the first 10-15 seconds — is where viewer attention is most fragile. Decisions about whether to keep watching happen here. A slow visual pace loses viewers before the premise lands.
+
+Rules for the cold open specifically:
+
+- **Chunks must rarely exceed 4 seconds.** Most should be single-beat chunks.
+- **Target image-change cadence of once every 2-3 seconds** — significantly denser than the rest of the video's 7-10 second average.
+- **Never hold one image across 3+ beats in the cold open.** If a narration block has 3 distinct thoughts, split the chunk three ways, one image per thought.
+- **Overlays, meme spikes, and micro-panels all count toward visual variety** — anything that changes what's on screen while narration runs.
+
+The density curve across a video: **very dense (0-15s) → dense (15-60s) → normal pacing (rest)**. This is intentional, not uniform.
+
+Concrete: a narration block like *"You build things. Getting attention for what you built is a separate job. Different skills. Different time. Different energy."* in the cold open probably wants each sentence as its own chunk — three images in ~7 seconds, not one image across all three. The tricolon *"Different skills / Different time / Different energy"* can even be a three-panel micro-montage inside a single chunk if that lands cleaner than three separate chunks.
+
+Outside the cold open, this rule relaxes — long multi-beat chunks are fine past the 15-second mark because the viewer has already committed. Within the cold open, they're a failure mode.
+
+### 9b. Meta-rules are demonstrated, not listed
+
+When a video is ABOUT a specific system or pipeline, the content catalog should cover the **specific craft unique to that system** — not the meta-rules that apply to any scripted video.
+
+Meta-rules like *"declare a core message,"* *"define terms before first use,"* *"orient the viewer in the cold open"* are real and important — but they belong in `SCRIPT_EXTRACTION_RULES.md`, not in the video's content. The video should *demonstrate* those meta-rules by following them, not narrate them as items in a catalog.
+
+Why: if a video prescribes these meta-rules to the viewer, it becomes a video about "how to make videos." That's a different video, with a different audience and a different core message. When covering a specific system, trust the viewer to absorb the meta-craft implicitly from watching it applied.
+
+Concrete example: the V1 spoolcast-explainer video has an "anti-slop processes" catalog (Scene 3). The catalog does NOT include:
+- "declare a core message" (meta — video demonstrates by having one)
+- "define terms before first use" (meta — video demonstrates by defining *beat* and *chunk* before using them)
+- "orient the viewer in the cold open" (meta — video demonstrates by passing the viewer-orientation gate in its own cold open)
+
+The catalog DOES include:
+- chunks-not-beats-as-image-unit, throughline-matching, 15-sec split rule, beat rewriting, TTS pronunciation, editorial judgment stays human.
+
+Those are spoolcast-specific craft. They belong in the video because they explain the *subject* of the video. The meta-rules that shaped how the video itself was written are out of scope for the video's content.
+
+The test: if an item in your catalog would still be relevant if the video were about a different system, it's meta — demonstrate it, don't list it.
+
+### 10a. Deadpan punchline beats get their own single-beat chunk
+
+Short beats that carry comedic weight — one-word reactions, deadpan capstones, understated asides like *"Obviously."*, *"You know, casually."*, *"Structurally, it was."*, *"That's the whole trick."* — need their own chunk so the image changes at the exact moment the line lands.
+
+When a punchline is buried mid-chunk, the visual stays constant and the joke has nothing to punctuate it. The reveal of a new image IS the rhythm that makes the deadpan line land.
+
+**How to identify a punchline beat:**
+- Short (under ~6 words is the sweet spot).
+- Deadpan tonality — matter-of-fact, slightly absurd when you think about it.
+- Often a capstone to a preceding setup ("Close enough that nobody notices.").
+- Rhythmically distinct from its neighbors (surrounded by longer, more technical lines).
+
+**Punchline visual options** (see `ASSET_RULES.md` carve-out for the allowed range):
+- Same style-anchor character with an exaggerated reaction face.
+- A real meme / reaction gif / cultural reference image, full-frame, deliberately breaking the anchor style. Limited to ~1-2 per video to stay a spike, not a running device.
+
+Not an overlay in either case — the punchline chunk's image replaces the scene for that beat, preserving the one-visual-layer rule.
+
+### 11. Effort is not importance — weight by core-message service only
+
+The amount of time, effort, or iteration spent on something during the project is NOT a signal of whether it deserves screen time in the video. Two failure modes this protects against.
+
+**Inflating the saga.** A feature that took ten iterations to get right is not automatically video-worthy. If the final result doesn't serve the core message, the journey behind it doesn't either. Concrete example: a pilot session burned multi-day stretches on the chalkboard-wipe transition, iterating through nine visually-distinct attempts before one landed. That effort was real. But if the next video's core message is "passive content for builders," the chalkboard saga doesn't serve it — cut it entirely. Do not even mention it. Time spent does not buy screen time.
+
+**Underweighting the breakthrough.** A decision that took minutes can be the most important thing in the video. Concrete example: image-ref chaining — the insight that passing a prior generation's URL back as a reference image locks style across scenes — is maybe twenty lines of wrapper code and a short afternoon realization. But it's the mechanism that makes every downstream illustration consistent, and deserves significant screen time. Cheap to produce does not mean small to explain.
+
+The test is always: **does this serve the core message**. If yes, weight it by how much it delivers the message — regardless of how cheap or expensive it was to produce. If no, cut it regardless of how much time you spent on it.
+
+**Related — concrete over abstract.** Specific concrete processes are always stronger video content than abstract meta-commentary about the same topic. *"We iterated on the reveal animation until the vibe was right"* is weaker than *"the per-pixel reveal-time map assigns each pixel a time between zero and the chunk's duration; connected components reveal in parallel."* When in doubt about how to cover a section, go concrete. Abstract decision-making process is usually less interesting than the specific craft moves that resulted from those decisions.
+
+---
+
+## Patterns Observed, Not Yet Rules
+
+### Payoff preview in the cold open
+
+For explainer-style videos where the output is itself visible (e.g. a video about a system that produces videos), inserting a 5-10 second preview of the actual output inside the cold open can turn later technical sections into callbacks rather than abstractions. When the viewer has already seen what the system produces, every technical beat becomes "here's how that thing you just saw gets made" — stronger than "here's a thing I'll describe."
+
+Observed to help in one session. Not yet a hard rule — a cold open can succeed without it when the viewer-orientation gate is passed cleanly. Consider when the output is concrete and recognizable in a few seconds. Does not apply to narrative / dev-log videos where the output *is* the story itself, or to videos where the output only makes sense after the full explanation.
 
 ---
 
@@ -892,6 +1072,52 @@ The strongest endings answer:
 
 That is better than simply repeating the results.
 
+### 9. The core message must be declared before drafting AND confirmed with the user
+
+See §3 Job E. One sentence naming the single thing the viewer must come away with. Every section either serves that message or gets cut. Section importance is downstream of this, not declared independently.
+
+The core message is too load-bearing to guess. Always propose 2-3 candidates in plain language, name the tradeoffs, and wait for the user to confirm or rephrase. Never write a guessed core message into the source analysis and proceed as if it's locked — that's a substance-before-form violation (`rules.md`) dressed up as progress.
+
+Two gaps this closes: first, without a declared core message the agent treats sections with roughly equal weight, diluting the sections that carry the thesis. Second, a guessed core message that sounds plausible can lock in the wrong framing for the entire video — the user then spends iterations reacting to downstream effects without realizing the root cause is upstream.
+
+### 10. The cold open must pass the viewer-orientation gate
+
+Four questions answered explicitly in the first ~30 seconds: what is this thing, who is it for, why should I keep watching, what am I about to see. See "Gates Between Versions" above.
+
+### 11. Every non-obvious term must be defined before first use
+
+Relative to the target viewer implied by the core message. See the concept-inventory gate under "Gates Between Versions."
+
+### 12. Every screenplay version is a two-step workflow: short version, confirm, then prose
+
+Not just a file-format requirement — a workflow enforcement. Write the short version first. Present it directly in chat (not via file link). Stop. Wait for explicit user confirmation that the spine is right. Only then draft the full prose.
+
+See "Screenplay File Format and Workflow" above for the enforced steps. A draft that was written in a single turn — short version and full prose together, with the short version only visible inside the file — violates this rule even if the file is formatted correctly.
+
+The test: if the user has not explicitly said the spine looks right, the full prose should not exist yet.
+
+### 13. Effort spent is not importance
+
+See heuristic 11 above. The amount of time, iteration, or struggle that went into a piece of work is not a signal of whether that work deserves space in the video. Don't let a long saga get covered just because it was expensive. Don't let a quick decision get underweighted because it was cheap. The core message is the only test.
+
+Concrete trap to avoid: during drafting, the agent often over-weights content that was recently or heavily worked on — editorial decisions the agent just wrote rules about, iteration sagas that felt substantial in memory — because that work is vivid. Vividness in the agent's working memory is not evidence of relevance to the viewer. Filter every candidate section against the core message. If a section passes only because "we did a lot of work on this," cut it.
+
+### 14b. Cold-open density is not uniform across the video
+
+The first ~15 seconds should hit at 2-3 sec per chunk. After that, pacing relaxes to the session's normal 7-10 sec average. See heuristic 9a. A video with uniformly slow pacing loses attention in the cold open; a video with uniformly fast pacing exhausts the viewer in the middle.
+
+### 14c. Demonstrate meta-rules; don't list them in the video's content
+
+When the video is about a specific system, cover the system-specific craft. Meta-rules that apply to any scripted video (core message, concept-inventory, viewer orientation) are demonstrated by the video itself, not named as catalog items. See heuristic 9b. Putting meta-rules inside the content turns the video into "how to make videos" — wrong subject, wrong audience.
+
+### 14a. Planned-vs-shipped distinction must be explicit
+
+Every system component the video describes must be clearly marked as shipped, planned, or speculative. See §3 Job D-1. Language like *"still being built,"* *"the next piece,"* *"once it's wired up,"* *"designed to work this way"* is required for planned components. Never use present-tense framing that implies a planned thing is already shipped — viewers can tell, and getting caught once poisons every other claim in the video.
+
+### 14. Concrete craft beats abstract commentary
+
+See heuristic 11 "related" paragraph above. When covering a section, choose the specific concrete process over the abstract description of the decision-making that produced it. Viewers learn from watching the actual move; they glaze over descriptions of how moves are chosen. Every time a draft reaches for "we thought carefully about X" or "we decided that Y," check whether the concrete move can replace that sentence. Usually it can.
+
 ---
 
 ## The Short Version To Remember
@@ -900,11 +1126,11 @@ The actual method was:
 
 1. stabilize the package
 2. read for the practical question, not for summary points
-3. write source analysis first
+3. write source analysis first — including the declared core message and anti-claims
 4. identify the strongest turning point
 5. choose the story angle
 6. write screenplay v1 around the spine
-7. rewrite for voice and pressure
+7. rewrite for voice and pressure; pass the viewer-orientation and concept-inventory gates
 8. rewrite again for beatability and scene structure
 9. build the scene plan from the stabilized screenplay
 10. build the voiceover script from the screenplay

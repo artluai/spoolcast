@@ -4,6 +4,34 @@ How to make titles, descriptions, and thumbnails that actually match
 what a video is about — not what the chunks/scenes/beat-descriptions
 imply.
 
+## The core-message rule (READ FIRST)
+
+Before anything else, know the **core message** — the one thing the
+viewer must come away with from the video. This is declared in the
+source analysis at Stage 1 (see `SCRIPT_EXTRACTION_RULES.md` §3 Job E).
+If you are generating publishing artifacts without a declared core
+message, stop and surface that gap before continuing.
+
+The publishing artifacts — title, thumbnail, description — are **the
+core message expressed in the most attention-grabbing way that is
+honest to the script.** Not a summary. Not a teaser. The core message,
+sharpened into something someone will click on.
+
+The tension: core messages are usually abstract. Attention-grabbing
+titles are concrete and specific. The craft is finding the concrete,
+specific expression of the abstract core message that pulls the viewer
+in — without lying about what the video is.
+
+If the title is about a topic other than the core message, the title
+is wrong. If the thumbnail visualizes a scene that isn't the core
+message, the thumbnail is wrong. If the description's first line
+isn't a sharpened version of the core message, the description is
+wrong.
+
+The rest of this document — the script-first rule, the actual-hook
+test, title and thumbnail patterns — is a toolkit for finding that
+concrete expression.
+
 ## The script-first rule (CRITICAL)
 
 **Before generating any title, description, or thumbnail concept,
@@ -34,9 +62,12 @@ for c in sl['chunks']:
 
 ## The "actual hook" test
 
-After reading the script, identify the **actual hook**: the surprising
-claim, finding, or twist the video makes. This is rarely the setup or
-premise. It's almost always the unexpected result.
+After reading the script, identify the **actual hook**: the concrete,
+specific expression of the core message that will pull a viewer in.
+This is usually the surprising claim, finding, or twist the video
+makes — rarely the setup or premise. The hook and the core message
+aren't two different things; the hook is the core message, made
+concrete and attention-grabbing.
 
 Test the hook against these questions:
 

@@ -188,6 +188,41 @@ Disallowed by default:
 - decorative darkening layers that are not explicitly needed
 - any effect applied on top of preprocessor frames
 
+## Overlay Placement Schema
+
+The one-visual-layer rule allows a carve-out for explicitly-specified overlays (see `WORKFLOW_RULES.md` Overlay carve-out). This section defines the schema.
+
+### Per-overlay fields (read by renderer, specified in shot list)
+
+Every overlay entry must specify ALL of the following — no defaults, no improvisation:
+
+- `source` — path or URL to the overlay image (PNG with clean alpha preferred, SVG acceptable if rasterized at render time)
+- `timing_start_s` — number of seconds into the chunk when the overlay appears. `0.0` for chunk-start.
+- `timing_end_s` — number of seconds into the chunk when the overlay disappears. Must be `> timing_start_s`.
+- `x` — horizontal position in 0.0-1.0 coordinates (0 = left edge, 1 = right edge) OR absolute pixels. Convention: use normalized coords.
+- `y` — vertical position, same convention.
+- `anchor` — which point of the overlay image is placed at (x, y). One of: `top-left`, `top-right`, `center`, `bottom-left`, `bottom-right`. Default convention: `center`.
+- `width` — target width in normalized coords (0.0-1.0 fraction of canvas width) OR absolute pixels. Convention: use normalized.
+- `height` — optional. If omitted, height is computed from source aspect ratio. Specify only when forcing a non-native aspect.
+- `entry_transition` — one of: `cut`, `fade-in`, `pop-in`, `slide-in-left`, `slide-in-right`, `slide-in-top`, `slide-in-bottom`. Default `fade-in` over 0.2s.
+- `exit_transition` — same vocabulary as entry. Default `fade-out` over 0.2s.
+
+### Renderer behavior
+
+On each frame, the renderer:
+- iterates overlays for the current chunk
+- for each overlay, checks if the current chunk-relative time is within `[timing_start_s, timing_end_s]` (including transition time)
+- composites the overlay at the specified position / size / anchor with the specified entry/exit transition state
+- does NOT compute its own positions, sizes, timings, or transitions
+
+If an overlay entry is missing any required field, the renderer must fail loudly (not silently substitute defaults).
+
+### Caps
+
+To preserve the "overlays are rare" principle:
+- Hard cap: 3 concurrent overlays on screen at any moment. Anything over 3 requires a rule-conflict flag.
+- Soft cap per video: ~5-10 overlay insertions total. More than that should be redesigned as full-frame scenes, not overlay-stacked.
+
 ## Preview-Data Rules
 
 Preview-data generation must:

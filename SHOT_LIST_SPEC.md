@@ -39,6 +39,39 @@ The current canonical header set is:
 18. `Asset To Find`
 19. `Priority`
 20. `Chunk`
+21. `Overlays` (optional — see Overlay Spec below)
+
+## Overlay Spec
+
+Per the overlay carve-out in `WORKFLOW_RULES.md`, chunks may include explicitly-specified overlays on top of the primary illustration (brand logos, official badges, cleanly-cropped screenshots).
+
+The `Overlays` column, when present, holds a JSON array of overlay specs. Each entry is a JSON object with fields defined in `RENDER_RULES.md` (Overlay Placement Schema):
+
+```json
+[
+  {
+    "source": "assets/overlays/meta-logo.png",
+    "timing_start_s": 1.2,
+    "timing_end_s": 2.8,
+    "x": 0.85,
+    "y": 0.15,
+    "anchor": "top-right",
+    "width": 0.12,
+    "entry_transition": "fade-in",
+    "exit_transition": "fade-out"
+  }
+]
+```
+
+If the column is empty, the chunk has no overlays — primary illustration only.
+
+Every field listed in `RENDER_RULES.md` overlay schema is required per overlay (no silent defaults). If any field is missing, the render will fail loudly rather than guess.
+
+Constraints (enforced at validation time, not render time):
+- Hard cap: 3 concurrent overlays per chunk at any moment.
+- Soft cap per video: ~5-10 overlay insertions total. More than that is a design smell — redesign as full-frame scenes.
+
+Typical use: brand-name mention in narration gets the brand's logo inserted at the word's timestamp, top-right corner, ~12% canvas width, fades in and out over ~0.3s.
 
 ## Removed Columns Rule
 

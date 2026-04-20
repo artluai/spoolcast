@@ -54,27 +54,33 @@ CONTENT_ROOT = REPO_ROOT.parent / "spoolcast-content"
 #        "beat" columns are per-row.
 COLUMNS: list[tuple[str, str, str, int]] = [
     # (key, header, scope, width_chars)
-    # Left half: scannable basics + camera action + timing.
+    # Left: scannable chunk metadata.
     ("chunk_id",         "Chunk",            "chunk", 7),
     ("scene",            "Scene",            "chunk", 18),
     ("summary",          "Summary",          "chunk", 32),
     ("continuity",       "Continuity",       "chunk", 20),
     ("reveal_direction", "Reveal Direction", "chunk", 14),
+    # Beat data + its visual job, adjacent for side-by-side review.
     ("beat_id",          "Beat",             "beat",  7),
     ("narration",        "Narration",        "beat",  48),
+    ("beat_description", "Beat Description", "chunk", 50),
     ("pause_after",      "Pause After",      "beat",  10),
+    # Camera/timing (used when camera moves are planned; blank otherwise).
     ("camera_reason",    "Camera Reason",    "beat",  36),
     ("camera_target",    "Camera Target",    "beat",  14),
     ("camera_zoom",      "Camera Zoom",      "beat",  12),
     ("transition_s",     "Transition (s)",   "beat",  12),
     ("start_s",          "Start (s)",        "beat",  10),
     ("end_s",            "End (s)",          "beat",  10),
-    # Right half: reference data (long text, scrolled to when needed).
-    ("beat_description", "Beat Description", "chunk", 50),
+    # Right: reference data. Full Prompt is hidden by default (see write_xlsx).
     ("full_prompt",      "Full Prompt",      "chunk", 60),
     ("image_source",     "Image Source",     "chunk", 14),
     ("image_path",       "Image Path",       "chunk", 36),
 ]
+
+# Columns that should be hidden by default in the written xlsx. They're still
+# present (for derivation/debugging) but collapsed so the sheet reads cleanly.
+HIDDEN_COLUMN_KEYS = {"full_prompt"}
 
 CHUNK_SCOPE_KEYS = {k for k, _, scope, _ in COLUMNS if scope == "chunk"}
 
@@ -278,16 +284,23 @@ def write_xlsx(xlsx_path: Path, data: dict[str, Any]) -> None:
 
         current_row = chunk_end + 1
 
-    # --- column widths ---
-    for col_idx, (_key, _label, _scope, width) in enumerate(COLUMNS, start=1):
-        ws.column_dimensions[get_column_letter(col_idx)].width = width
+    # --- column widths + hidden state ---
+    for col_idx, (key, _label, _scope, width) in enumerate(COLUMNS, start=1):
+        letter = get_column_letter(col_idx)
+        ws.column_dimensions[letter].width = width
+        if key in HIDDEN_COLUMN_KEYS:
+            ws.column_dimensions[letter].hidden = True
 
     # --- row heights ---
-    # Set header/meta rows explicitly; leave data rows unset so the
-    # spreadsheet app auto-grows them to fit wrapped narration.
     ws.row_dimensions[1].height = 24
     ws.row_dimensions[2].height = 18
     ws.row_dimensions[header_row].height = 24
+    # Data rows: fix a compact height so large cells (e.g. beat_description
+    # or full_prompt) don't balloon the whole row. Excel/Numbers will still
+    # wrap text inside the cell but won't auto-grow the row past this value.
+    # If a specific chunk needs more room, the user can expand that row.
+    for row in range(data_start_row, current_row):
+        ws.row_dimensions[row].height = 42
 
     # --- freeze panes so header stays visible ---
     ws.freeze_panes = f"A{data_start_row}"

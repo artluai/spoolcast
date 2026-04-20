@@ -108,8 +108,8 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
 
 - The shot list is the source of truth for structure and narration.
 - The session config is the source of truth for style, reveal behavior, and budget.
-- Videos use one visual layer per frame: the illustrated scene.
-- Do not create, preserve, or read a second visual layer.
+- Videos use one primary visual layer per frame: the illustrated scene.
+- Overlays (logos, badges, small reference artifacts) are permitted only when every overlay's position, size, entry/exit timing, and duration are explicitly specified per-overlay in the shot list. Renderer-improvised placement, size, or timing is still banned. AI-judged or AI-generated transparency is still banned — overlay sources must be authoritative images with clean alpha (brand logos, official badges, cleanly-cropped real screenshots). See `RENDER_RULES.md` overlay placement schema and `ASSET_RULES.md` overlay sourcing. See `DESIGN_NOTES.md` "Killed: foreground overlays → Reconsidered" for the reasoning behind the carve-out.
 - One AI illustration per narration chunk is the default. Stock sourcing is an alternate mode, not the default.
 - The preprocessor owns reveal animation; the renderer plays PNG sequences as-is.
 - If a scene cannot be visibly reviewed, it is not done.
@@ -207,6 +207,14 @@ Do not surface decoy options to seem thorough. Do not propose actions that look 
 The test: if what you are about to propose would be described as "honestly doesn't prove/serve/matter much for what we're doing," it should have been filtered out before you wrote it. Commit to a better alternative, or ask the user for direction, or do nothing.
 
 Narrow rule-lawyering (e.g., "this is a single action, not an options list, so the rule doesn't apply") is itself a violation. The point is: filter for benefit, regardless of the shape of what's being proposed.
+
+### Substance Before Form
+
+When collaborating with the user on any creative or editorial decision — a screenplay section, a camera choice, a thumbnail concept, a reveal style, a visual subject — propose the substance in plain words first. Get agreement on what the thing is trying to do. Only then propose how to show it, phrase it, or execute it.
+
+Jumping to specifics before the substance is agreed is a process failure. It wastes iterations on choices the user doesn't actually want, and it hides the editorial decision behind surface-level options the user can only react to aesthetically.
+
+Applied to review cycles: when the user pushes back on a draft, figure out which layer the objection is at — substance, structure, voice, or form — not just re-polish at the surface.
 
 ## Expected App Behavior
 

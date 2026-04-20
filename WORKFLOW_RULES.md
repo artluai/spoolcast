@@ -57,18 +57,43 @@ Shared documentation should avoid absolute local paths unless a path is truly re
 
 ## Global Visual Model
 
-All videos use one visual layer per frame: the illustrated scene.
+All videos use one primary visual layer per frame: the illustrated scene.
 
 That means:
 - each narration chunk is represented by one AI-generated full-frame illustration
-- the illustration is the whole scene; no overlays, no compositing
+- the illustration is the whole scene at the primary layer
 - emphasis comes from moving to the next illustration on the next chunk
 - returning to a prior illustration later is allowed
 
-This system does not use a second visual layer.
+### Overlay carve-out
+
+Overlays (logos, badges, small reference artifacts) are permitted on top of the primary illustration, under strict constraints:
+
+- every overlay's position, size, entry timestamp, exit timestamp, and any entry/exit transition must be **explicitly specified per-overlay** in the shot list
+- the renderer may not improvise placement, size, or timing — it only plays the specified values
+- overlay source images must have **authoritative clean alpha** — brand logos from press kits or SVG libraries, official badges, cleanly-cropped real screenshots
+- AI-generated transparency or AI-judged cutouts are still banned (the original failure mode)
+- overlays are rare by construction — used for brand-mention logo inserts and similar small contextual markers, not as a routine visual device
+
+See `RENDER_RULES.md` (overlay placement schema), `SHOT_LIST_SPEC.md` (overlay fields), and `ASSET_RULES.md` (overlay sourcing) for the concrete contracts. See `DESIGN_NOTES.md` "Killed: foreground overlays → Reconsidered" for the reasoning behind reopening this.
 
 If a legacy sheet still contains removed columns from an older model:
 - delete those columns before doing any other work
+
+## Tracker Project Organization (One Project Per Shipped Video)
+
+Each shipped video is a standalone unit of work tracked as **its own artlu-tracker project** — not grouped into a broader "spoolcast project" or a session-level project.
+
+Why per-video: the tracker's unit of record is "a publishable piece of content." A single spoolcast session folder might span multiple chat sessions, refactors, and restarts before the video ships. The tracker project is the stable identity of the finished thing: its core message, its shipped URL, its journal entries.
+
+The pilot video followed this pattern — it was tracked as *"TRIBE brain-prediction ad-test explainer — spoolcast pilot video"*, distinct from the tool-building project *"chat to video workflow - session to video"*. Future videos should use the same convention.
+
+Session → tracker mapping:
+- Each `spoolcast-content/sessions/<session-id>/session.json` should reference the tracker project name in its `notes` field for cross-reference.
+- Journal entries per video go under that video's tracker project, not the workflow project.
+- Paired videos (e.g., a V1 explainer + V2 dev-log about the same subject) each get their own tracker project.
+
+External writes to the tracker (create project, add journal entry) require explicit user yes in chat per the best-practices rule — same as commits and PRs.
 
 ## Canonical Directory Contract
 
@@ -147,6 +172,16 @@ Each stage must have:
 - a clear validation step
 
 Do not blur these stages together.
+
+### Stage 4 ordering rule: external assets before AI generation
+
+Within Stage 4 (scene generation), produce assets in this order:
+
+1. **External / fetched / file-derived assets first.** Anything that's free and reversible: screenshots (via headless browser), B-roll extractions from existing videos, audio A/B samples from existing TTS renders, composite images from existing PNG files, file-format conversions (xlsx → PNG, json → highlighted code image), overlays sourced from brand press kits / SVG libraries. All of these can be produced cheaply and iterated on at zero cost per iteration.
+2. **Re-approve the shot list after external assets are produced.** A screenshot may be illegible at the target size. A B-roll clip may have bad framing. A composite may lack contrast. A converted xlsx may show irrelevant columns. Fix those chunks before proceeding — the chunk may need a different visual approach, a different asset source, or a cropping pass.
+3. **AI-generated assets second.** Submit the kie.ai image batch only after external assets are locked and the shot list has been re-approved. Image generation costs real money per generation and each regeneration is wasteful. TTS comes after images (narration text is locked by then; any script edit triggered by a visual issue would have been caught in step 2).
+
+Why the ordering: external assets are real-world constraints. If one doesn't work, the chunk has to change, and any AI generation done against the old chunk spec is wasted. Front-loading the zero-cost work protects the spend on the variable-cost work.
 
 For fragile visual systems:
 - validate changes in a prototype or duplicate first when possible

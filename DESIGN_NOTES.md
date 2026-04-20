@@ -98,11 +98,35 @@ Reason: The repo is the reusable scaffold. Session-specific content (media, data
 
 ## What We Tried And Killed
 
-### Killed: foreground overlays (cutouts on top of backgrounds)
+### Killed: foreground overlays (cutouts on top of backgrounds) → Reconsidered (bounded carve-out)
 
-Tried in tribe-session-001. Approximately 15 beats had generated foreground elements meant to float over backgrounds. Every overlay needed manual fixup — drift in placement, wrong sizing, half-broken AI-generated transparency. The renderer couldn't improvise positioning reliably. Abandoned in favor of illustrated full-frame scenes.
+**Original kill (tribe-session-001).** Approximately 15 beats had generated foreground elements meant to float over backgrounds. Every overlay needed manual fixup — drift in placement, wrong sizing, half-broken AI-generated transparency. The renderer couldn't improvise positioning reliably. Abandoned in favor of illustrated full-frame scenes.
 
-What would make this reconsider-able: a real breakthrough in how Remotion handles per-beat positional data AND a reliable way to judge AI-generated transparency. Neither condition is met.
+The stated reopen condition at the time was: *"a real breakthrough in how Remotion handles per-beat positional data AND a reliable way to judge AI-generated transparency. Neither condition is met."*
+
+**Reconsidered (2026-04-20, spoolcast-explainer session).** The reopen condition is now met for a specific sub-class of overlays:
+
+1. **Per-overlay positional data is specifiable, not improvised.** Remotion itself was never the problem — it just needs exact values. The original failure was asking the renderer (or an AI layer above it) to pick placement/size/timing. A shot-list column that hard-codes position, size, entry/exit timing, and transition style per overlay sidesteps this entirely. Remotion just reads and places.
+
+2. **The transparency problem only applies to AI-generated overlay sources.** Brand logos from press kits, Wikipedia SVGs, Clearbit-served PNGs, Material Symbols, and cleanly-cropped real screenshots all come with authoritative clean alpha. Those source classes were never the failure mode.
+
+So the rule was reopened in a **bounded** way: overlays allowed *only* when (a) every placement/size/timing parameter is explicitly specified in the shot list, and (b) the source image is authoritative with clean alpha. AI-improvised placement and AI-generated transparency remain banned. Renderer may not silently default-fill missing fields — it fails loudly.
+
+The original motivating use case: brand-name mentions in narration ("Meta", "kie.ai", "OpenCV") get the brand logo inserted at the word's timestamp, small, upper-corner, for ~1-2 seconds. This adds attribution and visual texture without breaking the primary illustration.
+
+Constraints to prevent overlay creep:
+- Hard cap: 3 concurrent overlays on screen at any moment.
+- Soft cap per video: ~5-10 overlay insertions total.
+- If a chunk "needs" more than one overlay, consider whether a full-frame scene would be a better fit — that's the original lesson and it still applies.
+
+Codified in:
+- `rules.md` Non-Negotiable System Defaults (updated)
+- `WORKFLOW_RULES.md` "Global Visual Model → Overlay carve-out" (new subsection)
+- `RENDER_RULES.md` "Overlay Placement Schema" (new section, defines per-overlay fields)
+- `SHOT_LIST_SPEC.md` header 21 `Overlays` + "Overlay Spec" subsection (new)
+- `ASSET_RULES.md` "Overlay Sourcing" (new section, defines authoritative-source rules)
+
+Kills the brand-logo auto-insertion from the *Deferred* list — it's now active with the overlay system.
 
 ### Killed: AI-judged stock footage selection
 
@@ -229,3 +253,221 @@ push-in. Implemented in `Composition.tsx` `computeCamera()`.
   narration before any title/description/thumbnail work.
 - **The shipped product is the strongest argument for the workflow.**
   https://youtu.be/hqbmHuEtayM exists. Pipeline works end-to-end.
+
+## Lessons from the spoolcast-explainer session (pre-ship)
+
+During source-analysis and screenplay drafting for the explainer
+video, four real gaps in the Stage 1 rules surfaced. All were
+observed in use, not speculation.
+
+1. **The single biggest gap: no requirement to declare the core
+   message.** The agent was treating all sections with roughly equal
+   weight and depth, diluting the sections that carried the video's
+   actual thesis. The builder caught this as the meta-cause of
+   several other gaps: without a declared core message, the agent
+   had no north star for what to cut vs expand, what to define vs
+   assume, what to open on, or what the ending should answer. Section
+   importance is downstream of this — declaring sections as
+   "important" independently is fake precision. Fixed: Job E in
+   `SCRIPT_EXTRACTION_RULES.md` §3 and rule 9 in §8. Also surfaced
+   downstream into `PUBLISHING_RULES.md` top-level "core-message
+   rule" — the title/thumbnail/description are not "aligned with"
+   the core message, they ARE the core message expressed in an
+   attention-grabbing way honest to the script.
+
+   **Follow-on gap caught during the same session.** After the rule
+   was added, the agent immediately guessed a core message and wrote
+   it directly into the source analysis without confirming with the
+   builder. This violated the already-documented Substance-Before-Form
+   rule (`rules.md`) but happened anyway because the Stage 1 rule for
+   Job E didn't explicitly call out user confirmation. Two iterations
+   later, the builder proposed a different and sharper core message
+   in their own words — which became the final one. Fix: Job E now
+   requires proposing 2-3 candidates in plain language, naming the
+   tradeoffs, and waiting for the user to pick or rephrase before
+   writing anything into the source analysis. Enforcement language
+   also added to rule 9 of §8. The lesson: load-bearing editorial
+   decisions need user confirmation even when a rule exists saying
+   "declare X" — declaring and confirming are different things.
+
+2. **Viewer orientation missing from Stage 1 rules.** The existing
+   "find the practical question first" rule is about story logic;
+   it doesn't protect against a cold open that launches into concept
+   before the viewer knows what/who/why/what-they'll-see. Observed:
+   the first screenplay draft stacked three abstraction paragraphs
+   before the viewer saw anything concrete. Same failure mode as
+   the TRIBE pilot's cold open. Fixed: viewer-orientation gate in
+   `SCRIPT_EXTRACTION_RULES.md` "Gates Between Versions."
+
+3. **No concept-inventory gate.** Central concepts (*beat*, *chunk*,
+   how images match chunks) went unexplained in the v1 draft even
+   though they carry the thesis. The builder caught the gap on
+   review; had to add the entire "how the script gets made"
+   section mid-stream. Fixed: concept-inventory gate in
+   `SCRIPT_EXTRACTION_RULES.md` "Gates Between Versions."
+
+4. **Substance-before-form pattern undocumented.** The agent
+   repeatedly jumped to visual specifics before the builder had
+   agreed on what the section was trying to say, wasting iterations.
+   Observed: four back-and-forths on hook images before the builder
+   stopped the loop and demanded plain-words-first. Fixed: new
+   "Substance Before Form" section in `rules.md` (global
+   agent-behavior rule, not just Stage 1 — applies to camera choices,
+   thumbnail concepts, reveal styles, any creative/editorial decision
+   where an agent is collaborating with the user).
+
+5. **No short-version summary at the top of each screenplay draft.**
+   The user repeatedly said "too much text" during v1 and v2 review
+   cycles — the symptom. The cause: every review forced the user to
+   parse a full prose draft to catch issues that were actually at
+   the spine level. A short-version summary block (core message,
+   spine with target times, what changed, flags for review) at the
+   top of each screenplay file lets the user accept, reject, or
+   redirect in seconds. Fixed: new "Screenplay File Format" section
+   in `SCRIPT_EXTRACTION_RULES.md` and rule 12 in §8. The principle:
+   drafting takes effort; reviewing shouldn't.
+
+   **Follow-on — review artifacts are just two things.** The
+   short-version rule then exposed a broader pattern: across the
+   whole Stage 1 pipeline, the agent was handing the user
+   markdown files (source analysis, screenplay prose, scene plan,
+   voiceover script) for "review." The user pushed back: they want
+   only the short version in chat and the final xlsx. Everything
+   else is working scaffolding that shouldn't pull their attention.
+   Fixed: new top-level "Review-Artifact Policy" section in
+   `SCRIPT_EXTRACTION_RULES.md` locks the rule: only two review
+   artifacts per pipeline — the short version in chat, and the
+   shot list xlsx when it exists.
+
+6. **Effort spent is not importance — the agent kept weighting
+   content by how much work went into it.** Two related failure
+   modes surfaced during shot-list review:
+
+   - **Inflating sagas.** The chalkboard-wipe transition took
+     multi-day stretches and nine iterations during the pilot.
+     That effort is real but doesn't make it video-worthy on its
+     own — if the core message doesn't call for it, the saga
+     shouldn't be mentioned. The user flagged this explicitly:
+     "just because we spent a long time on something doesn't
+     mean it's important."
+   - **Underweighting quick breakthroughs.** Image-ref chaining
+     is a small afternoon insight with a tiny code footprint,
+     but it's the mechanism that makes the whole style-lock
+     work. It deserves significant screen time regardless of
+     how cheap it was to implement.
+   - **Abstract over concrete.** The agent's first shot list
+     spent 8 chunks on an "editorial workshop" (abstract
+     decisions: find the question, find the turning point,
+     declare the core message). The user pushed back: that's
+     meta-commentary. The actual anti-slop craft — chunking,
+     throughline matching, beat rewriting, pronunciation fixes,
+     the 15-second split rule — is more interesting and more
+     specific. Go concrete.
+
+   Fixed: new heuristic 11 ("Effort is not importance — weight
+   by core-message service only") in `SCRIPT_EXTRACTION_RULES.md`
+   Heuristics section, plus rules 13 and 14 in §8 ("Rules I Wish
+   The Original Spec Had Said Explicitly").
+
+7. **Deadpan punchline beats need their own visual moment.** During
+   review the builder noted that short comedic beats like
+   *"Obviously."* or *"You know, casually."* were buried inside
+   multi-beat chunks — so the image didn't change at the moment
+   the joke landed. The deadpan line had no visual punctuation.
+   Separating these beats into their own single-beat chunks
+   restores the rhythm: the new image IS the beat. The builder
+   also raised the idea of using real meme / reaction visuals for
+   the peak deadpan beats — which required reconciling with the
+   one-visual-layer rule (no overlays). Resolution: the meme
+   replaces the chunk's image full-frame, not overlaid, preserving
+   the one-layer rule. Limited to 1-2 per video to stay a spike.
+   Fixed: new heuristic 10a in `SCRIPT_EXTRACTION_RULES.md`
+   ("Deadpan punchline beats get their own single-beat chunk")
+   plus a "Punchline Chunk Carve-Out" section in `ASSET_RULES.md`
+   that authorizes the style-anchor override specifically for
+   those single-beat punchline chunks.
+
+8. **Planned-vs-shipped honesty in narration.** During shot-list
+   review the builder caught that the V1 script's Zara/agent-layer
+   beats used present-tense framing ("Zara watches every signal...")
+   that implied the integration was shipped and running. In reality
+   the Zara chatbot exists and posts in Matrix but the spoolcast
+   pipeline integration is designed and not yet built. Over-claiming
+   once poisons viewer trust across the whole video: every other
+   claim becomes suspect. Fix: new Job D-1 in
+   `SCRIPT_EXTRACTION_RULES.md` §3 ("mark planned-vs-shipped for
+   every system component") + rule 14a in §8. Narration must use
+   explicit planned-state language for designed-but-not-built
+   components: "still being built," "the next piece," "once it's
+   wired up," "designed to work this way." Rewrote Scene 10 of V1
+   with those verbs; substance unchanged, framing honest.
+
+9. **External assets before AI generation (Stage 4 ordering).**
+   During V1 shot-list review the builder flagged that AI image
+   generation (real money per call) should not fire until all the
+   free / reversible external assets are produced and the shot list
+   is re-approved. If an external asset fails the chunk has to
+   change, and any AI gen done against the old chunk is wasted.
+   Fix: Stage 4 ordering rule in `WORKFLOW_RULES.md` (external
+   assets first → re-approve shot list → AI generation second →
+   TTS last). This front-loads zero-cost work to protect the
+   variable-cost work. Also incidentally lines up with the
+   substance-before-form principle in `rules.md` — the external
+   assets often surface structural issues that AI gen would bury.
+
+10. **Cold-open visual density is not uniform across the video.**
+    During V1 shot-list re-review the builder pointed out that
+    Scene 1 chunk C1 had 3 beats on one image — meaning the first
+    ~6-7 seconds of the video held a single static illustration.
+    That's the exact opposite of what a cold open needs. The
+    first 10-15 seconds is where attention is most fragile; a slow
+    visual pace loses viewers before the premise lands. Fix: new
+    heuristic 9a in `SCRIPT_EXTRACTION_RULES.md` ("Cold-open visual
+    density"), rule 14b in §8. Target image change every 2-3 sec in
+    the cold open, relaxing to 7-10 sec for the rest of the video.
+    Chunks in the cold open should rarely exceed 4 sec. Applied
+    retroactively to V1: C1 split into C1/C1B/C1C (one beat each),
+    C5 split into C5/C5B/C5C. Scene 1 now has ~15 chunks for ~45
+    seconds, vs the 8 it had before.
+
+11. **Meta-rules are demonstrated by the video, not listed inside
+    its content.** When building V1's Scene 3 "anti-slop catalog,"
+    the first draft included items like "declare a core message,"
+    "define terms before first use," and "orient the viewer in the
+    cold open." The builder pointed out these are meta-rules — they
+    apply to *any* scripted video. Putting them in the catalog
+    turns the video into "how to make videos," which is the wrong
+    subject and wrong audience. The catalog should cover the craft
+    specific to the system being explained. The meta-rules should
+    be *demonstrated* by the video itself (the video has a core
+    message, defines terms before using them, orients the viewer)
+    rather than narrated. Fix: new heuristic 9b in
+    `SCRIPT_EXTRACTION_RULES.md` ("Meta-rules are demonstrated, not
+    listed"), rule 14c in §8. Applied retroactively to V1: Scene 3
+    catalog covers only spoolcast-specific craft (chunks-as-image-
+    unit, throughline matching, 15-sec rule, beat rewriting, TTS
+    pronunciation, human editorial judgment). Meta-rules cut.
+
+12. **Per-video tracker project organization.** Discussion early in
+    the V1 build surfaced that the artlu-tracker pattern is "one
+    tracker project per shipped video," not "one project per
+    codebase" or "one project per session." The pilot video
+    followed this — it was tracked as *"TRIBE brain-prediction
+    ad-test explainer — spoolcast pilot video,"* separate from
+    the workflow tool's tracker entry. Fix: documented in
+    `WORKFLOW_RULES.md` under new "Tracker Project Organization"
+    section, with the session.json ↔ tracker-project name
+    cross-reference convention.
+
+**Noted but not mandated:** the payoff-preview pattern in the cold
+open (5-10 seconds of the actual output before any technical
+explanation). Observed to help once, not yet observed enough times
+to lift to a rule. Logged as a pattern worth considering in
+`SCRIPT_EXTRACTION_RULES.md` "Patterns Observed, Not Yet Rules."
+
+**Deferred:** a trigger/passive-content layer above Stage 1 — the
+agent that watches signals and decides when a video exists. Belongs
+in a future `TRIGGER_RULES.md` once the Zara/Animabot integration
+is shipped. Logged here so it's not forgotten.
+
+**Brand-logo auto-insertion — PROMOTED from Deferred to Active (2026-04-20).** Now enabled by the overlay carve-out. When narration mentions a known brand ("Meta", "Tesla", "Google Cloud", "kie.ai", "OpenCV", "Remotion"), the pipeline identifies the word's timestamp from TTS metadata and inserts the brand logo as an explicitly-specified overlay per the shot-list schema. See `RENDER_RULES.md` Overlay Placement Schema and `ASSET_RULES.md` Overlay Sourcing for the contracts. See the "Reconsidered" subsection under "Killed: foreground overlays" above for the reasoning and constraints.

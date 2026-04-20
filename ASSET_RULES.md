@@ -342,6 +342,77 @@ Before considering the asset stage complete:
 
 ---
 
+## Overlay Sourcing (Logos, Badges, Contextual Markers)
+
+Per the overlay carve-out in `WORKFLOW_RULES.md` and the placement schema in `RENDER_RULES.md`, overlays are permitted on top of the primary chunk illustration. This section covers where overlay source images come from.
+
+### Required source qualities
+
+Overlay images must be:
+- **Authoritative**: brand logos from the brand's own press kit or official SVG, not fan-art versions
+- **Clean alpha**: PNG with proper transparency, or SVG. No white boxes, no anti-aliased edges on solid backgrounds, no jpg artifacts
+- **Appropriately sized at source**: at least 2x the target display size to avoid upscaling blur
+
+AI-generated transparency is **still banned** — that was the original overlay failure mode. If an AI model is the only way to produce the overlay, pick a full-frame substitution instead (see Punchline Chunk Carve-Out below, or the scene illustration).
+
+### Sourcing order for brand logos
+
+When a chunk needs a brand logo overlay, source in this order:
+
+1. **Brand press kit / official download page** — always the canonical source. Brand names + "press kit" or "logo download" in search.
+2. **Wikipedia's SVG for the brand** — usually licensed under Creative Commons or public domain, consistently clean.
+3. **Clearbit Logo API** (`https://logo.clearbit.com/<domain>`) — free, auto-resolves by domain, returns PNG.
+4. **Simple Icons** (`simpleicons.org`) — SVG library of brand icons, MIT-licensed.
+5. **Direct Google Image search** — fallback only, filter for PNG with transparency. Verify quality before using.
+
+Store downloaded overlay assets in `sessions/<session-id>/source/overlays/<brand>.png` or `.svg`.
+
+### Sourcing for non-logo overlays
+
+For badges, callouts, checkmark icons, "NEW" labels, and similar small contextual markers:
+
+- **Material Symbols** and **Feather Icons** — free icon libraries with SVG output
+- **Hand-drawn in anchor style via kie.ai** — when the overlay should match the session's illustration aesthetic rather than stand out. Generate once, reuse across chunks.
+
+For cleanly-cropped real screenshots (e.g., showing a specific UI element inline):
+- Take the screenshot at 2x target resolution
+- Crop tightly to the element
+- Save as PNG with the surrounding area alpha-cleared (use a tool like Preview's Instant Alpha, or Figma's Remove Background)
+
+### Manifest entries
+
+Each overlay source file gets a manifest entry in `source/overlays/overlays.manifest.json`:
+
+```json
+{
+  "meta-logo": {
+    "source_kind": "press-kit",
+    "source_url": "https://about.meta.com/brand/",
+    "local_path": "source/overlays/meta-logo.png",
+    "license": "Meta brand guidelines (attribution not required)",
+    "fetched_at": "2026-04-20T12:00:00Z",
+    "native_width": 512,
+    "native_height": 512
+  }
+}
+```
+
+This lets the review board and future sessions verify attribution and license status at a glance.
+
+## Punchline Chunk Carve-Out (Style-Anchor Override)
+
+Default: every chunk's illustration is style-locked to the session anchor (see Style Anchor Rule above).
+
+Exception: single-beat chunks marked as **deadpan punchlines** (see `SCRIPT_EXTRACTION_RULES.md` heuristic 10a) may use a real meme image, reaction gif, screenshot, or external cultural-reference visual as the full-frame chunk image — deliberately breaking the anchor style for comedic punctuation.
+
+Constraints:
+- **Full-frame substitution only, never overlay.** The meme/reaction visual IS the chunk's image, not composited on top of a style-locked scene. The one-visual-layer rule (`WORKFLOW_RULES.md`, `rules.md`) still applies.
+- **Single-beat chunks only.** Multi-beat chunks stay in anchor style. The substitution is reserved for the specific moment the punchline lands.
+- **Budget: ~1-2 per video.** Past that, the substitution stops being a spike and becomes a running device — the anchor style's consistency starts to feel porous. Rarity is what makes it work.
+- **Flag in the shot list.** Set `image_source` to `meme` or `stock-image` with a `source_kind` of `google-image` or `youtube` per the alternate-mode schema below, and add a `punchline: true` marker in the chunk's notes so review can validate budget.
+
+Example use: a short deadpan beat like *"Obviously."* or *"You know, casually."* lands at the exact moment a well-chosen reaction gif appears full-frame. Single-beat chunk, full substitution, back to anchor style on the next chunk.
+
 ## Alternate Mode: Stock / Sourced Assets
 
 This mode is supported but is not the default. It exists for sessions that explicitly need real footage — for example, showing real screenshots or real clips from the source session.
