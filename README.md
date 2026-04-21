@@ -61,7 +61,7 @@ The repo and content dirs are **separate** so the pipeline is portable across pr
 
 ```bash
 # 1. Clone the pipeline and create the sibling content directory
-git clone https://github.com/<you>/spoolcast.git
+git clone https://github.com/artluai/spoolcast.git
 mkdir spoolcast-content
 cd spoolcast
 
