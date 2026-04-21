@@ -311,11 +311,11 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
                 return s[len("../"):]
             return s
 
-        # weight:high enforces ≥1.5s silence + linger after the chunk.
-        # Bump the last beat's pause to at least 1.5s worth of frames.
+        # weight:high enforces ≥1.0s silence + linger after the chunk.
+        # Bump the last beat's pause to at least 1.0s worth of frames.
         weight = chunk.get("weight", "normal")
         if weight == "high" and beats_out:
-            min_tail_frames = round(1.5 * fps_value)
+            min_tail_frames = round(1.0 * fps_value)
             last = beats_out[-1]
             if last["pauseFrames"] < min_tail_frames:
                 added = min_tail_frames - last["pauseFrames"]
@@ -481,7 +481,82 @@ def _cli() -> None:
         default=None,
         help="Comma-separated chunk IDs to include (default: all renderable).",
     )
+    parser.add_argument(
+        "--skip-audit",
+        action="store_true",
+        help="Skip the narration-audit gate (validator still runs).",
+    )
+    parser.add_argument(
+        "--skip-validate",
+        action="store_true",
+        help="DANGEROUS: skip structural validation. Use only for debugging.",
+    )
     args = parser.parse_args()
+
+    # --- Layer 1: structural validator ---
+    if not args.skip_validate:
+        import validate_shot_list  # sibling module in scripts/
+
+        shot_list = validate_shot_list.load_shot_list(args.session)
+        errors = validate_shot_list.validate(shot_list)
+        if errors:
+            validate_shot_list.print_report(args.session, errors)
+            print(
+                "\n[preview-data] refused to build: shot-list has structural errors.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    # --- Layer 2: narration audit gate ---
+    if not args.skip_audit:
+        audit_path = (
+            CONTENT_ROOT
+            / "sessions"
+            / args.session
+            / "working"
+            / "narration-audit.json"
+        )
+        sl_path = (
+            CONTENT_ROOT
+            / "sessions"
+            / args.session
+            / "shot-list"
+            / "shot-list.json"
+        )
+        if not audit_path.exists():
+            print(
+                f"[preview-data] refused to build: no audit report at {audit_path}.\n"
+                f"  Run: scripts/audit_narration.py --session {args.session}\n"
+                f"  Or pass --skip-audit to bypass (validator still runs).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if audit_path.stat().st_mtime < sl_path.stat().st_mtime:
+            print(
+                f"[preview-data] refused to build: audit report is older than the "
+                f"shot-list. Re-run audit_narration.py or pass --skip-audit.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        try:
+            with audit_path.open() as f:
+                audit = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"[preview-data] refused to build: unreadable audit report: {e}",
+                  file=sys.stderr)
+            sys.exit(1)
+        unresolved = (
+            len(audit.get("bridge_flags") or [])
+            + len(audit.get("overweight_flags") or [])
+            + len(audit.get("preview_flags") or [])
+        )
+        if unresolved:
+            print(
+                f"[preview-data] refused to build: audit report has {unresolved} "
+                f"unresolved flag(s). Resolve or pass --skip-audit.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     data = build(args.session)
     # Apply --chunks filter after build (preserves timeline recomputation).

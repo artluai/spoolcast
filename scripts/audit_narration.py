@@ -195,6 +195,27 @@ tests pass.
 
 Always reply with a single JSON object. No prose outside the JSON."""
 
+PREVIEW_SYSTEM_PROMPT = """You are a narrative structure reviewer for an explainer video.
+
+Your job: for a chunk whose role is to PREVIEW what a section / Act / list
+will cover, decide whether it delivers the preview or just lists names.
+
+STORY.md § Part 2 "Preview structure" requires every preview chunk to:
+1. NAME each sub-element (item, layer, rule, step) the section will cover
+2. Give a ONE-LINE JOB per item — what it does, in plain terms
+3. Give a RELATIONSHIP line — how the items connect or what they produce together
+
+Minimum to pass: names PLUS either (2) OR (3). Ideal: all three.
+
+Anti-example: "Four layers. Image. Animation. Voice. Render." — names only.
+The viewer has no idea what any layer does or why four.
+
+Good example: "Four layers. Image makes the pictures. Animation gives them
+motion. Voice narrates. Render stitches everything into an mp4. Each one does
+one thing. Together they make the video." — names + jobs + relationship.
+
+Always reply with a single JSON object. No prose outside the JSON."""
+
 OVERLOAD_SYSTEM_PROMPT = """You are a narrative pacing reviewer for an explainer video.
 
 Your job: for each beat, decide whether it is overweight — packed with
@@ -533,6 +554,131 @@ def run_bridge_audit(
     return flags
 
 
+# Phrases that signal "this chunk is promising a preview / roadmap" — any
+# chunk whose concatenated narration matches one of these is a preview
+# candidate even if boundary_kind is not act-boundary. Kept small and
+# specific; extend deliberately.
+_PREVIEW_PHRASE_RE = _re.compile(
+    r"\b("
+    r"(?:two|three|four|five|six|seven|eight|nine|ten)\s+"
+    r"(?:layers?|things?|rules?|steps?|ways?|parts?|pieces?|reasons?|items?)"
+    r"|here'?s\s+what\s+we'?ll\s+cover"
+    r"|in\s+the\s+next\s+\d+\s+(?:minutes?|seconds?)"
+    r"|here\s+are\s+(?:two|three|four|five|six|seven)"
+    r")\b",
+    _re.IGNORECASE,
+)
+
+
+def _concat_chunk_narration(chunk: dict[str, Any]) -> str:
+    beats = chunk.get("beats") or []
+    return " ".join((b.get("narration") or "").strip() for b in beats).strip()
+
+
+def select_preview_candidates(shot_list: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return chunks that should be checked for preview structure.
+
+    A chunk is a candidate if:
+    - boundary_kind == "act-boundary", OR
+    - its concatenated narration contains a preview-signal phrase.
+    """
+    candidates: list[dict[str, Any]] = []
+    for c in shot_list.get("chunks", []):
+        bk = (c.get("boundary_kind") or "").strip()
+        narration = _concat_chunk_narration(c)
+        is_act = bk == "act-boundary"
+        matches_phrase = bool(_PREVIEW_PHRASE_RE.search(narration))
+        if is_act or matches_phrase:
+            candidates.append({
+                "chunk_id": c.get("id") or "",
+                "scene_title": c.get("scene_title") or c.get("scene") or "",
+                "boundary_kind": bk,
+                "act_title": c.get("act_title") or "",
+                "act_opener_line": c.get("act_opener_line") or "",
+                "narration": narration,
+                "reason": "act-boundary" if is_act else "preview-phrase",
+            })
+    return candidates
+
+
+def build_preview_prompt(core_message: str, cand: dict[str, Any]) -> str:
+    return (
+        f'Core message of the video: "{core_message}"\n\n'
+        f'Chunk id: {cand["chunk_id"]}\n'
+        f'Scene/Act: {cand["scene_title"]!r}\n'
+        f'Role: {cand["reason"]}\n'
+        f'Concatenated narration:\n"{cand["narration"]}"\n\n'
+        "Apply the preview-structure test:\n"
+        "1. Does the narration NAME each item / layer / rule / step it's "
+        "previewing?\n"
+        "2. Does it give a ONE-LINE JOB per item (what each does)?\n"
+        "3. Does it give a RELATIONSHIP line (how items connect or what they "
+        "produce together)?\n\n"
+        "Minimum to pass: names PLUS (job OR relationship). Ideal: all three.\n\n"
+        "Reply in JSON:\n"
+        "{\n"
+        '  "verdict": "ok" | "missing_explanation",\n'
+        '  "has_names": true | false,\n'
+        '  "has_jobs": true | false,\n'
+        '  "has_relationship": true | false,\n'
+        '  "missing_elements": "<if missing_explanation: short description of '
+        'what to add>",\n'
+        '  "reasoning": "<one sentence>"\n'
+        "}"
+    )
+
+
+def run_preview_audit(
+    client: "ModelClient",
+    model: str,
+    shot_list: dict[str, Any],
+    core_message: str,
+    parallel: int,
+) -> list[dict[str, Any]]:
+    candidates = select_preview_candidates(shot_list)
+    if not candidates:
+        return []
+    results: list[dict[str, Any] | None] = [None] * len(candidates)
+
+    def audit_one(i: int) -> tuple[int, dict[str, Any] | None]:
+        prompt = build_preview_prompt(core_message, candidates[i])
+        parsed = call_claude(client, model, PREVIEW_SYSTEM_PROMPT, prompt)
+        return i, parsed
+
+    print(f"Auditing {len(candidates)} preview-candidates (parallel={parallel})...")
+    if parallel <= 1:
+        for i in range(len(candidates)):
+            _, parsed = audit_one(i)
+            results[i] = parsed
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as ex:
+            futures = {ex.submit(audit_one, i): i for i in range(len(candidates))}
+            for fut in concurrent.futures.as_completed(futures):
+                i, parsed = fut.result()
+                results[i] = parsed
+
+    flags: list[dict[str, Any]] = []
+    for i, parsed in enumerate(results):
+        if parsed is None:
+            continue
+        if parsed.get("verdict") != "missing_explanation":
+            continue
+        cand = candidates[i]
+        flags.append({
+            "chunk_id": cand["chunk_id"],
+            "scene_title": cand["scene_title"],
+            "role": cand["reason"],
+            "narration": cand["narration"],
+            "verdict": parsed.get("verdict"),
+            "has_names": parsed.get("has_names"),
+            "has_jobs": parsed.get("has_jobs"),
+            "has_relationship": parsed.get("has_relationship"),
+            "missing_elements": parsed.get("missing_elements"),
+            "reasoning": parsed.get("reasoning"),
+        })
+    return flags
+
+
 def run_overweight_audit(
     client: "ModelClient",
     model: str,
@@ -593,14 +739,32 @@ def print_stdout_report(
     total_pairs: int,
     bridge_flags: list[dict[str, Any]],
     overweight_flags: list[dict[str, Any]],
+    preview_flags: list[dict[str, Any]] | None = None,
 ) -> None:
+    preview_flags = preview_flags or []
     print()
     print(f"=== Narration audit: {session_id} ===")
     print(f"Total beats: {total_beats}")
     print(f"Total pairs audited: {total_pairs}")
     print(f"Bridge flags: {len(bridge_flags)}")
     print(f"Overweight flags: {len(overweight_flags)}")
+    print(f"Preview-structure flags: {len(preview_flags)}")
     print()
+
+    for f in preview_flags:
+        cid = f.get("chunk_id") or "?"
+        role = f.get("role") or "?"
+        print(f"PREVIEW — {cid} ({role})")
+        print(f'  "{f.get("narration")}"')
+        missing = []
+        if not f.get("has_names"): missing.append("names")
+        if not f.get("has_jobs"): missing.append("jobs")
+        if not f.get("has_relationship"): missing.append("relationship")
+        if missing:
+            print(f"  Missing: {', '.join(missing)}")
+        if f.get("missing_elements"):
+            print(f"  Fix: {f['missing_elements']}")
+        print()
 
     for f in bridge_flags:
         conn = f.get("connection_type") or "?"
@@ -718,6 +882,10 @@ def main() -> int:
         client, model, beats, core_message, args.parallel
     )
 
+    preview_flags = run_preview_audit(
+        client, model, shot_list, core_message, args.parallel
+    )
+
     report = {
         "session_id": args.session,
         "total_beats": len(beats),
@@ -729,6 +897,7 @@ def main() -> int:
         "bridge_flags_suppressed_count": len(suppressed_flags),
         "bridge_flags": bridge_flags,
         "overweight_flags": overweight_flags,
+        "preview_flags": preview_flags,
         "suppressed_bridge_flags": suppressed_flags,
     }
 
@@ -753,9 +922,10 @@ def main() -> int:
         max(0, len(beats) - 1),
         bridge_flags,
         overweight_flags,
+        preview_flags,
     )
 
-    if overweight_flags:
+    if overweight_flags or preview_flags:
         return 2
     if bridge_flags:
         return 1

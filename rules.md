@@ -11,6 +11,31 @@ This file tells any new agent or app:
 
 Read repo-local rules before making suggestions, writing workflow docs, or changing implementation details.
 
+## First Turn Protocol — what to do when you open this repo
+
+Before writing any editorial content, generating any assets, or running any script:
+
+1. **Identify the current pipeline stage** (see table below). Don't assume — check the session directory state.
+2. **Read the stage-specific rule file(s)** named in § What Each File Does. At minimum, read the file that owns the stage you're in.
+3. **Confirm with the user what they want you to do.** If source/ exists but the shot-list is empty and the user says "make a video," you're at Stage 1 (script extraction), not Stage 7 (render). Don't skip ahead.
+4. **Before drafting any editorial content, read STORY.md § 3 Jobs A–E.** Core-message confirmation (Job E) is the most load-bearing decision in the whole pipeline — skip it and every downstream decision drifts.
+5. **Propose your first step in chat. Wait for confirmation. Then work.**
+
+Violating this protocol is how iteration loops get born — the agent runs ahead, the user catches misses in review, expensive re-renders happen. The protocol is cheaper.
+
+### Stage identification
+
+| Session state | Stage | Primary rule file |
+|---|---|---|
+| No `session.json` in `sessions/<id>/` | Stage 0 — scaffold | PIPELINE.md § Workflow |
+| Raw source in `source/`, shot-list empty | Stage 1 — script extraction | STORY.md Part 1 |
+| Shot-list has narration, no images generated | Stage 3–4 — asset generation | VISUALS.md § Assets |
+| Images exist, no `frames/` | Stage 5 — preprocessing | VISUALS.md § Preprocessor |
+| `frames/` + audio + shot-list all present | Stage 7 — render | PIPELINE.md § Render Config |
+| Rendered mp4 exists | Stage 8 — shipping | SHIPPING.md |
+
+Run `scripts/validate_shot_list.py --session <id>` at any point to confirm the shot-list is schema-valid before proceeding. `build_preview_data.py` runs the validator automatically before emitting preview-data.
+
 ## Read Order
 
 Read these files in this exact order:
@@ -79,6 +104,8 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
 - When the shot list, session config, or scene manifest changes, downstream artifacts must be regenerated.
 - Every transition needs a context signal proportional to its size (STORY.md § Part 2 meta-rule).
 - Shared docs should avoid absolute local paths unless a path is truly required to make something work.
+- **The core message is confirmed with the user before any screenplay or narration drafting.** Propose 2–3 candidates in plain language with tradeoffs, wait for the user to pick or rephrase. See STORY.md § 3 Job E. Guessing the core message and proceeding is the single biggest process failure in Stage 1.
+- **Review artifacts are exactly two things: the short version in chat, and the final shot-list xlsx.** Source analysis, screenplay v1/v2/v3 prose, voiceover scripts — written to disk for traceability but NEVER linked to the user for review. See STORY.md § Review-Artifact Policy.
 
 ## If There Is A Conflict
 
@@ -128,6 +155,12 @@ Instead, flag the conflict explicitly before acting, using this format:
 Wait for the user to pick before proceeding. If the user answers with anything other than "update", do NOT edit the rule file.
 
 Obvious clarifications or typo fixes in the rule itself do not need this ceremony.
+
+## Before challenging any rule
+
+Read DESIGN_NOTES.md first. It captures what was tried, what was killed, and why current rules are shaped the way they are. Many "improvements" agents propose are variations of approaches that already got killed — DESIGN_NOTES exists so those don't get re-litigated in every session.
+
+Especially check DESIGN_NOTES for entries dated from recent sessions — those are the failure modes freshest in the pipeline's memory and most likely to recur if an agent doesn't know they've already been addressed.
 
 ## Expected Agent Behavior
 

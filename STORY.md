@@ -1431,7 +1431,7 @@ Certain chunks carry disproportionate weight for their size:
 - **An Act opener** — the first narration after a bumper
 
 These are flagged `weight: high` in the shot-list. High-weight means:
-- ≥1.5 seconds of silence after the chunk ends
+- ≥1.0 seconds of silence after the chunk ends
 - The illustration LINGERS on screen during the silence — no hurried wipe-in to the next chunk
 - Camera doesn't move during the chunk (hold the frame still)
 - Within the chunk, beats that are list items get ≥1s pause instead of 0.3–0.6s so each item can register
@@ -1475,7 +1475,7 @@ The pipeline never renders a video from estimated timing once real audio exists.
 Six new fields support the rules above:
 
 - **`boundary_kind`** (required on every chunk): one of `continues-thread`, `topic-shift`, `act-boundary`, `bumper`. Drives which pause tier and which signal the builder emits.
-- **`weight`** (required on every chunk): `normal` or `high`. Normal gets default pause-after. High gets ≥1.5s silence + linger behavior.
+- **`weight`** (required on every chunk): `normal` or `high`. Normal gets default pause-after. High gets ≥1.0s silence + linger behavior.
 - **`context_justification`** (required on broll chunks only): one sentence naming the context mechanism and what makes this broll obvious to a cold viewer.
 - **`act_title`** (required on `act-boundary` and `bumper` chunks): the text rendered on the bumper card. No prefix, no number.
 - **`act_opener_line`** (required on `act-boundary` chunks): the narration line that previews the Act's contents.
@@ -1505,7 +1505,7 @@ The audit is the layer that catches the failures the structural schema misses. W
 - an `act-boundary` chunk lacks `act_title` or `act_opener_line`
 - a `bumper` chunk lacks `act_title`
 - a broll chunk has empty `context_justification`
-- a `high` weight chunk's post-chunk pause would fall below 1.5s
+- a `high` weight chunk's post-chunk pause would fall below 1.0s
 
 **Layer 2 — semantic (LLM).** `scripts/audit_narration.py` refuses to pass any shot-list where:
 - a beat pair fails the viewer-cognition test and has no bridge or no author-marked acceptance
