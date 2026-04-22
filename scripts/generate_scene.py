@@ -30,6 +30,10 @@ from pathlib import Path
 from typing import Any
 
 from kie_client import KieClient, KieError, build_input_for_model
+from style_library import (
+    resolve_reference,
+    session_style,
+)
 
 
 # ---- paths -------------------------------------------------------------
@@ -99,40 +103,83 @@ def save_manifest(session_id: str, manifest: dict[str, Any]) -> None:
 # ---- prompt composition ------------------------------------------------
 
 def compose_prompt(
-    cfg: dict[str, Any], narration: str, beat: str | None = None
+    cfg: dict[str, Any],
+    narration: str,
+    beat: str | None = None,
+    *,
+    visual_direction: str | None = None,
+    on_screen_text: list[str] | None = None,
+    motion_notes: str | None = None,
 ) -> tuple[str, list[str]]:
     """Build the image prompt + image_input list for this chunk.
 
-    Tight assembly: style + scene description only. The narration text is kept
-    in the signature for future use (timing, audio sync) but is NOT included
-    in the image prompt — the beat should describe exactly what the image
-    must show. If no beat is provided, narration is used as the fallback
-    scene description.
+    Style source precedence (per VISUALS.md § Style library):
+    1. If session.json has a `style` field, pull default_style_prompt from the
+       style library entry.
+    2. Else session.json's own `style_reference` (URL or prompt) or
+       `default_style_prompt`.
+
+    Structured slots (preferred):
+    - `visual_direction` — how the image should look/feel. Sent as scene guidance.
+    - `on_screen_text` — literal text to render on the frame. Sent with explicit
+      "render exactly these words" framing so the model doesn't mix it with style
+      direction or hallucinate inspirational quotes.
+    - `motion_notes` — deliberately IGNORED. Still-image models can't render
+      motion; describing motion produces overlapping duplicate elements
+      (phantom limbs, double characters). Motion belongs to the reveal layer.
+
+    Backward compatibility: if no structured slots are provided, falls back to
+    the legacy `beat` string (which mixes all three concerns into one blob).
     """
-    style_ref = cfg.get("style_reference")
-    default_style = cfg.get("default_style_prompt")
+    style = session_style(cfg)
 
     style_text: str | None = None
     image_input: list[str] = []
 
-    if isinstance(style_ref, str) and style_ref.startswith(("http://", "https://")):
-        image_input.append(style_ref)
-    elif isinstance(style_ref, str) and style_ref.strip():
-        style_text = style_ref
-    elif default_style:
-        style_text = default_style
+    if style:
+        # Session uses the style library. Style prompt is authoritative.
+        style_text = style.default_style_prompt or None
     else:
-        raise ValueError(
-            "session config has neither style_reference nor default_style_prompt — "
-            "refusing to generate without a locked style (see ASSET_RULES.md)"
-        )
+        style_ref = cfg.get("style_reference")
+        default_style = cfg.get("default_style_prompt")
+        if isinstance(style_ref, str) and style_ref.startswith(("http://", "https://")):
+            image_input.append(style_ref)
+        elif isinstance(style_ref, str) and style_ref.strip():
+            style_text = style_ref
+        elif default_style:
+            style_text = default_style
+        else:
+            raise ValueError(
+                "session config has neither style (library), style_reference, "
+                "nor default_style_prompt — refusing to generate without a "
+                "locked style (see VISUALS.md § Style Anchor Rule)"
+            )
 
     parts: list[str] = []
     if style_text:
         parts.append(style_text.rstrip("."))
-    scene = beat if beat else narration
-    if scene:
-        parts.append(f"Scene: {scene.rstrip('.')}")
+
+    # Prefer structured slots. Fall back to legacy `beat` blob otherwise.
+    using_structured = visual_direction is not None or on_screen_text is not None
+    if using_structured:
+        if visual_direction and visual_direction.strip():
+            parts.append(f"Scene: {visual_direction.strip().rstrip('.')}")
+        if on_screen_text:
+            # Filter empty strings, keep author's literal text verbatim.
+            texts = [t.strip() for t in on_screen_text if t and t.strip()]
+            if texts:
+                # Explicit instruction so the model renders these exact words
+                # rather than interpreting them as style direction.
+                joined = " | ".join(f'"{t}"' for t in texts)
+                parts.append(
+                    f"Render exactly this text on the frame, "
+                    f"hand-lettered in the session style: {joined}"
+                )
+        # motion_notes intentionally NOT appended — see docstring.
+    else:
+        scene = beat if beat else narration
+        if scene:
+            parts.append(f"Scene: {scene.rstrip('.')}")
 
     prompt = ". ".join(parts) + "."
     return prompt, image_input
@@ -150,6 +197,10 @@ def generate(
     model_override: str | None = None,
     dest_override: Path | None = None,
     image_ref_override: str | None = None,
+    references: list[str] | None = None,
+    visual_direction: str | None = None,
+    on_screen_text: list[str] | None = None,
+    motion_notes: str | None = None,
 ) -> Path:
     cfg = load_session_config(session_id)
     scenes = scenes_dir(session_id)
@@ -161,24 +212,72 @@ def generate(
         print(f"[gen] {chunk_id} already exists at {dest}. Use --force to regenerate.")
         return dest
 
-    prompt, image_input = compose_prompt(cfg, narration, beat)
+    prompt, image_input = compose_prompt(
+        cfg,
+        narration,
+        beat,
+        visual_direction=visual_direction,
+        on_screen_text=on_screen_text,
+        motion_notes=motion_notes,
+    )
+
+    # Resolve the ONE image_ref for this generation. Precedence:
+    # 1. Explicit --image-ref override (continues-from-prev / callback).
+    # 2. First entry in `references` list (character/object reference — doubles as style anchor).
+    # 3. The session's style-library anchor URL (or legacy manifest style_anchor).
+    #
+    # See VISUALS.md § Style Anchor Rule + § Reference Registry for the rule.
+    manifest = load_or_init_manifest(session_id)
+
+    style = session_style(cfg)
 
     if image_ref_override:
-        # Explicit continuity reference — overrides any manifest style anchor.
-        # Used for continues-from-prev / callback-to-<chunk-id> cases.
+        # Explicit continuity reference — overrides any other ref.
         image_input = [image_ref_override]
-        manifest = load_or_init_manifest(session_id)
+    elif references:
+        # Character/object reference for this chunk. Use the FIRST resolved
+        # reference only (VISUALS rule: one image_input per generation — passing
+        # multiple confuses compositional tendencies). The reference doubles
+        # as the style anchor for this scene.
+        session_path = session_dir(session_id)
+        chosen_url = ""
+        chosen_name = ""
+        for name in references:
+            local, url = resolve_reference(cfg, session_path, name)
+            if url:
+                chosen_url = url
+                chosen_name = name
+                break
+            if local and local.exists():
+                print(
+                    f"[gen] warning: reference {name!r} has local file {local} "
+                    f"but no live kie URL — skipping (regenerate the reference to refresh)"
+                )
+        if chosen_url:
+            image_input = [chosen_url]
+            print(f"[gen] using reference {chosen_name!r} as image_ref for chunk {chunk_id}")
+        elif style:
+            # Style-library session: references were declared but none resolved
+            # to a live URL. Fall back to prompt-only (per VISUALS rule — don't
+            # bleed the style anchor in). Log loudly.
+            print(
+                f"[gen] references {references} had no live URLs — generating prompt-only (per VISUALS.md rule)"
+            )
+    elif style:
+        # Style-library session, chunk has NO references — generate prompt-only.
+        # Do NOT pass the style anchor as image_input (VISUALS.md § "visual anchor
+        # when something specific recurs, text anchor otherwise"). Style lock is
+        # carried by the default_style_prompt text, not by the image.
+        print(f"[gen] no references on chunk {chunk_id} — generating prompt-only")
     else:
-        # Pass the existing style anchor image back in on subsequent generations
-        # (style consistency rule — see ASSET_RULES.md § Style Anchor Rule).
-        manifest = load_or_init_manifest(session_id)
+        # Legacy fallback (sessions without a style library): use the manifest
+        # style_anchor URL as image_input. Kept for pre-style-library sessions.
         anchor = manifest.get("style_anchor")
-        if anchor and anchor.get("kind") in ("image_url", "local_image"):
+        if anchor and anchor.get("kind") == "image_url":
             anchor_src = anchor.get("value")
-            if anchor_src and anchor_src not in image_input:
-                # kie.ai needs a URL, so only pass through if it's a URL.
-                if anchor.get("kind") == "image_url":
-                    image_input.append(anchor_src)
+            if anchor_src:
+                image_input = [anchor_src]
+                print(f"[gen] legacy manifest style anchor applied (no style library)")
 
     client = KieClient()
     print(f"[gen] session={session_id} chunk={chunk_id}")
@@ -288,9 +387,44 @@ def _cli() -> None:
     parser.add_argument(
         "--image-ref",
         default=None,
-        help="URL of an image to pass as image_input (overrides the style anchor from manifest). Used for continues-from-prev / callback continuity.",
+        help="URL of an image to pass as image_input (overrides everything else). Used for continues-from-prev / callback continuity.",
+    )
+    parser.add_argument(
+        "--references",
+        default=None,
+        help="comma-separated list of character/object reference names for this chunk. The FIRST one with a live URL is used as the scene's image_input (doubling as the style anchor).",
+    )
+    parser.add_argument(
+        "--visual-direction",
+        default=None,
+        help="structured slot: how the image should look/feel (composition, mood, pose). Replaces the legacy `--beat` blob. See PIPELINE.md § visual_direction.",
+    )
+    parser.add_argument(
+        "--on-screen-text",
+        default=None,
+        help="structured slot: JSON array of literal text strings to render on the frame (e.g. '[\"rules.md\", \"(a) update the rule\"]'). Empty/missing = no text.",
+    )
+    parser.add_argument(
+        "--motion-notes",
+        default=None,
+        help="structured slot: motion description for the reveal layer. ACCEPTED BUT IGNORED by the image model (still images can't render motion).",
     )
     args = parser.parse_args()
+
+    references_list: list[str] | None = None
+    if args.references:
+        references_list = [r.strip() for r in args.references.split(",") if r.strip()]
+
+    on_screen_text_list: list[str] | None = None
+    if args.on_screen_text:
+        try:
+            parsed = json.loads(args.on_screen_text)
+            if not isinstance(parsed, list) or not all(isinstance(s, str) for s in parsed):
+                raise ValueError("on-screen-text must be a JSON array of strings")
+            on_screen_text_list = parsed
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"[gen] invalid --on-screen-text: {e}", file=sys.stderr)
+            sys.exit(2)
 
     try:
         generate(
@@ -302,6 +436,10 @@ def _cli() -> None:
             model_override=args.model,
             dest_override=Path(args.out) if args.out else None,
             image_ref_override=args.image_ref,
+            references=references_list,
+            visual_direction=args.visual_direction,
+            on_screen_text=on_screen_text_list,
+            motion_notes=args.motion_notes,
         )
     except Exception as e:
         print(f"[gen] error: {e}", file=sys.stderr)

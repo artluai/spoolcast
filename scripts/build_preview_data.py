@@ -293,6 +293,27 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
                 running_frame += dur_frames + pause_frames
 
         chunk_end_frame = running_frame
+
+        # Honor explicit hold_duration_sec — extend the chunk by the gap
+        # between the narrated-beats duration and the requested hold time.
+        # Renderer holds the final frame (no paint, no animation) for the
+        # extra frames. See PIPELINE.md § hold_duration_sec.
+        hold_sec = chunk.get("hold_duration_sec")
+        if isinstance(hold_sec, (int, float)) and hold_sec > 0:
+            required_frames = round(float(hold_sec) * fps_value)
+            current_frames = chunk_end_frame - chunk_start_frame
+            if required_frames > current_frames:
+                extra = required_frames - current_frames
+                running_frame += extra
+                chunk_end_frame = running_frame
+                # Stretch the last beat's endFrameInChunk so the held frame
+                # range is explicit (audio already finished playing).
+                if beats_out:
+                    last = beats_out[-1]
+                    last["endFrameInChunk"] = (
+                        last.get("endFrameInChunk", 0) + extra
+                    )
+
         # Check for preprocessed stroke-reveal frames
         frames_dir_abs = session_dir(session_id) / "frames" / chunk_id
         pre_gen_count = 0
@@ -313,6 +334,10 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
 
         # weight:high enforces ≥1.0s silence + linger after the chunk.
         # Bump the last beat's pause to at least 1.0s worth of frames.
+        # CRITICAL: extra frames must be folded into THIS chunk's duration,
+        # not left as a gap after chunk_end_frame — otherwise the renderer
+        # shows composition-white during those frames (visible as a flash
+        # between chunks). See VISUALS.md § Inter-chunk transition vocabulary.
         weight = chunk.get("weight", "normal")
         if weight == "high" and beats_out:
             min_tail_frames = round(1.0 * fps_value)
@@ -321,6 +346,7 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
                 added = min_tail_frames - last["pauseFrames"]
                 last["pauseFrames"] = min_tail_frames
                 running_frame += added
+                chunk_end_frame = running_frame  # close the gap
 
         chunks_out.append({
             "id": chunk_id,
@@ -349,6 +375,7 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
                     "y": float(o.get("y", 0.18)),
                     "anchor": o.get("anchor", "center"),
                     "width": float(o.get("width", 0.08)),
+                    "rotationDeg": float(o.get("rotation_deg", 0)),
                     "entryTransition": o.get("entry_transition", "cut"),
                     "exitTransition": o.get("exit_transition", "cut"),
                 }
@@ -373,86 +400,129 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
 
     # Annotate each chunk with entrance/exit transitions.
     # Rules:
-    # - proof chunks always hard-cut in AND out (the style clash IS the transition)
+    # - proof / meme / broll_image / broll chunks always hard-cut in AND out
+    #   (external/reference assets should appear and disappear with no animation
+    #   — the style-clash IS the transition; any wipe dilutes it)
     # - first chunk of video: wipe-in
-    # - chunk immediately after a proof: wipe-in (returning to illustrated world)
+    # - chunk immediately after a hard-cut external asset: wipe-in (returning
+    #   to the illustrated world)
     # - continues-from-prev / callback-to-*: cut in (scene already established)
     # - standalone chunks: wipe-in (new visual world)
     # - arc end (last of video OR next chunk is NOT continues-from-prev): wipe-out
     # - arc middle (next chunk IS continues-from-prev): cut out
-    # - proof always: cut out
+    # Hard-cut sources: external assets (memes, broll, proof) + reuse chunks.
+    # These always hard-cut in AND out — no fade, no paint-on.
+    HARD_CUT_SOURCES = {"proof", "meme", "broll_image", "broll", "reuse"}
+
+    # Transition vocabulary (VISUALS.md § Inter-chunk transition vocabulary):
+    # - cut: instant, no animation
+    # - crossfade: prior-frame underlay + fade-in on the incoming chunk
+    #
+    # paint-on is DEFERRED pending preprocessor support for RGBA paint frames
+    # (the existing stroke-reveal outputs RGB with white background, so it
+    # flashes white at every entrance — VISUALS.md § Paint-on deferred).
+    #
+    # A crossfade entrance requires the prior chunk to have a valid still
+    # image to use as underlay. Prior chunks without one (broll videos,
+    # bumpers, first chunk of the video) fall back to a cut entrance.
+    def _has_underlay(prev_chunk: dict) -> bool:
+        if prev_chunk is None:
+            return False
+        prev_path = (prev_chunk.get("imageSrc", "") or "").lower()
+        if not prev_path:
+            return False
+        if any(prev_path.endswith(ext) for ext in (".mp4", ".mov", ".webm")):
+            return False
+        # Bumpers have no imageSrc; they're rendered as a title card, not
+        # from a file — crossfade underlay would have nothing to display.
+        if prev_chunk.get("boundary_kind") == "bumper":
+            return False
+        return True
+
     for i, chunk in enumerate(chunks_out):
-        cont = chunk.get("continuity", "standalone")
         src = chunk.get("imageSource", "generated")
         prev = chunks_out[i - 1] if i > 0 else None
-        next_ = chunks_out[i + 1] if i + 1 < len(chunks_out) else None
+        prev_src = (prev or {}).get("imageSource", "")
 
-        # entrance
-        if src == "proof":
+        # Entrance classifier (simple two-value vocabulary):
+        if src in HARD_CUT_SOURCES:
             entrance = "cut"
         elif i == 0:
-            entrance = "eraser-wipe"
-        elif prev and prev.get("imageSource") == "proof":
-            entrance = "eraser-wipe"
-        elif cont == "standalone" or cont.startswith("callback"):
-            entrance = "eraser-wipe"
-        else:
+            # First chunk of the video: no prior frame to fade from, cut in.
             entrance = "cut"
-
-        # exit — wipe out ONLY at chapter/scene boundaries (not arc boundaries).
-        # "scene" in shot-list terms = the chapter from the voiceover script
-        # (scene 01 Cold Open, scene 02 What TRIBE Is, etc.)
-        if src == "proof":
-            exit_ = "cut"
-        elif next_ is None:
-            # last chunk of the whole video — wipe out as closing flourish
-            exit_ = "eraser-wipe"
-        elif next_.get("imageSource") == "proof":
-            # next is a proof insert — hard cut into it (style clash is the point)
-            exit_ = "cut"
-        elif chunk.get("scene") != next_.get("scene"):
-            # crossing a scene/chapter boundary — wipe out
-            exit_ = "eraser-wipe"
+        elif prev_src in HARD_CUT_SOURCES:
+            # Coming out of a meme / broll / reuse / proof insert — cut, not
+            # crossfade. The insert was meant to have no transition on EITHER
+            # side; a crossfade after it breaks that rule (you'd see the
+            # meme's last frame fading under the next illustration for ~0.35s).
+            # See STORY.md § Deadpan punchlines + VISUALS.md § Inter-chunk
+            # transition vocabulary.
+            entrance = "cut"
+        elif not _has_underlay(prev):
+            # Prev is a broll video, bumper, or has no renderable still —
+            # degrade crossfade to cut so we don't fade in from white.
+            entrance = "cut"
         else:
-            # same scene — keep cutting through
-            exit_ = "cut"
-
-        # wipe durations scale with chunk duration (bounded)
-        chunk_sec = chunk["durationFrames"] / fps_value
-        if entrance == "eraser-wipe":
-            wipe_in_sec = max(1.0, min(chunk_sec * 0.4, 3.0))
-            wipe_in_frames = round(wipe_in_sec * fps_value)
-        else:
-            wipe_in_frames = 0
-        if exit_ == "eraser-wipe":
-            wipe_out_sec = max(0.8, min(chunk_sec * 0.25, 2.0))
-            wipe_out_frames = round(wipe_out_sec * fps_value)
-        else:
-            wipe_out_frames = 0
-
-        # Reveal-group suppression: if this chunk is inside a reveal group,
-        # suppress wipes at the group-interior edges. First-in-group keeps its
-        # wipe-in; middle suppresses both; last keeps its wipe-out.
-        reveal_pos = reveal_positions.get(chunk["id"], "solo")
-        if reveal_pos == "first":
-            wipe_out_frames = 0
-        elif reveal_pos == "middle":
-            wipe_in_frames = 0
-            wipe_out_frames = 0
-        elif reveal_pos == "last":
-            wipe_in_frames = 0
-
+            entrance = "crossfade"
         chunk["entrance"] = entrance
-        chunk["exit"] = exit_
+
+    # Crossfade is entrance-side only — the incoming chunk fades in over the
+    # prior's held last frame. Every chunk's exit is a simple "cut" (hold
+    # final frame until the next chunk takes over). No fade-to-white, no
+    # two-sided wipe.
+    for chunk in chunks_out:
+        chunk["exit"] = "cut"
+
+    # Durations per chunk based on entrance. Under the cut/crossfade
+    # vocabulary, only crossfade has an animated duration.
+    fps_value_f = float(fps_value)
+    for i, chunk in enumerate(chunks_out):
+        entrance = chunk.get("entrance", "cut")
+
+        # paint-on is deferred — no chunks should have this, but keep the
+        # field at 0 for backward compat with any consumers.
+        wipe_in_frames = 0
+        wipe_out_frames = 0
+
+        if entrance == "crossfade":
+            crossfade_in_frames = round(0.35 * fps_value_f)
+        else:
+            crossfade_in_frames = 0
+        crossfade_out_frames = 0  # exit-side fades don't exist under new vocab
+
+        # Reveal-group suppression: group-interior chunks hard-cut in (the
+        # group's cadence IS the rhythm; soft transitions inside dilute it).
+        reveal_pos = reveal_positions.get(chunk["id"], "solo")
+        if reveal_pos in ("middle", "last"):
+            crossfade_in_frames = 0
+            chunk["entrance"] = "cut"
+
+        # Record final-state image path from the previous chunk so the renderer
+        # can composite a crossfade underlay. Blank when the prev asset is a
+        # video (Img can't decode a video) — renderer falls back to no
+        # underlay in that case (effectively a cut into the new chunk).
+        prev_img = ""
+        if i > 0:
+            prev_chunk = chunks_out[i - 1]
+            prev_path = (prev_chunk.get("imageSrc", "") or "").lower()
+            is_video = any(
+                prev_path.endswith(ext) for ext in (".mp4", ".mov", ".webm")
+            )
+            if not is_video:
+                prev_img = prev_chunk.get("imageSrc", "") or ""
+        chunk["priorFinalImageSrc"] = prev_img
+
         chunk["wipeInFrames"] = wipe_in_frames
         chunk["wipeOutFrames"] = wipe_out_frames
+        chunk["crossfadeInFrames"] = crossfade_in_frames
+        chunk["crossfadeOutFrames"] = crossfade_out_frames
         chunk["wipeSeed"] = _hash(chunk["id"]) % 6  # 6 variation buckets
         # reveal_direction comes from shot-list; empty means auto (seed-based)
         chunk["wipeDirection"] = chunk.get("reveal_direction", "") or ""
         chunk["reveal_group"] = chunk.get("reveal_group", "")
         chunk["reveal_group_position"] = reveal_pos
         # legacy field kept for compatibility with any old Composition code
-        chunk["transition"] = entrance
+        chunk["transition"] = chunk["entrance"]
 
     return {
         "sessionId": session_id,
@@ -484,7 +554,22 @@ def _cli() -> None:
     parser.add_argument(
         "--skip-audit",
         action="store_true",
-        help="Skip the narration-audit gate (validator still runs).",
+        help=(
+            "BYPASS the narration-audit gate. Logs a prominent warning and "
+            "writes a bypass marker to sessions/<id>/working/audit-bypass.json "
+            "so downstream stages (and future sessions) can see the render was "
+            "not audited. Not allowed for final builds — use --preview to mark "
+            "this as an intentional preview-only build."
+        ),
+    )
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help=(
+            "Mark this build as a preview-only render (pre-audit iteration). "
+            "Required alongside --skip-audit for the bypass to be honored. "
+            "Final builds require a fresh audit report."
+        ),
     )
     parser.add_argument(
         "--skip-validate",
@@ -508,7 +593,51 @@ def _cli() -> None:
             sys.exit(1)
 
     # --- Layer 2: narration audit gate ---
-    if not args.skip_audit:
+    audit_bypass_path = (
+        CONTENT_ROOT
+        / "sessions"
+        / args.session
+        / "working"
+        / "audit-bypass.json"
+    )
+    if args.skip_audit:
+        if not args.preview:
+            print(
+                "[preview-data] refused to build: --skip-audit without --preview.\n"
+                "  --skip-audit is for preview-only iteration, not final builds.\n"
+                "  Final builds require a fresh audit. Options:\n"
+                "    (a) run `scripts/audit_narration.py --session "
+                f"{args.session}` and address the flags, then rebuild, OR\n"
+                "    (b) if this is a deliberate preview build, re-run with both "
+                "`--skip-audit --preview` so the bypass is recorded.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        # Preview bypass is allowed — log loudly and write a marker.
+        import datetime as _dt
+        print(
+            "\n" + "=" * 72 + "\n"
+            "[preview-data] WARNING: building with --skip-audit (preview mode).\n"
+            "  This build is NOT audited for bridge / overweight / preview / "
+            "layman / alignment issues.\n"
+            "  A bypass marker is being written to the session so downstream "
+            "stages can see it.\n"
+            "  Do NOT ship this build as final.\n" + "=" * 72 + "\n",
+            file=sys.stderr,
+        )
+        audit_bypass_path.parent.mkdir(parents=True, exist_ok=True)
+        with audit_bypass_path.open("w") as f:
+            json.dump({
+                "session_id": args.session,
+                "bypassed_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+                "reason": "preview build via --skip-audit --preview",
+                "is_preview_only": True,
+            }, f, indent=2)
+    else:
+        # Normal path: require a fresh, clean audit.
+        # Clear any stale bypass marker on an audited build.
+        if audit_bypass_path.exists():
+            audit_bypass_path.unlink()
         audit_path = (
             CONTENT_ROOT
             / "sessions"
@@ -527,14 +656,16 @@ def _cli() -> None:
             print(
                 f"[preview-data] refused to build: no audit report at {audit_path}.\n"
                 f"  Run: scripts/audit_narration.py --session {args.session}\n"
-                f"  Or pass --skip-audit to bypass (validator still runs).",
+                f"  Or for a preview-only iteration build, pass both "
+                f"`--skip-audit --preview`.",
                 file=sys.stderr,
             )
             sys.exit(1)
         if audit_path.stat().st_mtime < sl_path.stat().st_mtime:
             print(
                 f"[preview-data] refused to build: audit report is older than the "
-                f"shot-list. Re-run audit_narration.py or pass --skip-audit.",
+                f"shot-list. Re-run audit_narration.py, or for preview-only "
+                f"iteration pass `--skip-audit --preview`.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -549,11 +680,15 @@ def _cli() -> None:
             len(audit.get("bridge_flags") or [])
             + len(audit.get("overweight_flags") or [])
             + len(audit.get("preview_flags") or [])
+            + len(audit.get("layman_flags") or [])
+            + len(audit.get("alignment_flags") or [])
         )
         if unresolved:
             print(
                 f"[preview-data] refused to build: audit report has {unresolved} "
-                f"unresolved flag(s). Resolve or pass --skip-audit.",
+                f"unresolved flag(s) across bridge/overweight/preview/layman/"
+                f"alignment. Resolve or rebuild as preview-only with "
+                f"`--skip-audit --preview`.",
                 file=sys.stderr,
             )
             sys.exit(1)

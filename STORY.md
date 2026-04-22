@@ -250,6 +250,24 @@ Example from the spoolcast-explainer session: three candidates were proposed (ar
 
 Without a declared core message, the agent has no north star for what to cut vs expand, what to define vs assume, what to open on, or what the ending should answer. Attention drifts to whichever section is currently on the page, not to the one that matters most.
 
+**Mechanical enforcement.** The confirmed core message is written into `session.json` as the `core_message` field (single sentence, locked). `scripts/audit_narration.py` runs a core-message alignment pass: for each beat, the auditor decides whether the beat serves the locked message — setup, evidence, analogy, payoff, generalization, or callback — or whether it's decorative / tangential / off-thesis. Off-thesis beats are flagged with a proposed fix (cut / rewrite / move). `build_preview_data.py` refuses to produce a final render while alignment flags are unresolved, on the same gate as layman and overweight. Without this enforcement, beats that felt important during drafting but don't actually serve the thesis tend to survive into the render.
+
+###### Job F: deliverable-feasibility check — no creative commitment without confirmed deliverables
+
+Before narration locks any claim that depends on specific deliverables being available, confirm those deliverables are actually available — existing on disk and matching the plan, sourceable within budget and time, or regenerable with available tools. This includes (but isn't named as) every shape of deliverable-dependent creative choice — visual artifacts, audio cuts, proof screenshots, real iteration outputs, cultural references, archival clips, anything the narration will name or imply a viewer should see.
+
+What "confirm" means at this stage:
+- The specific deliverable exists or can be produced
+- Its actual content (not its label or intent) matches what the plan will describe
+- Any quantitative commitment (*N distinct items*, *a before/after pair*, *a three-step progression*) has each element independently confirmed, not inferred from a collection's existence
+- The verification uses the same rules as VISUALS.md § Asset Verification Principles — labels are hypotheses, content is evidence
+
+If a deliverable is not confirmed, the narration must change at the planning stage — before it locks — to match what is actually deliverable. Do not draft narration that commits to specifics and hope the deliverable will materialize in production.
+
+**Counter-balance clause — this rule must not be read as a bias.** The right response to a feasibility failure is to find or produce the missing deliverable, not to avoid creative commitments that require specific deliverables. Real artifacts, real iterations, and real evidence played on screen carry engagement illustrations alone cannot match. This check exists to make those stories *shippable*, not to nudge the agent toward safer alternatives. If the agent notices itself gravitating away from deliverable-heavy angles when proposing options, that bias is the thing this rule must not produce.
+
+Failure mode this prevents: commit to a creative concept based on a source-material description (*"use the saga renders as an iteration-hell montage"*), draft narration around it, discover at production that the required deliverables don't exist in the needed form, rewrite mid-flight. The 2-second version: *"can we actually get these?"* gets answered before narration says *"these specific ones."*
+
 ##### 4. Pick the story angle only after the source analysis is done
 
 Only after the source analysis existed was the story angle chosen.
@@ -458,46 +476,88 @@ It is a statement of how the narration should behave on screen.
 
 #### Review-Artifact Policy (READ FIRST)
 
-Across the whole Stage 1 pipeline, only two things are presented to the user for review:
+Across the whole Stage 1 pipeline, review happens at exactly these surfaces:
 
-1. **A short version in chat** — a tight summary block with core message, spine, what changed, flags. See "Screenplay File Format and Workflow" below for the required fields.
-2. **The shot list xlsx** — the final deliverable. Opened via `open <path>` when ready.
+1. **Short version in chat** — used ONLY at two specific gates:
+   - **After source analysis** (Job A–D written, Job E locked): short version = core message, spine, turning point, anti-claims, planned-vs-shipped flags, any review flags. User confirms the spine is right before screenplay drafting begins.
+   - **After structure is proposed** (Act/chapter shape): short version = the bullet list of Acts with one-line per beat. User confirms the structure is right before screenplay drafting begins.
+2. **Shot-list xlsx** — the single consolidated review artifact for the actual script. Narration, beat, background, camera, chunk — all visible in one scannable grid, per row. The user reviews the script by reading the xlsx, not by reading a prose screenplay.
 
-Everything else — source analysis, screenplay v1/v2/v3 prose, scene plan, voiceover script — is a **working doc**. Working docs are written to disk for traceability, but are **not** linked to the user for review. The user should never have to open a markdown file to approve a stage.
+Between screenplay v1, v2, v3 — **no short-version chat summary is sent for review.** Screenplay prose is a working doc written to disk for traceability only. The substance-before-form gate has already fired at the source-analysis and structure short-versions; the voice/pacing/line-level craft that v1→v2→v3 refines is best reviewed via the shot-list xlsx (where the viewer can see ten beats at once instead of scrolling a wall of prose).
 
-Why: reading prose drafts is the highest-cost form of review. The short version captures the substantive decisions cheaply; the xlsx captures the concrete output completely. Everything in between is scaffolding the user shouldn't have to parse.
+Everything else — source analysis prose, screenplay v1/v2/v3 prose, scene plan, voiceover script — is a **working doc**. Working docs are written to disk for traceability, but are **not** linked to the user for review. The user should never have to open a markdown file to approve a stage.
 
-This applies to every review point in the pipeline. A stage is not "ready for review" unless the agent has (a) presented the short version directly in chat, and (b) — at the shot-list stage — produced the xlsx.
+Why: reading prose drafts is the highest-cost form of review. Short versions capture substantive (spine-level) decisions cheaply; the xlsx captures the concrete script completely and visually. Handing over v1/v2/v3 chat summaries between them turns review into a wall-of-text exercise where spine-level issues were already caught upstream.
+
+A stage is not "ready for review" unless the agent has presented the appropriate artifact for that gate: short version in chat at source-analysis and structure gates; shot-list xlsx at the script gate.
 
 #### Screenplay File Format and Workflow
 
-Every screenplay version (v1, v2, v3, any rewrite) follows a two-step workflow. The short version is produced first, presented in chat, and confirmed by the user *before* the full prose gets drafted.
+Screenplay v1 / v2 / v3 are **working docs**, not review artifacts. Per the Review-Artifact Policy above, they are drafted to disk for traceability and are not reviewed in chat between versions.
 
-##### Required workflow (enforced, not optional)
+The spine-level substance-before-form gate that used to live in per-version short summaries has moved upstream: it now lives in the **source-analysis short summary** and the **structure short summary** (see Review-Artifact Policy). By the time screenplay v1 drafting begins, the spine is already confirmed — what v1 → v2 → v3 does is refine voice, pacing, and line-level craft against that locked spine.
 
-1. **Write the short version first, as its own artifact.** Not buried at the top of a long file the user may not open.
-2. **Present the short version directly in chat.** Not a file link, not "open the doc to see it" — paste the block into the chat message so the user reads it without any extra step.
-3. **Stop. Wait for the user to confirm, edit, or redirect.** Do not draft the full prose in the same turn as the short version. Do not assume silence or a short acknowledgment ("ok", "good", "processed") means proceed — explicit confirmation on the spine is required.
-4. **Only after explicit confirmation, draft the full prose.** Save the file with the short version at the top and the full draft below a `---` separator.
+##### Required workflow
 
-##### Required short-version fields
+1. **Source analysis** written to disk. Short version presented in chat. User confirms spine.
+2. **Structure** proposed in chat (short version). User confirms structure.
+3. **Screenplay v1** drafted to disk. Proves the confirmed spine holds as prose. No chat review.
+4. **Screenplay v2** drafted to disk. Voice / pressure / deadpan tuning pass. No chat review.
+5. **Screenplay v3** drafted to disk. Beat-level rewrite — lines sized to survive as independent voiceover units. No chat review.
+6. **Voiceover script** derived from v3 (one audio chunk per row), written to disk. No chat review.
+7. **Shot-list xlsx** generated from the voiceover script + scene plan. User reviews the xlsx — this is the consolidated review surface where narration, beat, background, camera, and chunk are visible together.
 
-- **Core message (confirmed)** — one line, the locked message from §3 Job E.
-- **Spine** — ordered list of sections with a one-line description and a target narration time for each. Running total at the bottom.
-- **What changed from the previous version** — bullet list of substantive changes (skip for v1).
-- **Flags for review** — anything the user should confirm, reject, or redirect before the next version. If none, say "none."
+##### Required on-disk file format (each screenplay version)
 
-Keep the short version under ~25 lines.
+Each v1/v2/v3 file on disk begins with a short summary block at the top (for agent traceability and future-session context), then a `---` separator, then the full prose draft below. The fields mirror what the chat summary used to contain:
 
-##### Why this workflow, not just the format
+- **Core message (confirmed)** — one line from §3 Job E.
+- **Spine** — ordered list of Acts/sections with one-line descriptions and target narration times. Running total at bottom.
+- **What changed from the previous version** — bullet list (skip for v1).
+- **Flags** — any ambiguities the agent wants to revisit when building the shot list.
 
-Drafting a full screenplay takes real effort; reviewing one shouldn't. If the spine is wrong, the prose is wasted. Writing the full prose before the user has seen the spine defeats the entire reason the short version exists — the user ends up reviewing a finished draft instead of catching the wrong turn at the cheap moment.
+This is a traceability artifact the agent may re-read later, not a user review artifact. It is not presented in chat.
 
-The failure mode this prevents: the agent writes a short version AND full prose in one shot, the user only sees the full prose in chat (short version is inside the file, unopened), the user reacts to prose-level issues that are actually spine-level issues, and the next draft is written against the wrong feedback layer.
+##### Why the policy moved upstream
 
-The test: if the user has not explicitly said "the spine looks right" (or equivalent) after reading the short version in chat, the full prose is not allowed to exist yet.
+Drafting a full screenplay takes real effort; reviewing one shouldn't. The old policy caught spine-level issues by requiring a short version before drafting prose at every version gate. That is still the right principle — but the cheapest place to apply it is ONCE, at the source-analysis stage (catching the core-message / anti-claims / turning point) and ONCE, at the structure stage (catching the Act shape). After both are locked, v1 → v2 → v3 runs on disk without further chat gates, and the shot-list xlsx becomes the single consolidated review surface where narration + beat + background + camera can be seen together in one grid.
+
+The failure mode the new policy prevents: short-version chat summaries piling up between v1/v2/v3 become wall-of-text reviews themselves, without actually showing the user more than they already saw at the structure stage. The xlsx is a better review surface for line-level craft because the visual grid shows pacing, repetition, and weight at a glance.
+
+The test: by the time the xlsx is handed over, every spine decision should already have been confirmed upstream. The xlsx review should catch line-level issues (narration phrasing, beat pacing, camera / background choices), not spine-level ones.
 
 This rule applies to every review point in the screenplay pipeline.
+
+---
+
+#### The four drafting checks (apply to every beat, every version)
+
+Four checks the agent MUST run on every beat while drafting — screenplay v1, v2, v3, voiceover, and shot-list. These are not audit-only concepts. The audit (`scripts/audit_narration.py`) is a safety net; drafting is the primary filter. If drafting ignores them, the audit becomes the only barrier and the failure mode is late / expensive rework.
+
+Apply each to the beat currently being written, BEFORE committing it to the draft.
+
+1. **Alignment — does this beat serve the core message?**
+   Name the beat's job toward the locked core message in one sentence: setup, evidence, analogy, payoff, generalization, callback. If the job is unclear or the beat would fit just as well in a different video, the beat is off-thesis — cut, rewrite to serve the thesis, or move elsewhere. See § Job E and the `core_message` field in `session.json`.
+
+2. **Layman — can a non-technical viewer understand this beat from the narration alone?**
+   Without having read any rule file, technical doc, or the project's glossary. If a technical term appears, the plain version must EITHER (a) be given in the same beat, OR (b) be established in an earlier beat still fresh in viewer memory. A beat can be short and well-paced yet still use a term the viewer has no frame for — those fail this check. See § Layman-first explanation rule for the general principle.
+
+3. **Overweight — is this beat the right density for its position in the video?**
+   Cold opens dense-quick. Middle sections relaxed. Proof / punchline moments slow. Could half the words be cut without losing the argument? Is jargon stacked? Are multiple concepts packed when they'd land better spread out? If yes: split, simplify, or cut.
+
+4. **Bridge — does this beat follow naturally from the previous beat?**
+   The viewer should not experience an unbridged orthogonal jump. Apply the viewer-cognition test: what is the viewer thinking after the prior beat — does this beat answer that thought, or introduce something the prior beat didn't set up? Valid bridge archetypes (setup-consequence, state-question, claim-evidence, problem-solution, comparison, strict tricolon, closing-conclusion, callback) handle the transition without an added bridge line; everything else needs one. See § Pairwise narration audit for the full archetype list and the deterministic post-filter rules.
+
+**What these checks are for, in one line:** alignment keeps the beat on-thesis, layman keeps it understandable, overweight keeps it the right size, bridge keeps it in sequence. A beat can pass one and fail another — you run all four.
+
+**Procedural integration:**
+- Screenplay v1 drafting: run the four checks per beat before moving to the next beat.
+- v1 → v2 rewrite: scan each v1 beat against all four; every rewrite must improve at least one check without regressing another.
+- v2 → v3 rewrite: apply again at beat-breakable granularity, where individual lines must survive as single-beat narration units.
+- Voiceover + shot-list: still apply — the shot-list is the last chance to catch before TTS generation locks the narration into audio.
+- Audit pass: catches what drafting missed. A clean audit run indicates drafting worked; many flags indicate the checks weren't being applied during drafting.
+
+**Failure mode this rule prevents:** agent drafts all three screenplay versions without applying these four checks beat-by-beat, produces narration that pattern-matches prior screenplays' jargon and structure, relies on the audit gate to catch issues, then bypasses the audit gate for convenience. The four checks then never fire at all. Happened on V2 (spoolcast-dev-log) — documented in DESIGN_NOTES.md as a cautionary case.
 
 ---
 
@@ -523,6 +583,41 @@ List every non-obvious term the script uses in its argument — project-specific
 "Non-obvious" is judged relative to the target viewer implied by the core message. A developer audience doesn't need *HTTP request* defined; a general audience does. A reader of the spoolcast rules understands *chunk*; a first-time viewer does not.
 
 This gate protects against the failure mode where central concepts carry the thesis but remain undefined — the viewer nods along without actually following the argument.
+
+##### Layman-first explanation rule
+
+Applies to everything presented to a viewer: narration in the final video, and chat output to the user during the build (structure proposals, plan summaries, option lists, fix explanations).
+
+The rule:
+
+1. **Lead with the plain-English version.** If an idea can be said in everyday words, say it that way first. A concrete analogy or a small scenario usually lands better than a definition.
+2. **Technical terms are allowed — but only after the plain version exists, and only with a short in-line explanation the first time the term appears.** "Deterministic — meaning: same input, same output, no surprises." "Preprocessor — a script that prepares the image before the video is rendered."
+3. **Never assume the reader has the jargon.** Default posture: the listener / reader has never seen this project before. Reading the rules docs does not count as viewer context for the YouTube audience, and it does not count as build context for a user who is making decisions at the substance level, not the implementation level.
+4. **Don't test the rule against whether the reader *could* figure it out** — test it against whether the reader should have to. If the plain version was one sentence away, skipping it is a failure.
+
+Concrete failure example (caught during V2 structure phase): the fix was presented as *"the rule-conflict protocol: surface, present (update / exception / keep), wait."* The user asked for the layman version. The plain version — *"the AI stops and asks the human to pick instead of silently overwriting the rule"* — was one sentence away and should have led.
+
+The test: if a non-technical reader skims your explanation and walks away thinking *"I understood what this is doing,"* it passed. If they walk away thinking *"I got the general vibe but not the mechanics,"* lead with the layman version and keep the technical version as a second pass.
+
+Applies equally to:
+- **Narration** — the YouTube viewer is a stranger. Introduce every load-bearing concept in layman form before any technical framing.
+- **In-chat presentation to the user** — the user is smart and the substance owner, but they are not pre-loaded on every mechanism. When proposing a fix, a structure, or a decision, lead with what it DOES in plain terms before naming the mechanism.
+
+**Mechanical enforcement on the narration side.** The layman-first rule is procedurally enforced by the layman-accessibility pass in `scripts/audit_narration.py`. For each beat, the auditor asks whether a non-technical viewer can understand it from the narration alone — and flags beats that rely on unexplained jargon / terms-of-art / insider vocabulary. The auditor maintains a rolling glossary: a term flagged on first use is considered "established" for subsequent beats, so the rule catches first-use violations without punishing legitimate reuse. `build_preview_data.py` refuses to produce a final render while layman flags are unresolved; the only way past is to address the flag or build as an explicit preview via `--skip-audit --preview` (which writes a bypass marker so the render is not mistaken for final). Prose rules on this one lose to pattern-matching in agent drafting — the audit pass is what actually enforces the rule.
+
+##### Timestamps, not chunk IDs
+
+When referring to a moment in the video during chat, use the video timestamp (`0:42`, `1:15`, `3:28`) — not the shot-list chunk ID (`C14`, `C32`). Chunk IDs are build-time addresses; the user experiences the video as a time-indexed stream. A user reading *"adjust C14"* has no way to know where C14 falls in the video without opening the xlsx and counting. A user reading *"adjust 1:26"* can picture the moment immediately.
+
+Chunk IDs are fine in on-disk artifacts (shot-list, screenplays, scene manifests, logs) — they're the right primary key there. The rule is about chat output to the user during review gates.
+
+When both the user and the agent need to refer to the same beat, prefer *"the 1:26 beat about rule rewriting"* — timestamp plus a short semantic anchor — over either identifier alone. Pure timestamps can drift if the shot-list re-times; the semantic anchor survives.
+
+##### Full filepaths, not repo-relative
+
+When referring to a file on disk in chat, use the absolute filepath (`/Users/.../spoolcast-content/sessions/.../shot-list.xlsx`), not a repo-relative path (`sessions/.../shot-list.xlsx`) or a content-root-relative path. Relative paths only resolve for a reader standing in the right working directory; absolute paths open from anywhere. The user is not standing in the agent's cwd — they're in a chat window. Make paths clickable on first mention.
+
+Exception: on-disk canonical doc contents (the rule files themselves, written artifacts meant to be read inside the repo) use relative paths because the doc's own context resolves them. The rule is about chat, not about persistent files.
 
 ---
 
@@ -713,6 +808,22 @@ Concrete: a narration block like *"You build things. Getting attention for what 
 
 Outside the cold open, this rule relaxes — long multi-beat chunks are fine past the 15-second mark because the viewer has already committed. Within the cold open, they're a failure mode.
 
+##### 9a-2. Cold-open → Act 1 handoff: continuous, not reset
+
+The cold open ends on a thesis-shaped line (a punchline, a reveal, a reframe — the line that tells the viewer what this video is really about). The first line of Act 1 must build on that line, not start a fresh "let me set up a story from scratch" introduction. A reset breaks the handoff and the viewer experiences a jump.
+
+The failure mode: cold open lands *"A rule you rewrite every time you break it is not a rule. It's a log."* — a conclusion — and then Act 1 opens with *"I was building a project with an AI partner."* — a neutral setup that would also fit the first line of a completely different video. The viewer has just been told the ending of the thesis; going back to generic setup feels like starting over.
+
+The fix, applied per-chunk: the first beat of Act 1 must reference, answer, or build on what the cold open just established. It can do any of:
+
+- **Name the subject.** If the cold open said *"rules that mutate are logs,"* Act 1 can open with *"I learned this the hard way, building a project with an AI partner."* — now the setup is explicitly the evidence for the cold-open claim, not a new topic.
+- **Take the cold open as a given and proceed.** *"Here's how that happens in practice."* — treats the cold open's conclusion as premise.
+- **Ask what the cold open just made you ask.** *"So how do you write rules that don't do that?"*
+
+Diagnostic: read the cold open's last line and the Act 1 opener aloud, in sequence. If the Act 1 opener would work equally well as the *first* line of the video (no cold open preceding), the handoff is broken.
+
+Applies to the cold-open → Act 1 handoff only; later Act transitions have their own bumper + opener contract (see § Acts are the editorial unit). This is specifically about the cold-open's thesis-landing → setup-of-story transition, which the bumper system doesn't protect.
+
 ##### 9b. Meta-rules are demonstrated, not listed
 
 When a video is ABOUT a specific system or pipeline, the content catalog should cover the **specific craft unique to that system** — not the meta-rules that apply to any scripted video.
@@ -747,7 +858,14 @@ When a punchline is buried mid-chunk, the visual stays constant and the joke has
 
 **Punchline visual options** (see `VISUALS.md` carve-out for the allowed range):
 - Same style-anchor character with an exaggerated reaction face.
-- A real meme / reaction gif / cultural reference image, full-frame, deliberately breaking the anchor style. Limited to ~1-2 per video to stay a spike, not a running device.
+- A real meme / reaction gif / cultural reference image, full-frame, deliberately breaking the anchor style. Spike device, not a running visual — each one must independently pass the contrast + specificity test (§ Broll earns attention) AND carry its own distinct recognition the viewer can pin in half a second.
+
+**How many memes?** No hard budget, no subject-type classification. The test is per-beat, not per-video: does removing this meme weaken the beat it lands in? If yes, keep it. If it's there for decoration or humor-for-its-own-sake, cut it. Count is a consequence of applying the per-beat test honestly — a subject that benefits from tone counterweight will naturally earn more memes; a subject that doesn't will earn fewer. Don't target a number either way.
+
+Guardrails that keep memes working as spikes:
+- No repeated memes — a repeat isn't a spike.
+- No back-to-back memes within ~30 seconds — clustering collapses the spike effect. If two earn their slot close together, space them by moving one or drop the weaker.
+- If memes start feeling like a running visual device rather than punctuation, the per-beat test is being applied loosely — recheck each one against "does removing this weaken the beat?"
 
 Not an overlay in either case — the punchline chunk's image replaces the scene for that beat, preserving the one-visual-layer rule.
 
@@ -1360,6 +1478,25 @@ These sizes are descriptive of common transition scales, not prescriptive. The v
 
 Any of these transitions can fail the viewer-cognition test even at its default size. A "beat → beat" pair can have a logical jump that needs bridging; a "chunk → chunk" topic-shift can be fine without a verbal bridge if the shared visual language connects them. The structural category is the starting bid; the cognition test makes the final call.
 
+### Visual transition primitives (comic-strip vibe)
+
+Beyond the signal sizes above, the renderer uses named visual transitions from `src/transitions/` — a small library of presentations tuned to the illustrated comic-strip vibe. The editorial rule for which to use where:
+
+| Transition primitive | Use for | Why |
+|---|---|---|
+| `comicPan` | Inter-chunk within the same act, same thread (`continues-thread` / `continues-from-prev`) | Panel-pan mimics the viewer's eye crossing to the next panel; matches the baseline reading cadence |
+| `pageFlip` | Act boundaries only | The biggest transition in the library — signals chapter change. Overuse flattens its signal. |
+| `panelSplit` | Adjacent chunks that benefit from being on screen together (setup/payoff pair, adjacent evidence, comparison) | Two panels coexist mid-transition; viewer takes both in before the first collapses out |
+| `CUT` | Reveal-group internals, proof inserts, cold-open → Act-1 handoff, deadpan punchline leads | Any soft transition dilutes a deadpan reveal or a proof-style clash; the hard cut is its own signal |
+
+Rules of application:
+- **Match transition primitive to signal size.** `comicPan` is a chunk-scale signal, `pageFlip` is an Act-scale signal. Never use a larger primitive than the structural transition actually is.
+- **Direction follows reading flow.** `comicPan` defaults to `from-right` (viewer's eye moves left-to-right). Use `from-left` only for deliberate callbacks where the viewer's eye is returning to an earlier panel.
+- **`pageFlip` is scarce.** Reserved for `act-boundary` chunks and their preceding bumpers. If every transition is a page-flip, none of them signal anything. Cap: one per Act boundary, no more.
+- **`CUT` is the deadpan default.** If a beat's job is deadpan punctuation and you're tempted to add a soft transition to smooth it — don't. The hard cut is what lets a punchline land.
+
+See `src/transitions/README.md` for the implementation-level factory API, default timings, and how to add new primitives.
+
 ### Signals by transition, in detail
 
 #### Beat → beat
@@ -1421,6 +1558,31 @@ The `act_title` field on the bumper chunk drives the card. The card appears cent
 
 If a future video wants an Act card to include a doodle / stick figure / decorative element, swap that single card to kie.ai without changing the schema: drop an image at a known path, Composition.tsx falls back to the image if it exists, else renders text from `act_title`.
 
+#### Act-title naming rule — don't expose the craft
+
+Act titles are what the viewer sees on bumpers. They must describe the *content* of the Act the viewer is about to watch — not the *narrative function* the Act serves. Exposing the function ("PAYOFF", "THE HOOK", "THE REVEAL", "THE SETUP") reads as behind-the-curtain craft vocabulary; the viewer feels the machinery working on them and trusts the video less.
+
+**Avoid function-name labels:**
+- "PAYOFF" / "THE PAYOFF"
+- "THE HOOK"
+- "THE REVEAL"
+- "THE SETUP"
+- "THE PROBLEM" (generic function-label; fine if the video genuinely reveals the problem IS named "the problem" in-world)
+- "THE FIX" (same caveat — OK when "the fix" is the in-world name, not just narrative role)
+- "PART N" / "ACT N" / "CHAPTER N" — numbering with no content is worst of all; tells the viewer nothing + exposes structure
+
+**Prefer content-describing labels:**
+- A noun phrase for the thing the Act is actually about — "THE INCIDENT" (the specific event the Act covers), "THE DIAGNOSIS" (what's wrong), "WHAT CHANGED", "THE ANSWER", "CONCLUSION"
+- A question the Act answers — "NOW WHAT?"
+- The in-world name for the moment — "THE TURN", "SESSION 12"
+
+Test: replace the act_title with "THE [random-role]" and see if the viewer learns less. If function-label > content-label on "does this tell me what the Act is about?", the label is wrong.
+
+Example fixes:
+- "PAYOFF" → "CONCLUSION" / "THE ANSWER" / a content noun ("THE PROTOCOL", "THE FIX THAT STUCK")
+- "THE HOOK" → drop the bumper entirely (first Act has none anyway) or replace with the content noun
+- "THE SETUP" → the name of what's being set up ("THE PROJECT", "THE RULES FILE")
+
 ### High-weight chunks
 
 Certain chunks carry disproportionate weight for their size:
@@ -1436,7 +1598,147 @@ These are flagged `weight: high` in the shot-list. High-weight means:
 - Camera doesn't move during the chunk (hold the frame still)
 - Within the chunk, beats that are list items get ≥1s pause instead of 0.3–0.6s so each item can register
 
+### Lean away from on-screen text
+
+Default: the narration carries the words, the illustration carries the feeling. On-screen text is a spike, not a running device. Before putting text on the frame, check whether the narration already says the same thing — if it does, the on-screen text is usually decorative and the chunk works better without it.
+
+Lean toward text only when it does a job the narration alone can't:
+- a **rule**, **quote**, or **protocol** the viewer should register as authoritative (title card, pinned note, rule card)
+- a **label** that names a specific thing in the scene (a filename tag, a signage caption, a calendar or date marker, a product name)
+- a **punchline stamp** or deadpan reaction (a single-word stamp or exclamation) where the word IS the beat
+- an intentional **wall-of-text** whose density is itself the joke
+
+Strong lean away from long strings unless the wall of text is the point:
+- a paragraph-length quote rendered full-frame is rarely worth the read-time cost unless the quote itself is the beat
+- multi-line lists (numbered protocols, rule files, bulleted cards) must be budgeted against the read-time floor below — a 40-word card needs ~14 seconds of screen-time to be readable, and dense cards often land faster as a narrated voiceover with a simpler illustration
+- when in doubt, replace the text card with a single-word stamp or a labeled diagram
+
+The cost of text that can't be read: the viewer registers "there were words but I couldn't read them" as noise, which dilutes the beat instead of reinforcing it. Text the viewer *can't* read is worse than no text.
+
+### On-screen text read-time (required)
+
+Any chunk whose `on_screen_text` field declares visible text — a rule on a page, a caption, a chart label, a document, a title card, a meme with caption — must hold on screen long enough for the viewer to finish reading.
+
+Floor: **readable window ≥ visible-text-word-count × 0.35 seconds**, where the readable window = chunk duration minus the paint-on animation (if the chunk's entrance is `paint-on`). During paint-on the text isn't fully legible, so that time doesn't count toward the budget. Crossfade and cut entrances count fully toward the readable window.
+
+If a chunk is 2s long with a 0.5s paint-on, the readable window is 1.5s — a 9-word card (~3.15s floor) is under-timed. Extend `pause_after`, set `hold_duration_sec`, or reduce the on-screen text.
+
+Most chunks inside an act use crossfade (not paint-on), so the full chunk duration is the readable window for those. Only scene-opener chunks take the paint-on hit. See VISUALS.md § Inter-chunk transition vocabulary.
+
+0.35s per word is a floor (roughly 170 wpm reading speed for short bursts of on-screen text, with a buffer). Longer for text that uses unfamiliar words, stylized typography the viewer has to parse, or handwriting. Shorter only if the text is a single recognizable word (*"NO"*, *"OUCH!"*, *"WAIT"*) where the viewer doesn't read so much as recognize.
+
+The rule applies regardless of whether the beat narration is short or long. The constraint is *the viewer reading the frame*, which is independent of *the viewer hearing the narration*. A common failure: narration is a one-line 2-second beat, the illustration shows a full rules page with eight bullets, the chunk ends at 2s — the viewer saw the page but can't read it.
+
+**Authoring-time read-time budget (primary enforcement).** The read-time check belongs in the authoring step, not the audit step. When writing a chunk that carries on-screen text, do the math inline before setting `pause_after`:
+
+1. Write the literal words into `on_screen_text` as an array of strings.
+2. Count the words (including headings, labels, punctuation-separated items). Call this `W`.
+3. Floor = `W × 0.35` seconds.
+4. Estimate chunk duration = `narration_word_count / 2.5` + `pause_after` tier. Pause tiers: tight=0.15s, short=0.3s, medium=0.6s, long=1.2s.
+5. Subtract paint-on time if this chunk is a scene-opener (first chunk of a new scene, cold-open, or first chunk of the video): paint-on = `max(0.5, min(chunk_sec × 0.2, 1.5))` seconds. Readable window = duration − paint-on. For chunks inside an act (crossfade or cut entrance), readable window = full duration.
+6. If readable window < floor, choose the fix in this order:
+   - **(a)** promote the `pause_after` tier (short → medium → long)
+   - **(b)** set an explicit `hold_duration_sec` on the same chunk — the chunk plays its narration, then holds the frame silently for the remainder. This is the preferred pattern for dense text cards: one chunk, one image, explicit hold time. No second chunk to manage.
+   - **(c)** split into two chunks only when the editorial beat genuinely has two moments (narration + later reveal). Use `image_source: reuse` with `silent_hold: true` on the follow-on chunk. This is rare — most cases are (b).
+
+Worked example: `on_screen_text` is a 28-word block. Floor = `28 × 0.35 = 9.8s`. Narration is a short 5-word line. Narration-duration ≈ 2s. `pause_after: long` adds 1.2s → 3.2s. Paint-on eats 0.64s → readable 2.56s. Not enough. Preferred fix: set `hold_duration_sec: 11` on the same chunk. Narrator plays the line at the top (2s), then the frame holds silently for ~9 more seconds. Paint-on only fires once at the start, so total readable window comfortably clears the floor.
+
+The rule: compute the floor *when you write the chunk*, not after validation catches it. The validator is the backstop for drift — ideally it never fires because the authoring step already budgeted correctly.
+
+**Enforcement (backstop).** `validate_shot_list.py` computes `on_screen_text` word-count × 0.35 and compares against the estimated chunk duration. Any chunk whose estimated duration falls below the floor is a validation error and blocks render. See PIPELINE.md § `on_screen_text` field.
+
+**Author opt-out — `readtime_override: true`.** The floor is a safety net, not a mandate. By-ear tuning can legitimately pick a shorter hold when:
+- the card was already seen recently (continuation of recognition — viewer doesn't re-read)
+- the text is scannable at a glance (headings + short labels, not paragraph prose)
+- the viewer is meant to glance/absorb pattern, not read word-for-word
+
+Set `readtime_override: true` on the chunk to bypass the validator check. The flag is explicit so intent is recorded — never silently lower a hold_duration_sec without flagging. See PIPELINE.md § `readtime_override`.
+
+### Deadpan punchlines
+
+Short beats that carry comedic weight — one-word reactions, deadpan capstones, understated asides like *"Obviously."*, *"You know, casually."*, *"Structurally, it was."*, *"That's the whole trick."* — need their own chunk so the image changes at the exact moment the line lands. Burying a one-word punchline as the middle beat of a multi-beat chunk kills the gag; the image doesn't switch, so the word lands on the same frame as the lead-in, and the deadpan is lost.
+
+When a punchline beat is split into its own chunk, mark `punchline: true` on the chunk. That unlocks two forms of meme/stamp substitution (VISUALS.md § Punchline Chunk Carve-Out):
+
+- **full-frame substitution** — the meme/reaction replaces the prior scene entirely. Use when the punchline resets / erases the prior moment. `image_source: meme`.
+- **overlay on reused scene** — a stamp or reaction artifact drops onto the prior scene as an overlay, the scene stays visible underneath. Use when the punchline reacts to the scene rather than replacing it. `image_source: reuse` pointing at the prior chunk, plus an `overlays` entry for the artifact.
+
+Pick based on intent. A REJECTED stamp smacking a desk scene reads as a reaction TO the scene — use overlay. A SpongeBob "9 attempts later" card reads as "time passes, reset" — use full-frame.
+
+Enforcement: `validate_shot_list.py` flags any beat whose narration is ≤3 words and lives inside a multi-beat chunk. Those beats almost always belong in their own `punchline: true` chunk with `image_source: meme`.
+
+Suppressions the validator applies automatically:
+- **List-enumeration openers** — beats that begin with ordinal/enumeration markers ("One.", "First.", "Step 1.", "1.") are list items, not deadpan punchlines. The marker itself is the structural signal; the short length is expected.
+- **Closing-conclusion bridges** — beats that begin with wrap-up markers ("So.", "In short.", "Zooming out.") are outro bridges, not deadpan capstones.
+
+Author opt-out: if a short beat is structurally NOT a deadpan (typical case: a short setup line that previews an enumerated list the following chunks expand) and the automatic suppressions don't catch it, set `not_a_punchline: true` on the beat or chunk. Use sparingly — most overrides indicate the beat should actually be split. See PIPELINE.md § `not_a_punchline`.
+
+### Multi-panel chunks
+
+Default: one chunk = one full-frame illustration. Alternate pattern: a chunk whose illustration is composed of two or three panels laid out together in the same frame, like a page in a comic strip. The viewer's eye moves across the panels within the chunk; the renderer applies a slow pan or held wide shot to let each panel register.
+
+When this pattern fits:
+- **Parallel options / choices** — e.g. three cards side-by-side showing three distinct actions.
+- **Before/after pairs** — left panel is the before state, right panel is the after; holding both visible lets the viewer register the change.
+- **Tricolons** — three rhythmically parallel lines of narration ("*different skills / different time / different energy*") land cleanly as a three-panel strip with one micro-image per clause.
+- **Condensed lists** — when a narration beat names three things the viewer should take in together, not sequentially.
+
+When this pattern doesn't fit:
+- Sequential story beats. If the narration is "first X, then Y," that's two chunks, not two panels in one.
+- Abstract / emotional moments where the viewer should dwell on one image. Multi-panel splits attention; a single full-frame holds it.
+- Payoff moments. Final beats should be one-image-one-feeling — don't multi-panel the payoff.
+
+Generation: multi-panel chunks are a prompt pattern, not a schema change. The chunk's `beat_description` explicitly specifies the panel layout (*"Three side-by-side hand-drawn cards in the wojak-comic style, each showing one option: …"*). Style anchor logic is unchanged — if the chunk has `references`, it uses them as image-ref; otherwise prompt-only per the anchor rule.
+
+Rendering: the preprocessor reveals the composite frame as one image. Optionally, `Composition.tsx` can apply a slow horizontal pan across the panel strip during the chunk's screen-time, letting the viewer's eye read the panels in order. Use a `panelSplit` transition when a multi-panel chunk hands off to another multi-panel chunk (e.g., the second "after" state in a before/after sequence).
+
+Budget note: one multi-panel illustration costs one kie generation (same as a full-frame single-subject chunk). No cost increase vs. splitting into multiple chunks — and in fact cheaper if it replaces what would otherwise be three chunks.
+
+### Ending sequence (required)
+
+The final chunk of the video must do more than land the last narrated line and cut. A video that ends on the last spoken word with no deliberate outro structure feels abrupt — the viewer hasn't had time to finish processing, or isn't sure whether the video is actually over.
+
+Every video must end with a **deliberate ending sequence**. The exact shape depends on the video's goal, but the rule is: the end must be chosen, not accidental. Several archetypes qualify. Pick the one that fits what the video is trying to do.
+
+**Ending archetypes (any one of these satisfies the rule):**
+
+1. **Settle-and-hold.** For standalone videos that land a thesis. Final narrated beat is `weight: high`, followed by ≥2.5s of silent visual hold (normal post-beat silence + extra linger). Ideal final frame is a resolution of the cold open — same element, resolved form, viewer's eye completes a loop.
+
+2. **Cliffhanger.** For multi-part series, pilots, or any video deliberately handing off to a sequel. The final beat does NOT resolve — it raises a new question, teases a follow-up, or drops on an unresolved image. Required for validity: the cliffhanger is *signaled* (viewer can tell this is intentional, not truncation). Signals include a "to be continued" card, a direct address like *"next time,"* a visual that points forward (arrow, portal, door opening), or an explicit beat naming the follow-up. A cliffhanger without a signal reads as the upload getting cut off — not an ending.
+
+3. **Call-to-action.** Ends with a direct viewer ask: *"watch the V2,"* *"read the source,"* *"try it,"* *"subscribe."* Valid when the CTA is earned by the thesis (the viewer is being asked to do the thing the video was about) and the ask is brief enough not to overwhelm the thesis payoff.
+
+4. **Circular callback.** The last chunk returns literally to the cold open's frame — same image, same composition — but now meaning something different because of what happened in between. Often paired with a closing verbal callback to the cold-open line.
+
+5. **Open question.** Ends on a question posed to the viewer. Valid when the question is load-bearing (the video doesn't need to answer it because the viewer now has the frame to answer it themselves) and when the question lands on a weighted, held beat.
+
+6. **Quiet payoff.** Minimal or no final narration — just a held visual, possibly with a single word or short phrase. Valid when the thesis has already been landed verbally and the final frame functions as a resolution in itself.
+
+**Universal floor across all archetypes:**
+
+- The final narrated beat (or final silent beat, for quiet payoff) has `weight: high` — frame holds, no camera move during the beat.
+- At least **2.5s of held silence** between the final narrated word and the video ending (the cut to black / end card / YouTube auto-advance). This is the post-beat silence + extra linger on the final frame; implement via `pause_after: "long"` on the final beat (and add an outro hold chunk if more is needed).
+- The shape of the ending is *declared* in the shot-list `notes` field on the final chunk — e.g. `"ending: settle-and-hold"`, `"ending: cliffhanger-to-V3"`, `"ending: CTA-to-tracker"`. The validator can later check that one of the allowed archetypes is declared.
+
+**Failure mode this prevents:** the video ends with a final line, a hard cut, and the YouTube player auto-advances before the viewer has processed anything. Abrupt endings undercut whatever the thesis was trying to do. This applies to every archetype — even a cliffhanger fails if it just cuts off without a signal, because the viewer will read it as a broken upload.
+
+A video without a declared ending-sequence archetype is not a finished video. Pick one. Hold the frame. Let it land.
+
+**Editorial rules that apply to every archetype:**
+
+1. **Emotional coherence beats logical coherence.** An ending can be structurally correct and emotionally flat. The rule: every ending archetype must leave the viewer with a feeling, not just a conclusion. If the final beat lands the thesis intellectually but the viewer doesn't feel anything shift, the ending hasn't worked — regardless of whether the mechanics are right.
+
+2. **The final frame is for feeling, not work.** The last held image should not require the viewer to read, decode, or piece together. If a payoff depends on cognitive work, resolve it before the final frame and let the last image be simple and emotional.
+
+3. **Any transformation shown in the ending has to be set up.** If the payoff depends on a change (register, character, setting, tone), the change must have been foreshadowed earlier. First-and-last appearances in the final beats read as *"who is this"* instead of landing the arc.
+
+4. **Don't break the visual world in the final Act.** Foreign-style assets in the last beats snap the emotional thread. Any cross-reference callbacks belong earlier — before the final turn, not inside it.
+
+**Preferred shape above the minimum floor:** a **dedicated silent outro hold chunk** after the final narrated chunk — no narration, visual continuation of the final frame (or a simple final card), 1.5–3s additional held silence. Implemented as a non-bumper chunk with empty beats and `image_source: "generated"` (or reuse of the final frame via `image_source: "reuse"`). `pause_after: "long"` on the final narrated beat is the floor — a dedicated hold chunk is the form that actually lets the ending settle. Use this whenever budget allows.
+
 ### Broll requires obvious viewer context
+
+**"Broll" covers everything that isn't an anchor-style illustration.** This includes: raw video clips, saga-montage clips, meme stills, meme gifs, reaction clips, cultural-reference images, short archival clips, screenshot captures. The rules in this section and the next (*Broll earns attention*) apply uniformly across sub-types. The punchline "meme" carve-out earlier in this document (STORY.md § 10a) is one sub-type of broll — it inherits every rule here. Do not split memes out as a separate category with its own editorial logic.
 
 B-roll is never played without context. The viewer must know *why the clip is playing* and *what they should see in it* within 2 seconds of it starting.
 
@@ -1454,9 +1756,62 @@ Forms that DON'T work (cut the broll instead):
 - Generic proof (*"look, the thing works"*) with no pointed reason
 - Broll with narration about a different topic playing over it
 
+#### Broll also has to earn attention
+
+Context (the 6 mechanisms above) is about *comprehension* — the viewer knows why the clip is playing. Earning attention is a separate requirement. A clip that the viewer understands but has no reason to look at still bleeds interest.
+
+Broll earns attention via ONE of:
+
+- **(a) Contrast with the host video** — the clip is visually / stylistically / tonally different from the video it's embedded in, so the viewer's eye registers a delta. Real footage inside an illustrated video. A cultural-reference meme inside an anchor-style sequence. A raw terminal capture inside a polished explainer.
+- **(b) Specificity — a specific thing inside the clip the viewer is being pointed at** — a named moment, a punchline, a recognizable artifact, a concrete thing the narration just said ("*watch the timestamp at 0:42*", "*the eraser here is the wrong version*"). The viewer has been given something to look for.
+
+If the clip has neither — same style as the host video AND no specific moment being pointed at — cut it. Playing "random clips" under narration is never the move, regardless of whether a comprehension mechanism is technically satisfiable.
+
+Special case, cold-open broll: same-style broll from a sibling video (e.g. V1 clips inside a V2 dev-log about the same project) is disallowed as a cold-open device. It fails both (a) and (b) by construction. Save sibling-video broll for mid-video callbacks where the viewer is being pointed at a specific shipped moment being reverse-engineered, and lead with a setup line that names the thing to watch for.
+
+#### Saga-montage carve-out for spacing
+
+The no-back-to-back-within-~30s guardrail (see § 10a Punchline visual options for the original meme spacing rule, which generalizes to all broll) treats each broll moment as one unit. A **saga-montage** — several broll clips played contiguously that together tell one story (*"here's attempt one, here's attempt two, here's attempt three — all rejected"*) — counts as ONE unit for spacing, not N. Spacing to the next broll moment is measured from the end of the montage, not from each clip inside it.
+
+Why: the viewer experiences a saga-montage as one continuous comedic/narrative beat, not three spikes. Applying the spacing rule per-clip inside a montage would force artificial padding between clips that are supposed to feel continuous, defeating the montage.
+
+Required for saga-montage classification:
+- Clips are contiguous in the timeline (no illustrated chunk between them)
+- They tell one rhetorical unit together (a list of attempts, a catalog of failures, a parade of reactions)
+- Shared framing or caption treatment that visually groups them (consistent caption placement, consistent length, consistent edit rhythm)
+
+Concrete example: V2's chalkboard-saga clips at 0:55–1:23 — three rejected chalkboard renders in a row, each ~9 seconds, all framed the same way. Treated as one unit; spacing to the SpongeBob time card at 1:23 measures from the montage's end, not from any individual clip.
+
+#### Format default: lean toward motion
+
+When a broll slot can be filled by a still image OR a short video/gif clip, **default to the clip**. Motion registers as a stronger attention spike than a held frame, especially in a video whose baseline is illustrated stills that reveal over time. Breaking that rhythm with motion is cleaner than breaking it with another still.
+
+A still only earns the slot when:
+- (a) The still is the canonical form of the reference — the meme or artifact is more recognized as a single frame than animated (e.g., an anime-panel meme like *"is this a pigeon?"* is a drawn still; there's no better animated version), OR
+- (b) The beat needs a held silent punctuation where motion would over-read (e.g., a deadpan thesis card where a pan or zoom would compete with the silence).
+
+Pipeline difficulty is NOT a valid reason to default to still. Trimming, muting, and compositing a video clip is craft cost, not an editorial veto. The schema term `meme` is a punchline *role*, not a file-format constraint — animated meme gifs / short clips route through the broll pipeline without penalty (see PIPELINE.md § Shot-List Spec).
+
+Concrete effect: in a V2-style sequence with three meme slots, defaulting to clips might yield 2 animated + 1 still, not 3 stills. If every slot defaults to a still, re-audit — the still-default bias is leaking through.
+
+#### Additive framing — not subtractive
+
+When auditing a beat for broll, ask: *"does adding this add engagement without costing the beat?"* — NOT *"does removing this weaken the beat?"*
+
+The two framings look symmetric but produce very different videos:
+
+- **Subtractive default** (*"does removing hurt?"*) — treats illustration as the baseline and makes every broll earn its existence against the question *"but would plain illustration work?"* Because plain illustration often does work, subtractive framing cuts broll aggressively. You end up with a minimum-broll video that the per-beat test can defend but that bleeds engagement on long illustrated stretches.
+- **Additive default** (*"does adding help?"*) — treats engagement as a first-class goal and cuts broll only when it actively competes with the beat (thesis moments, deadpan punctuation, abstract principle sections where no concrete subject exists to point at). You end up with a texture-rich video where the broll count emerges from actual per-beat benefit, not from clearing a subtract-to-cut bar.
+
+All existing guardrails still apply (no repeats, spacing, contrast + specificity, audio). The additive framing changes the *starting stance*, not the constraints.
+
+The test failure mode this fixes: an agent auditing broll under subtractive framing keeps saying *"illustration would work fine here, so cut the broll"* and produces videos that are technically on-rule but dry. The same agent under additive framing catches slots the subtractive pass missed.
+
+Applies to all broll sub-types — raw video clips, meme stills, meme gifs, reaction clips, saga montages.
+
 Additional broll rules:
 - Two audio tracks never play simultaneously. Narration OR broll-audio, never both. Broll audio defaults to muted unless the clip's audio IS the point.
-- Payoff-preview broll (an early "here's the output") must play ≥5 seconds with ≥1 second silent pause before and after.
+- Payoff-preview broll (an early "here's the output") must play ≥5 seconds with ≥1 second silent pause before and after. Does not apply to narrative / dev-log videos where the output *is* the story itself — see "Payoff preview in the cold open" earlier in this file.
 
 ### Audio-first re-timing
 

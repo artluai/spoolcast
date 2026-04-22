@@ -45,6 +45,8 @@ Read these files in this exact order:
 3. [VISUALS.md](./VISUALS.md) — assets, preprocessor, transitions
 4. [SHIPPING.md](./SHIPPING.md) — review board, publishing
 
+Delivery modes (agent-skill vs standalone-app, autopilot) are covered inside this file — see § Delivery Modes below.
+
 If you are about to challenge or change a rule, also read [DESIGN_NOTES.md](./DESIGN_NOTES.md) — it captures the reasoning behind current decisions and what was tried and abandoned. The rule files tell you what to do; design notes tell you why.
 
 ## What Each File Does
@@ -106,6 +108,7 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
 - Shared docs should avoid absolute local paths unless a path is truly required to make something work.
 - **The core message is confirmed with the user before any screenplay or narration drafting.** Propose 2–3 candidates in plain language with tradeoffs, wait for the user to pick or rephrase. See STORY.md § 3 Job E. Guessing the core message and proceeding is the single biggest process failure in Stage 1.
 - **Review artifacts are exactly two things: the short version in chat, and the final shot-list xlsx.** Source analysis, screenplay v1/v2/v3 prose, voiceover scripts — written to disk for traceability but NEVER linked to the user for review. See STORY.md § Review-Artifact Policy.
+- **Lead with the plain-English version when presenting to any viewer — user in chat or YouTube audience.** Technical terms are allowed only after the plain version exists, and only with an in-line explanation on first use. See STORY.md § Layman-first explanation rule. Caught repeatedly: jargon-first fixes forced the user to ask *"can you explain in layman terms"* when the plain version was one sentence away.
 
 ## If There Is A Conflict
 
@@ -172,6 +175,23 @@ A new agent should:
 4. make changes only within that stage unless regeneration is required
 5. validate downstream outputs after any upstream change
 
+### Verified = mechanical check passed
+
+A fix is not "verified" because the code changed, because the intermediate data looks right, or because a few frames were extracted by eye. Those are proxies for verification, not verification.
+
+"Verified" means: a mechanical, reproducible check ran against the final artifact the user consumes (the rendered mp4, the deployed app, the shipped file) and passed.
+
+Shapes this takes:
+- Render pipeline: `scripts/audit_render.py` runs against the mp4 and its sentinel is written. See PIPELINE.md § Render Audit Rule.
+- Validator pipeline: `scripts/validate_shot_list.py` exits 0 against the final shot-list.
+- Any other stage with known failure classes: encode the class as a check, run the check on the artifact, require it to pass.
+
+Why this matters: causal models of bugs are always partial. A diagnosis that explains N of M user-reported symptoms doesn't mean the other M-N are gone — it just means your model doesn't cover them. The mechanical audit doesn't rely on the diagnosis being complete; it re-checks the artifact from scratch.
+
+Failure mode this prevents: agent fixes the mechanisms it diagnosed, declares done based on diagnostic closure, user points out the symptom is still there, cycle repeats. The audit breaks the cycle because the artifact is either passing or not — independent of what the agent believes about its own fix.
+
+Applies in both human-in-loop and autonomous modes. The only difference is who reads the failure report when the audit fails.
+
 ### Pre-Pass Rule
 
 Before presenting anything to the user — a list of options, a single proposed next step, a recommendation, or an action you are about to take — do an internal pre-pass and drop anything that isn't actually beneficial to what the user is trying to accomplish.
@@ -187,6 +207,18 @@ Do not surface decoy options to seem thorough. Do not propose actions that look 
 The test: if what you are about to propose would be described as "honestly doesn't prove/serve/matter much for what we're doing," it should have been filtered out before you wrote it. Commit to a better alternative, or ask the user for direction, or do nothing.
 
 Narrow rule-lawyering (e.g., "this is a single action, not an options list, so the rule doesn't apply") is itself a violation. The point is: filter for benefit, regardless of the shape of what's being proposed.
+
+### Describe behaviors, not taxonomies, when writing agent rules
+
+When writing or editing a rule that the agent will later read into working memory, describe the agent's behavior — not the category of thing the behavior applies to. Rules carried in context prime the concepts they name. If a rule names a story shape, an option category, an asset class, or an argument structure as a distinct thing to watch for, that named thing becomes more available in the agent's later decision-making — regardless of whether the rule encourages or discourages it.
+
+Concrete pattern:
+- Bad: *"When picking [named category X], run check Y."* This plants category X in attention. Future sessions reach for X more often because X is now a salient option in the ruleset.
+- Good: *"Before committing to any plan, run check Y."* Same behavior required, no category planted.
+
+Applies to rules about option lists, creative structures, asset types, visual styles, narrative shapes. The rule should be phrased so the agent cannot infer a menu of named alternatives from reading it. If a rule requires naming a class of thing to be intelligible, the test is: does naming this category narrow the agent's future generation more than the check warrants? If yes, find a phrasing that doesn't name the category.
+
+The test: rewrite the rule without any noun phrase that describes a specific shape-of-thing. If the rewrite still conveys the required behavior, prefer it. If not, the noun is probably load-bearing — keep it, but note that future behavior in that category may be biased by mere mention.
 
 ### Don't Offload Production Work To The User
 
@@ -210,6 +242,83 @@ When collaborating with the user on any creative or editorial decision — a scr
 Jumping to specifics before the substance is agreed is a process failure. It wastes iterations on choices the user doesn't actually want, and it hides the editorial decision behind surface-level options the user can only react to aesthetically.
 
 Applied to review cycles: when the user pushes back on a draft, figure out which layer the objection is at — substance, structure, voice, or form — not just re-polish at the surface.
+
+## Delivery Modes
+
+Spoolcast is delivered in two shapes. The pipeline (Stages 0–8 in PIPELINE.md) is identical in both. What changes is who initiates each step, how decisions are surfaced, where user-confirmation gates fall, and what happens when the user chooses not to decide. Both modes must honor every rule in this file and in PIPELINE.md / STORY.md / VISUALS.md / SHIPPING.md.
+
+### Mode 1 — Agent Skill (conversational)
+
+Spoolcast runs as a skill inside a chat agent. The user drops a raw session package into a working directory; the agent drives the pipeline by asking questions, proposing options, and waiting for user decisions. Currently the only shipped mode (V1 + V2 both produced this way).
+
+**Default interaction shape (user-driven).** At every decision point the agent (1) says what stage we're at in plain terms, (2) proposes 2–3 options or one clear recommendation with tradeoffs, (3) waits for the user to pick / edit / propose their own, (4) only then acts.
+
+**Gate list, in order:**
+
+1. **Stage 0 — scaffold.** Agent confirms session id, budget, style. Runs `init_session.py`.
+2. **Stage 1a — core message (Job E).** Agent proposes 2–3 candidates with tradeoffs. User picks or rewrites. Locked before anything else.
+3. **Stage 1b — structure.** Agent proposes the Act/chapter shape. User approves or revises.
+4. **Stage 1c — screenplay v1 → v2 → v3.** Drafted to disk (working docs). Per STORY.md § Review-Artifact Policy, no chat review between versions — the shot-list xlsx is the consolidated review artifact.
+5. **Stage 2 — shot-list.** Agent builds the shot list from the locked screenplay. User reviews the xlsx directly.
+6. **Stage 3 — chunking.** Chunks populated per heuristics. User approves visible boundaries.
+7. **Stage 4 — external assets + AI generation.** Externals first (mechanically enforced by `batch_scenes.py` pre-flight per PIPELINE.md § Stage 4 ordering rule), QA pass, re-approval, then AI spend.
+8. **Stage 5 — preprocessing.** Deterministic; no user decisions.
+9. **Stage 6 — review board.** User reviews the per-chunk board. Regeneration triggered from any flag.
+10. **Stage 7 — render + preview.** User watches the preview. Approves or requests revision.
+11. **Stage 8 — publish.** Title, thumbnail, description per SHIPPING.md. User final-approves before upload.
+
+The agent communicates in plain terms per STORY.md § Layman-first explanation rule.
+
+### Sub-mode — Autopilot ("you decide everything, I'll wait")
+
+At session start, the agent MUST offer a second path: *"Do you want me to make every decision and surface the final video when it's ready? You'll only be pulled in if I hit something that genuinely needs your judgment."*
+
+If the user picks autopilot:
+
+- The agent makes all Job E / angle / structure / pacing / visual / chunking / publishing decisions itself using the defaults below.
+- The agent still writes source analysis + screenplay drafts to disk for traceability.
+- The agent surfaces one thing at session end: the finished video plus a short summary of the choices it made (core message locked, structure used, any tradeoffs worth knowing about).
+- The agent is allowed to interrupt autopilot only when:
+  1. A rule conflict is triggered (rules.md § User request vs existing rule — the 3-option surface).
+  2. The AI budget is about to be exhausted.
+  3. A hard dependency is missing (source package incomplete, required asset cannot be produced).
+  4. The content raises an ethical / factual concern the agent is not confident to resolve alone.
+
+**Defaults the agent uses in autopilot:**
+
+- **Core message:** picks the outcome-focused candidate unless the source material clearly calls for architecture-focused or meta-lesson framing. Documents the choice in source analysis §6.5 with a one-line reason.
+- **Structure:** follows the dominant shape the source material suggests. If ambiguous, defaults to the 4-Act shape (cold open → problem → reframe → payoff).
+- **Style anchor:** inherits from the most recent sibling session in `sessions/` unless the session notes specify otherwise.
+- **Reveal style:** `paint-auto`.
+- **Thumbnail/title:** script-first per SHIPPING.md.
+
+Autopilot is NOT a silent bypass — the agent still writes the same artifacts, runs the same validators, honors the rule-conflict protocol. It just doesn't wait at every gate.
+
+**Workflow record.** Kept as a running log at `sessions/<id>/working/agent-workflow-log.md` per session. Entries: which gate, what options were offered, what the user picked, any deviations. For after-the-fact inspection, not realtime review.
+
+### Mode 2 — Standalone App
+
+Spoolcast runs as its own app (web or desktop). The user opens it, creates a session, drops source material into the UI, and drives the pipeline through explicit screens rather than conversation. Each pipeline stage is a discrete screen.
+
+**Status:** not yet built. Planned screens:
+
+- Session dashboard, source-drop, core-message, structure, shot-list editor, asset board, review, render+publish.
+
+Open design questions (resolve when building):
+
+- Whether the app includes the agent conversation as a sidebar or is fully GUI-driven.
+- Where Job E confirmation lives — dialog modal, dedicated screen, inline on dashboard.
+- How rule conflicts are surfaced without a conversational agent (likely a modal with the same 3-option menu).
+
+### Shared principles across modes
+
+Regardless of mode, every delivery must:
+
+- Honor the core-message confirmation gate (STORY.md § Job E). Never proceed past Stage 1 without it.
+- Honor the rule-conflict protocol (rules.md § User request vs existing rule). Silent rule rewrites are banned.
+- Lead with plain-English presentation (STORY.md § Layman-first explanation rule). Jargon-first UI copy fails the same test as jargon-first agent chat.
+- Write the same canonical artifacts to disk in the same locations (PIPELINE.md § Canonical Content Layout). Mode-specific state (UI drafts, etc.) goes in `working/`.
+- Run the same validators (`validate_shot_list.py`, `audit_narration.py`) before any render.
 
 ## Expected App Behavior
 

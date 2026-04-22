@@ -34,7 +34,11 @@ PUBLIC_DIR = REPO_ROOT / "public"
 
 
 def make_session_json(
-    session_id: str, ai_budget: int, model: str, style: str | None
+    session_id: str,
+    ai_budget: int,
+    model: str,
+    style_lib: str | None,
+    style_prompt: str | None,
 ) -> dict[str, object]:
     cfg: dict[str, object] = {
         "session_id": session_id,
@@ -50,8 +54,14 @@ def make_session_json(
         "tts_playback_rate": 1.1,
         "notes": f"session created {_dt.datetime.now().strftime('%Y-%m-%d')}",
     }
-    if style:
-        cfg["style_reference"] = style
+    # Style wiring — prefer library reference; fall back to raw prompt.
+    if style_lib:
+        cfg["style"] = style_lib
+        # When pointed at the library, the prompt lives in styles/<name>/style.json.
+        # Session.json's own prompt fields are left unset so generate_scene pulls
+        # from the library.
+    elif style_prompt:
+        cfg["style_reference"] = style_prompt
     else:
         cfg["default_style_prompt"] = (
             "loose hand-drawn black ink line art on white background, "
@@ -100,7 +110,12 @@ def make_shot_list_json(session_id: str) -> dict[str, object]:
 
 
 def scaffold_session(
-    session_id: str, ai_budget: int, model: str, style: str | None, force: bool
+    session_id: str,
+    ai_budget: int,
+    model: str,
+    style_lib: str | None,
+    style_prompt: str | None,
+    force: bool,
 ) -> Path:
     session_dir = CONTENT_ROOT / "sessions" / session_id
     if session_dir.exists() and not force:
@@ -133,10 +148,17 @@ def scaffold_session(
         if not gitkeep.exists() and not any((session_dir / sub).iterdir()):
             gitkeep.touch()
 
+    # Ensure references/ exists under source/generated-assets for session-local ref overrides.
+    (session_dir / "source" / "generated-assets" / "references").mkdir(parents=True, exist_ok=True)
+
     # session.json
     session_json_path = session_dir / "session.json"
     with session_json_path.open("w") as f:
-        json.dump(make_session_json(session_id, ai_budget, model, style), f, indent=2)
+        json.dump(
+            make_session_json(session_id, ai_budget, model, style_lib, style_prompt),
+            f,
+            indent=2,
+        )
 
     # shot-list/shot-list.json
     sl_path = session_dir / "shot-list" / "shot-list.json"
@@ -198,7 +220,19 @@ def main() -> None:
     p.add_argument(
         "--style",
         default=None,
-        help="optional style_reference string or image URL for the session anchor",
+        help=(
+            "name of a style in the style library (spoolcast-content/styles/<name>/). "
+            "Session.json will set `style` to this value and the style's prompt + anchor "
+            "apply automatically."
+        ),
+    )
+    p.add_argument(
+        "--style-prompt",
+        default=None,
+        help=(
+            "raw style prompt or image URL (legacy). Only used when --style is NOT set. "
+            "Writes to session.json as `style_reference`."
+        ),
     )
     p.add_argument(
         "--activate",
@@ -212,7 +246,24 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    scaffold_session(args.id, args.ai_budget, args.model, args.style, args.force)
+    # Validate: if --style points at a library style, require it to exist on disk.
+    if args.style:
+        style_json = CONTENT_ROOT / "styles" / args.style / "style.json"
+        if not style_json.exists():
+            print(
+                f"ERROR: --style {args.style!r} not found at {style_json}. "
+                f"Create the style first (or use --style-prompt for a raw prompt).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    scaffold_session(
+        args.id,
+        args.ai_budget,
+        args.model,
+        args.style,
+        args.style_prompt,
+        args.force,
+    )
     if args.activate:
         activate_session(args.id)
     print()

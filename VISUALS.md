@@ -108,21 +108,109 @@ Every session has one locked visual style.
 - The anchor is recorded in the scene manifest (anchor type, source, task id if applicable).
 - Every subsequent scene generation in the session must pass the anchor reference back in through `input.image_input` so character and style stay consistent across chunks.
 
-##### Multi-element anchors ("character sheet" style)
+##### Style library (named styles with anchors and reference registries)
 
-When a session needs visual continuity on **multiple recurring elements** (e.g. two characters, a landmark object, a specific location), the anchor itself should be constructed to include those elements — a single rich "character sheet" image rather than multiple separate named anchors.
+Styles are stored in a shared library at `spoolcast-content/styles/<name>/`. Each style owns a prompt, an anchor image, and a registry of neutral character/object references that are drawn in that style once and reused across sessions.
 
-Why one richer anchor instead of N smaller ones:
-- kie.ai's `image_input` is an array, but passing multiple style references confuses compositional tendencies. One comprehensive image biases the model more cleanly than a set.
-- Keeps the manifest simple: one `style_anchor` field, not a keyed set.
-- Every chunk's image-ref flow stays identical to the single-element case.
+Directory layout:
 
-How to build a multi-element anchor:
-1. Before locking the anchor, list the elements that must stay visually consistent across the session (main character, any secondary characters, key props, any recurring location).
-2. Generate an anchor that shows all those elements together in a neutral composition — like a character sheet with the main character on the left, secondary character on the right, a representative prop in front. Style locked by the session's `default_style_prompt`.
-3. Subsequent scene generations style-reference this comprehensive anchor. The model picks up the relevant element(s) based on what the scene's `beat_description` actually calls for.
+    spoolcast-content/styles/<style-name>/
+      style.json                          ← name, prompt, anchor metadata, reference map
+      anchor.png                          ← master anchor image
+      references/
+        <name>.png                        ← neutral reference image (character or object)
 
-For sessions with only one recurring element (the current default case), the anchor can be a single-character composition. The multi-element approach is an upgrade, not a requirement.
+`style.json` schema:
+
+    {
+      "name": "wojak-comic",
+      "description": "<what this style is for>",
+      "default_style_prompt": "<the prompt every generation in this style applies>",
+      "anchor": {
+        "image_path": "anchor.png",
+        "image_url": "https://kie.ai/...",      ← kie result URL (ephemeral, ~24h)
+        "url_fetched_at": "2026-04-21T..."
+      } | null,
+      "references": {
+        "<name>": {
+          "kind": "character" | "object",
+          "description": "<plain-text description>",
+          "image_path": "references/<name>.png",
+          "image_url": "...",
+          "url_fetched_at": "..."
+        }
+      }
+    }
+
+Sessions connect to a style via `session.json`'s `style` field:
+
+    {
+      "session_id": "my-session",
+      "style": "wojak-comic",
+      ...
+    }
+
+When `style` is set, the style's `default_style_prompt` and anchor URL are authoritative for this session — the legacy `style_reference` / `default_style_prompt` fields on `session.json` itself are ignored. Sessions without a `style` field fall back to the legacy behavior and continue to work unchanged.
+
+###### How to register a style
+
+First time creating a style:
+
+1. `mkdir -p spoolcast-content/styles/<style-name>/references` — make the folder.
+2. Create `style.json` with `name`, `description`, `default_style_prompt`, `"anchor": null`, `"references": {}`.
+3. Generate the master anchor image:
+   ```
+   scripts/.venv/bin/python scripts/generate_reference.py \
+       --style <style-name> --anchor --no-anchor-ref \
+       --description "<what the anchor should contain — e.g. a representative character in the locked style>"
+   ```
+   - `--anchor` writes to `anchor.png` and updates `style.anchor` in `style.json`.
+   - `--no-anchor-ref` tells the generator NOT to pass an existing anchor as `image_input` (there isn't one yet).
+
+After this, `style.anchor` is populated with the kie URL + local path. Every subsequent generation in this style uses the anchor as its base `image_input` unless overridden by a chunk's references (see below).
+
+###### How to register a character or object
+
+Library-scoped (reusable across sessions — keep descriptions neutral, no scene-specific pose):
+
+    scripts/.venv/bin/python scripts/generate_reference.py \
+        --style <style-name> --name <name> --kind character|object \
+        --description "<neutral description: who or what this is, no scene>"
+
+The generator writes `references/<name>.png` and registers it in `style.json`.
+
+Session-scoped (overrides library version for THIS session only — use when the character does one specific thing across most of the video):
+
+    scripts/.venv/bin/python scripts/generate_reference.py \
+        --session <session-id> --name <name> --kind character|object \
+        --description "<session-specific: e.g. the builder, sitting at a desk>"
+
+The generator writes to `sessions/<id>/source/generated-assets/references/<name>.png` and registers in `session.json`'s `characters` / `objects` map.
+
+###### How scene generation uses references
+
+Per-chunk, set a `references` array on the chunk pointing at registered names:
+
+    { "id": "C4", "references": ["builder"], ... }
+
+During `generate_scene.py`:
+
+1. If the chunk has a `references` array with at least one entry: resolve each name through `style_library.resolve_reference` (session overrides take precedence over library entries), pick the **first** reference with a live kie URL, and that URL becomes the scene's single `image_input` value.
+2. If the chunk has NO `references` (or the list is empty): **generate prompt-only — do NOT pass any `image_input`.** The style is locked through the `default_style_prompt` text, not through a reference image. The session's style anchor URL is NOT used as a fallback in this path.
+
+**Why this split — "visual anchor when something specific recurs, text anchor otherwise."** Passing the style anchor as image_input on chunks that don't need character/object consistency causes visual bleed-through: artifacts like duplicated desks, wrong arm geometry, extra characters that shouldn't be in frame, and props pulled in from the anchor that don't belong in the abstract scene. Chunks that represent pages, diagrams, title cards, blank backgrounds, split panels, or any composition that doesn't recur — these should generate prompt-only and let the style words (not style image) drive consistency. Chunks with a character or recurring object need the identity-lock that only the image reference provides.
+
+Concrete: if your shot-list has a text-page chunk, a rules.md page chunk, a title card, a diagram, a blank payoff page — none of those should list the style anchor as a reference. They should generate from the prompt alone. A character chunk (builder, chad) lists the character in `references` and gets the image anchor naturally.
+
+**Only one `image_input` URL is passed per generation.** kie.ai's `image_input` field is technically an array, but passing multiple reference images confuses compositional tendencies — the model produces mushier results. When a scene needs two distinct characters in frame together, register a combined reference (character sheet showing both characters in the locked style) as its own entry and reference that one name.
+
+**Legacy fallback (sessions without a `style` field).** The pre-library manifest-based style anchor still fires on chunks without `references`. This is the old behavior — kept for pre-style-library sessions only. New sessions using the style library follow the prompt-only rule above.
+
+###### Validator enforcement
+
+`scripts/validate_shot_list.py` reads the session's `characters`, `objects`, and (if `style` is set) the style's `references` registry. For every chunk with a `references` field, each name must resolve to a registered entry in one of those maps. Missing names fail validation loudly rather than silently generating with a wrong anchor.
+
+###### Legacy behavior (sessions without a `style` field)
 
 If `session.json` has `style_reference` set to an image URL or local path:
 - use it directly as the anchor for the first generation.
@@ -133,18 +221,55 @@ If `style_reference` is a descriptive prompt:
 If neither `style_reference` nor `default_style_prompt` is set:
 - scene generation must fail loudly instead of silently picking a style.
 
+This pre-library behavior is preserved so existing sessions continue to render unchanged.
+
 ##### Prompt Assembly Rule
 
-Per-chunk prompts should combine:
-- the session style anchor (prompt or a reference to the anchor image)
-- the narration text across all beats in the chunk
-- the beat descriptions across all beats in the chunk
+Per-chunk prompts are composed from **three structured slots** on the chunk (see PIPELINE.md § `visual_direction` / `on_screen_text` / `motion_notes`), not from one free-form blob. Structured assembly is what keeps stage direction, literal text, and motion from bleeding into each other during generation.
+
+The generator sends:
+- the session style anchor (prompt or reference image)
+- the chunk's `visual_direction` — how the image should look/feel
+- an explicit "render these exact words on the frame" instruction composed from the chunk's `on_screen_text` array, when non-empty
 - aspect ratio and resolution from session config
 
-The prompt must not include:
+The generator **does not send**:
+- the chunk's `motion_notes` — still-image models can't render motion; describing motion produces overlapping simultaneous elements (phantom limbs, duplicate objects). Motion belongs to the reveal/animation layer and is consumed there.
 - references to second visual layers
 - instructions to produce transparent or cutout output
-- requests for readable text in the image
+
+Backward compatibility: if a chunk has no structured slots, the legacy `beat_description` blob is used verbatim as a fallback. New sessions should populate the structured slots explicitly.
+
+##### Prompt Hygiene Rules
+
+Generated scenes fail most often on three failure classes, all preventable at prompt-authoring time:
+
+1. **One focal subject per frame.** Default to a single character / object / composition element as the eye's target. A multi-panel layout (comic strip, before/after split) is acceptable when the panel structure is explicit in `visual_direction` — but free-floating competing subjects without structural partition cause composition overload. If a chunk needs two characters interacting, that's one scene (the interaction); two characters doing unrelated things is two chunks.
+2. **Describe end states, not processes.** A still image cannot render a symbol mid-transformation, a character mid-motion, or a scene in the act of changing — the model draws every frame of that motion at once, producing duplicated elements and phantom body parts. Describe either the before state or the after state, and split into two chunks if both matter. Ink strokes mid-motion, hands holding multiple props, "the character turns and says" — all variants of the same bug.
+3. **Prefer simple poses over clever ones.** Current image models reliably break on poses where the character's anatomy is partially occluded, contorted, or holding multiple things — heads under hoods, hands gripping multiple props, characters mid-motion, face obscured by objects. The first move is to simplify the pose in `visual_direction` rather than fight the model. If a specific pose is editorially required and keeps breaking, use a reference image for the character (declared in the chunk's `references`) — but that's the escape hatch, not the default.
+4. **Empty text slots get invented.** If the visual mentions anything that holds words (card, page, sign, screen, label, document, book, banner, poster, ledger), either write the exact words into `on_screen_text` OR say it's `blank` / `wordless` / `no text` / `out of focus` / `illegible` inside `visual_direction`. Never leave it ambiguous — the generator will fill the empty slot with invented text, and the invention is almost never what you wanted.
+
+Post-generation check: `audit_scenes.py` runs a vision pass (Qwen-VL) on every generated scene and flags extra limbs, malformed faces/hands, duplicate characters, missing declared on-screen text, hallucinated text, and composition overload. A non-empty audit blocks render the same way `audit_narration.py` does.
+
+##### Previous-video broll framing
+
+When a chunk plays a clip that originated in a prior video (either a separately-shipped video in the same project, or an earlier iteration of the current video), the broll must be composited inside a TV or monitor graphic rather than filling the frame edge-to-edge.
+
+The framing:
+- the broll plays inside a bezel-styled TV/monitor positioned roughly centered in the canvas (~80% width, 16:9 aspect) — thick grey bezel, subtle drop shadow, rounded corners
+- the surrounding canvas is dimmed to a neutral dark grey so the TV is the focal point
+- for **video broll** (moving clip), a small REC indicator (red rewind-style triangles + "REC" label) sits in the bottom-right corner of the screen — signals "playback of a recording"
+- for **still broll** (a single frame from a prior video, `image_source: broll_image`), no REC indicator — a still can't be "playing", and a play-marker on a static frame reads wrong. The TV frame itself carries the "this is from another video" signal.
+
+Why this framing is load-bearing: full-frame broll from a prior video forces the viewer to interpret two overlapping signals ("what am I looking at?" + "is this the same video?"). The TV-inside-a-scene framing resolves both signals in half a second — the viewer reads "recording playing on a screen" and the cognitive load drops to zero. Without the frame, previous-video broll reads as either a style-break error or a scene that's failing to land.
+
+Implementation: the TV-frame + REC indicator are applied **at render time by the Remotion `TVFrameWrapper` component** (see `src/Composition.tsx`), not by AI generation. The broll asset itself (video file or still image) plays as-is; the renderer wraps it. This means there is no separate AI-gen composite scene for TV-framed broll chunks — the `image_source` stays as `broll` / `broll_image` and no kie.ai call is made for the frame.
+
+Declaration: set `broll_source_kind` to `sibling-video` (shipped previous video in the same project) or `self-reject` (earlier iteration of the current video). Set `broll_framing` to `tv-screen`. `visual_direction` / `on_screen_text` / `motion_notes` are not used on these chunks (the visual is the TV-wrapped broll asset; no AI scene to direct).
+
+Enforcement: `validate_shot_list.py` blocks render on any broll chunk whose `broll_source_kind` is `sibling-video` or `self-reject` and whose `broll_framing` is not `tv-screen`. External-capture and meme broll can still be full-frame; the rule is specifically about footage the viewer might otherwise mistake for "the current video glitching."
+
+Schema aliases: the canonical `broll_framing` value is `"tv-screen"`. The legacy value `"tv"` is accepted by the renderer for backward compatibility with pre-schema-formalization sessions but should be migrated to `"tv-screen"` on any touched chunk.
 
 ##### Scene Output Contract
 
@@ -410,6 +535,48 @@ If an asset type repeatedly causes fragile downstream behavior:
 - simplify the workflow
 - do not keep preserving a broken pattern
 
+#### Asset Verification Principles
+
+Apply to any asset before it ships to the shot-list — illustrations, broll, memes, proofs, overlays.
+
+1. **Verify before ship.** Confirm every asset's content matches what the plan says it should show. Method varies with asset type and available tools — frame inspection, hashing, metadata checks, text audit, pixel comparison. The principle is unchanged across methods.
+2. **Labels are hypotheses, content is evidence.** Filenames, manifest entries, prose descriptions, commit messages, transcript captions describe intent at write-time. They drift from actual content. Only the asset itself is authoritative.
+3. **Suspicious signals block delivery.** Duplicate extracts, byte-identical outputs across differently-labeled sources, matched-timestamp frames that look identical across clips supposed to differ, missing described elements, durations that don't fit the described content — any one of these stops delivery. Not a caveat, not a handoff footnote.
+4. **Verification is the agent's job — never delegated.** The agent runs verification autonomously. Delegating verification to the user is banned, including as a last resort. If the user is in autopilot, delegation would break the contract. If the user is not in autopilot, delegation wastes their time on work the agent can do.
+5. **Autonomous corrective action before escalation.** When verification fails, the agent tries reasonable autonomous fixes — different source, different extraction range, different asset, reduce scope, restructure the section. Escalate to the user only for substantive editorial judgment calls or the defined autopilot escape hatches (rule conflict, budget, missing hard dependency, ethical/factual concern).
+6. **Privileged tool access is a bonus, not a fallback.** Rules must hold without repo/script/API access. If a verification approach only works because the agent happens to have regeneration tooling, the rule is capability-specific and won't transfer. Privilege is for doing better, not for patching around skipped checks.
+
+Failure mode these prevent: agent trusts source-material prose, extracts assets based on label match, ships without content verification, mislabeled assets reach the shot-list, rework required at review or later. Verification is always cheaper than late rework.
+
+#### Asset Verification Enforcement
+
+Rules above describe behavior. The enforcement mechanism — what prevents pattern-matching from silently skipping the rules — is procedural and asset-type-specific.
+
+**Video / audio assets — require a sidecar file on disk.**
+
+Any non-illustration video or audio asset referenced in the shot-list must have a sidecar JSON next to it at `<asset>.verified.json` with these required fields:
+
+- `verified_at` — ISO 8601 timestamp
+- `verified_content` — one-line description of what the agent confirmed the asset shows (must match what the shot-list's `beat_description` will say)
+- `verification_method` — e.g., `"dense-frame inspection at t=0.3,0.6,0.9,1.2,1.5,1.8,2.1,2.4"`, `"ffmpeg ssim comparison against saga-reject-01.mp4"`, `"user-confirmed playback"`
+- `verified_by` — `agent` | `user`
+
+If the sidecar is missing or any required field is empty, the asset is treated as **unverified**. The agent is blocked from claiming in chat, in the shot-list `image_path`, or in any plan proposal that the asset contains any specific content. The block is strict — no claim-plus-caveat, no "flagged for review." Unverified assets cannot be referenced as if verified.
+
+The shot-list validator checks for sidecars on every `broll` / `broll_image` / `external_*` / `meme` chunk that points to a video or audio file. Missing sidecar = validation failure = cannot proceed to render.
+
+**Image assets — require in-session Read.**
+
+Any non-generated image asset (meme stills, proof screenshots, overlays, external_screenshot) referenced in the shot-list must have been viewed by the agent via the Read tool in the current session before the agent makes any content claim about it. Image verification does not require a sidecar because the Read inspection IS the verification. Session-bounded — verification from a prior session does not carry over; the agent must re-Read.
+
+Generated illustrations (`image_source: "generated"`) follow their own narration-text audit rule above and do not require either mechanism; the kie.ai contract + the text audit is the verification path for those.
+
+**Why asset-type-specific enforcement.**
+
+Sidecars exist because the agent cannot directly play video or audio — inspection requires extracting frames or probing metadata, and pattern-matching can easily skip that work. The sidecar makes the verification state visible on disk so the validator can block on it. Images the agent CAN inspect directly, so the cheapest-enforceable check is "must have called Read" — the file open is the verification. For illustrations, the generation pipeline already has text-content checks; adding a sidecar would be redundant ceremony.
+
+The rule this is the mechanical enforcement for: *"Verification is the agent's job — never delegated"* + *"Labels are hypotheses, content is evidence."* Without the sidecar or the Read, these rules depend on the agent remembering to verify. With them, the verification state is either on disk (video/audio) or in the current session (image), and the agent physically cannot claim an unverified asset without creating the verification evidence first.
+
 #### Validation Checklist
 
 Before considering the asset stage complete:
@@ -513,15 +680,27 @@ This lets the review board and future sessions verify attribution and license st
 
 Default: every chunk's illustration is style-locked to the session anchor (see Style Anchor Rule above).
 
-Exception: single-beat chunks marked as **deadpan punchlines** (see STORY.md heuristic 10a) may use a real meme image, reaction gif, screenshot, or external cultural-reference visual as the full-frame chunk image — deliberately breaking the anchor style for comedic punctuation.
+Exception: single-beat chunks marked as **deadpan punchlines** (see STORY.md § Deadpan punchlines) may use a real meme image, reaction gif, screenshot, or external cultural-reference visual — deliberately breaking the anchor style for comedic punctuation.
 
-Constraints:
-- **Full-frame substitution only, never overlay.** The meme/reaction visual IS the chunk's image, not composited on top of a style-locked scene. The one-visual-layer rule (PIPELINE.md, `rules.md`) still applies.
-- **Single-beat chunks only.** Multi-beat chunks stay in anchor style. The substitution is reserved for the specific moment the punchline lands.
-- **Budget: ~1-2 per video.** Past that, the substitution stops being a spike and becomes a running device — the anchor style's consistency starts to feel porous. Rarity is what makes it work.
-- **Flag in the shot list.** Set `image_source` to `meme` or `stock-image` with a `source_kind` of `google-image` or `youtube` per the alternate-mode schema below, and add a `punchline: true` marker in the chunk's notes so review can validate budget.
+**Two forms are allowed — pick the one that lands the beat:**
 
-Example use: a short deadpan beat like *"Obviously."* or *"You know, casually."* lands at the exact moment a well-chosen reaction gif appears full-frame. Single-beat chunk, full substitution, back to anchor style on the next chunk.
+| form | when to use | shape |
+|---|---|---|
+| **full-frame substitution** | the punchline erases the prior scene (reset, hard shift) | the meme/reaction IS the chunk's image, `image_source: meme`, full canvas. |
+| **overlay on reused scene** | the punchline stamps on top of the prior scene (reaction to it, not replacement) | `image_source: reuse` pointing back at the prior chunk, plus an `overlays` entry placing the stamp/reaction artifact at a zone with appear/disappear timing. |
+
+Pick based on intent. A REJECTED stamp slamming down on a builder-at-desk scene reads as a reaction TO the scene — use overlay. A SpongeBob time-card covering the screen reads as "time passes, reset" — use full-frame.
+
+Constraints that apply to both forms:
+- **Single-beat chunks only.** Multi-beat chunks stay in anchor style. Reserved for the specific moment the punchline lands.
+- **Budget: ~1-2 per video, editorial.** Past that, the device stops being a spike and becomes a running visual — rarity is what makes it work.
+- **Flag in the shot list.** Set `punchline: true` on the chunk so validation can see the intent. For full-frame: `image_source: meme`. For overlay: `image_source: reuse`, `continuity: callback-to-<prev>`, plus an `overlays` entry with the artifact's position/size/timing.
+
+Preferences for the overlay form (not requirements):
+- **Transparent background on the overlay asset.** A stamp / icon / sign with alpha channel sits cleanly on top of the reused scene. A full photo with its own background (e.g. a landscape wood-log photo) covers most of the underlay and reads as full-frame substitution instead of an overlay — use full-frame in that case. When in doubt, check: can the viewer still see the scene beneath the overlay artifact?
+- **Medium-contrast between overlay and underlay.** If the underlay is an illustrated / drawn scene (anchor style), a real-world photo as the overlay lands harder than another drawing — the medium shift IS the spike. Drawing-on-drawing can work but it's softer; the viewer may read it as one continuous illustration rather than a reaction punctuating the scene. Pick the medium contrast deliberately, not by default.
+
+The one-visual-layer rule (`rules.md`, PIPELINE.md) still applies: in both forms, the viewer sees exactly one primary illustration. Overlay form doesn't violate that — the reused prior scene IS the primary layer, the stamp is a small overlay the same way a logo or label is allowed.
 
 #### Alternate Mode: Stock / Sourced Assets
 
@@ -683,6 +862,39 @@ Final-frame rule:
 - intended to feel like hand-drawing, but optional
 
 Unapproved reveal styles must not ship. Any new style requires a spec entry in this file before code references it.
+
+##### Inter-chunk transition vocabulary
+
+Two named transitions cover every boundary. No other modes are allowed. Fade-to-white as a standalone exit is banned — it leaves the viewer looking at a blank canvas with nothing to parse.
+
+| name | when to use | behavior | default duration |
+|---|---|---|---|
+| `cut` | meme / broll / broll_image / reuse / proof chunks; punchlines; reveal-group internals; first chunk of the video; **any chunk whose previous chunk is a meme / broll / reuse / proof** (see post-insert cut rule below); any chunk where the previous chunk has no valid still-image underlay (broll video, bumper) | instant, no animation | 0 frames |
+| `crossfade` | **default** between any two illustrated chunks where the previous chunk has a renderable still-image underlay | prior chunk's last frame renders as an underlay while the incoming chunk fades in 0 → 1 opacity | 0.35s (≈10 frames at 30fps) |
+
+**Post-insert cut rule.** A meme / broll / reuse / proof insert takes no transition on EITHER side. The cut-IN rule is obvious (insert lands hard for punch). The cut-OUT rule is less obvious but just as load-bearing: if the next illustrated chunk crossfades out of a transparent-bg PNG (e.g. the stamp meme), the viewer sees the insert's background color shift mid-fade as the next chunk's bg bleeds through. Reads as a weird color-shift transition. Hard cut both sides keeps the insert surgical.
+
+Crossfade is **entrance-side only**: the incoming chunk does the fade-in; the previous chunk simply holds its final frame as the underlay. There is no "exit crossfade" — every chunk's exit is a cut (hold last frame, let the next chunk take over).
+
+**Underlay must match the prior chunk's visible end state.** If the prior chunk had a camera effect running (push-in, pan, zoom), the underlay during crossfade renders the prior image at the prior chunk's FINAL camera transform — not at the image's natural 1.0-zoom origin. Without this, the viewer sees: zoomed-in prior chunk → snap back to 1.0-zoom underlay → crossfade to new chunk. The snap-back is jarring and reads as a glitch. Implementation: `Composition.tsx` computes `computeCamera(priorChunk, priorChunk.durationFrames - 1, fps)` and applies that transform to the underlay div.
+
+Underlay-validity rule: crossfade needs something to fade FROM. When the previous chunk is a broll video (no decodable still), a bumper (title card rendered from text, no image file), or missing an image path, the crossfade degrades automatically to `cut`. No fade-in-from-white allowed.
+
+Read-time downstream: crossfade entrances count fully toward the readable window (the text is visible from frame one, just at reduced opacity for ~0.35s, which is still legible for held-text). `cut` entrances trivially count the full chunk duration.
+
+##### Bumper render rule
+
+Bumpers are chapter title cards. They render at **opacity 1 from frame 0** — no fade-in. A fade-from-0 against a white background produces a pure-white first frame that reads as a flash; the audit catches it. A hard cut into the bumper IS the act-boundary signal and doesn't need softening. Bumper exit is also a cut (the bumper holds until the next chunk takes over).
+
+##### Paint-on (deferred)
+
+Paint-on stroke reveals were the original spoolcast transition aesthetic. They are currently deferred because the existing `stroke_reveal.py` preprocessor outputs RGB PNGs with a white background (no alpha), which means any paint-on animation starts from a white canvas — producing visible white flashes at the start of every paint-on chunk. Using paint-on at scene boundaries stacked the problem: flash-at-end + flash-at-start = multi-second animated white.
+
+Before paint-on can return to the vocabulary, the preprocessor must be updated to emit RGBA PNG frames where pixels that haven't been painted yet are transparent (not white). Then the renderer can composite paint-on frames over the prior chunk's final frame as an underlay — no white ever visible.
+
+Until that preprocessor update ships, paint-on is not a valid `entrance` value. `build_preview_data.py` does not emit it; all scene-opener moments use `cut` or `crossfade` depending on underlay validity.
+
+These are defaults for all sessions. The two named transitions (`cut`, `crossfade`) are the only allowed values — no new named transitions without a spec entry here first.
 
 #### Determinism Rule
 

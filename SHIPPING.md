@@ -313,6 +313,29 @@ Avoid:
 - Vague capability claims ("scores ads")
 - Titles that describe the SETUP not the FINDING
 
+##### Copy principle: hit the psyche, not describe the topic
+
+Every title, description, and thumbnail caption should pull on a core human drive — not report what the video contains. "A video about X" is a topic description; nobody clicks a topic description. Copy lands when the reader's brain registers an unmet want *before* it registers a subject.
+
+The author's job is to find the specific drive that fits the specific content, then commit to it. There is no fixed menu of drives to pick from — the human psyche is bigger than any list would cover. What follows are examples that have worked, not an exhaustive catalog. If none of them fit, the answer is to find a new lever — not to force-fit the content into one of these.
+
+Examples that have landed:
+
+- **Cheat, not lesson.** Hand the reader a shortcut to knowledge someone else earned the hard way. "How I stopped", "what N rejected takes taught me", "the one setting that fixed." Signals "I went through this so you don't have to." *Test: does it read "I feel that AND this person figured out a shortcut I don't have"?*
+- **Hidden mechanism.** Imply the reader's current model is incomplete in a specific way. "What's actually happening when X", "the real reason Y happens." *Test: does it feel like lifting a curtain?*
+- **Private frustration named.** Put words to a pain the reader has felt but couldn't articulate — "silently breaking rules", "quietly dropping context." The validation alone drives the click. *Test: does the reader say "YES, that's exactly it" before finishing the title?*
+- **Expensive mistake, free lesson.** Someone else paid the cost; the reader gets the insight free. "I lost $X because I did Y." *Test: does the title imply real pain the author paid for?*
+
+Don't try to hit several at once — levers interfere. Pick the one strongest for this specific content and commit. And don't start from the example list above — start from the content, find the drive, then check whether an existing example fits or a new one is needed.
+
+Anti-patterns — copy that describes the topic instead of pulling on a drive:
+- "How to..." — tutorial framing, no earned-insight feeling
+- "Best practices for X" — academic consensus, no pain, no drive
+- "A guide to X" — instruction manual, no human lever
+- "Why AI is broken" — analysis with no fix signal
+- "The AI problem nobody's talking about" — vague, names no specific pain
+- "How X actually works" — sounds like a lecture unless it signals contrarian mechanism
+
 #### Thumbnail concept
 
 **Zero-prior-context rule.** Every thumbnail must communicate the hook using only what a viewer can read in the thumbnail itself. Assume the viewer has never heard of the product, the creator, the project, or anything the video references. No brand recognition. No insider knowledge. Only the image, the text, and universally-shared mental models (a laptop, a chat bubble, a receipt, a confused face).
@@ -338,6 +361,16 @@ the **disagreement** — not just "AI thinks". Examples:
 For style, see `VISUALS.md` re: prompt-only style overrides for
 thumbnails (typically allow ONE accent color even when scenes are
 locked to monochrome).
+
+**Thumbnail dimensions: exactly 1920×1080.** YouTube expects 16:9 thumbnails and letterboxes anything that deviates — including near-16:9 outputs like kie.ai's 1376×768 (which is 1.7917:1, subtly wider than 1.7778:1). The letterbox shows up as a thin black bar at the top or bottom of the thumbnail in the channel grid and under the player.
+
+After generating a thumbnail, always rescale to 1920×1080 before uploading:
+
+```bash
+ffmpeg -y -i thumbnail.png -vf "scale=1920:1080:flags=lanczos" thumbnail-1920x1080.png
+```
+
+A direct scale (not preserving aspect via padding) is correct here — kie.ai outputs are close enough to 16:9 that the 0.5-1% horizontal stretch is imperceptible, and any pad-to-fit approach reintroduces the black bars we're trying to eliminate.
 
 #### Don't self-hedge in the title or thumbnail
 
@@ -385,6 +418,32 @@ the viewer can already see in the title.
 4. Generate thumbnail via `generate_thumbnail.py` (uses session-aware
    helper from `VISUALS.md`)
 5. Pull real chapter timestamps from `preview-data.json`
+6. Generate captions via `generate_srt.py` — both narration AND on-screen
+   text are included (see Captions rule below)
+
+#### Captions (SRT) must include on-screen text
+
+The caption file ships both **narration** and **on-screen text** as cues. Narration alone isn't enough — a large share of YouTube viewers watch with sound off (mobile, autoplay, work-safe), and any text rendered inside the video's frames (rule cards, labels, stamps, titles) is invisible to them unless the caption includes it.
+
+Implementation (`generate_srt.py`): narration cues come from beat-level narration text; on-screen cues come from each chunk's `on_screen_text` field and span the chunk's full duration, bracketed as `[on-screen: …]` so a reader distinguishes them from spoken dialogue.
+
+This pairs with STORY.md § On-screen text read-time. The declared `on_screen_text` drives three things: the validator (read-time math), the scene generator (literal-text rendering), and the caption file (on-screen-text cues). One source of truth, three consumers.
+
+Post-processing note: if the shipped video is sped up to a non-1.0x rate after Remotion renders (e.g. 1.15x), produce a matching rescaled SRT (timestamps divided by the rate). Both files ship — the 1.0x master SRT is an archive; the rate-matched SRT is what gets uploaded alongside the final video.
+
+**Caption density cap — don't overpopulate with text.** The on-screen-text cues are for the sound-off viewer, not a transcript of every legible pixel. When a chunk's `on_screen_text` is short (a stamp, a label, a title card), include it verbatim. When it's long (a dense rules.md card with 30+ words + headings + bullets), prefer a short blurb over the full dump — something like `[on-screen: rules.md card showing the three-option protocol]` instead of the full card verbatim. Two failure modes the cap prevents: (a) captions filling the whole frame and covering the actual visual the viewer is trying to watch, (b) reading speed mismatches where the caption has more words than the text it's describing has time to be read. Rule of thumb: if the `[on-screen: ...]` cue exceeds ~15 words, compress to a blurb.
+
+#### Pre-upload checklist
+
+Before uploading to YouTube, every shipped video must have:
+
+1. **Final video at the intended playback rate** (1.15x post-processed if applicable, 1.0x otherwise). Confirm by checking the mp4's duration against the expected.
+2. **Thumbnail rescaled to exactly 1920×1080** (see Thumbnail dimensions above). `ffprobe` the file to verify dimensions before upload, not after.
+3. **SRT matching the shipped video's playback rate.** If you upload the 1.15x final, upload the 1.15x SRT — never the 1.0x master SRT against a 1.15x video. Timestamp drift compounds across the video.
+4. **Chapter timestamps in the description at the shipped rate.** Same trap as SRT — chapter marks computed from a 1.0x preview-data must be divided by the playback rate before pasting into the description. A video uploaded at 1.15x with 1.0x chapter timestamps will have the chapters drift further off-sync toward the end.
+5. **Title + description + tags drafted per the Copy principle** (hit the psyche, not describe the topic).
+
+Verify all five before publish. A mismatched rate on any of (1), (3), (4) is the class of failure most likely to slip through — catch it at the checklist stage, not after viewers flag it.
 
 #### What this prevents
 

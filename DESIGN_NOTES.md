@@ -639,3 +639,25 @@ The grouping logic:
 - **SHIPPING** = the last mile. Review and publish together
   because they're both "preparing the final artifact for a
   specific audience."
+
+## Three bug classes learned during spoolcast-dev-log V4 (April 2026)
+
+### Timeline-gap class
+
+Any code path that advances `running_frame` in `build_preview_data.py` AFTER `chunk_end_frame = running_frame` has been captured produces a white-flash gap in the rendered video. The chunk's `durationFrames` doesn't include the advance, but the next chunk's `startFrame` does — so the renderer sees a gap of N frames where no Sequence is active, and the composition's white background shows through.
+
+Hit twice on V4: once with the `weight: high` tail-pause bump, once with the `hold_duration_sec` extension. Fix in both places was the same: after advancing `running_frame`, re-assign `chunk_end_frame = running_frame`.
+
+Durable rule: any function that extends a chunk's duration must update both fields atomically. Consider wrapping this into a helper so future extensions can't forget.
+
+### Paint-on deferred
+
+`stroke_reveal.py` outputs RGB PNG frames with a white background (pixels that haven't been painted yet are white, not transparent). Any entrance that plays the stroke-reveal animation therefore starts from a visible white canvas — a flash, not a reveal.
+
+Paint-on is deferred from the transition vocabulary (`cut` + `crossfade` only for now) until the preprocessor emits RGBA frames where unpainted pixels are transparent. Then paint-on can composite over the prior chunk's final frame as an underlay, and the reveal feels like strokes appearing on an existing scene rather than strokes appearing on a blank page.
+
+### Loop-index leak
+
+During a `build_preview_data.py` refactor, a `for i, chunk in enumerate(chunks_out):` loop got simplified to `for chunk in chunks_out:` — but the body still referenced `i` (which was leaking from a prior `enumerate` loop). Every chunk ended up computing its prior-frame underlay from `chunks_out[49]` (the last `i` value) — all 50 chunks inherited the final chunk's image as their underlay.
+
+Rule: when simplifying a loop that drops `enumerate`, grep the loop body for lone `i` / `idx` / `j` references before committing. Python won't warn you — it'll silently use the leaked variable from the enclosing scope.

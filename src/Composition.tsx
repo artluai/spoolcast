@@ -5,7 +5,6 @@ import {
   Img,
   OffthreadVideo,
   Sequence,
-  interpolate,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
@@ -90,6 +89,7 @@ type Overlay = {
   y: number;
   anchor: string; // "top-right" | "top-left" | "bottom-right" | "bottom-left" | "center"
   width: number;  // fraction of canvas width
+  rotationDeg?: number;
   entryTransition?: string;
   exitTransition?: string;
 };
@@ -98,7 +98,7 @@ type Chunk = {
   id: string;
   imageSrc: string;
   imageSource?: string; // "generated" | "broll" | "meme" | "broll_image" | ...
-  brollFraming?: string | null; // "tv" | null
+  brollFraming?: string | null; // "tv-screen" | "full-frame" | "inset" | null — see PIPELINE.md § broll_framing
   startFromSec?: number; // for broll video: seconds into source to begin playback
   overlays?: Overlay[];
   startFrame: number;
@@ -108,12 +108,17 @@ type Chunk = {
   exit?: string;
   wipeInFrames?: number;
   wipeOutFrames?: number;
+  crossfadeInFrames?: number;
+  crossfadeOutFrames?: number;
+  priorFinalImageSrc?: string;
   framesDir?: string;
   preGenFrameCount?: number;
   beats: Beat[];
   boundary_kind?: string;
   act_title?: string;
   weight?: string;
+  punchline?: boolean;
+  reveal_group?: string;
 };
 
 type CameraState = {x: number; y: number; zoom: number};
@@ -271,6 +276,7 @@ const OverlayLayer: React.FC<{overlays: Overlay[]; canvasWidth: number; canvasHe
         const px = ov.x * canvasWidth;
         const py = ov.y * canvasHeight;
         const {tx, ty} = anchorToOffsets(ov.anchor);
+        const rot = ov.rotationDeg ?? 0;
         return (
           <div
             key={`${ov.src}-${i}`}
@@ -279,7 +285,8 @@ const OverlayLayer: React.FC<{overlays: Overlay[]; canvasWidth: number; canvasHe
               left: px,
               top: py,
               width: w,
-              transform: `translate(${tx}, ${ty})`,
+              transform: `translate(${tx}, ${ty}) rotate(${rot}deg)`,
+              transformOrigin: "center center",
             }}
           >
             <Img
@@ -293,8 +300,14 @@ const OverlayLayer: React.FC<{overlays: Overlay[]; canvasWidth: number; canvasHe
   );
 };
 
-const TVFrameWrapper: React.FC<{children: React.ReactNode}> = ({children}) => {
-  // Greyed background + centered styled frame at ~80% width.
+const TVFrameWrapper: React.FC<{
+  children: React.ReactNode;
+  playbackIcon?: boolean;
+}> = ({children, playbackIcon = false}) => {
+  // Greyed background + centered styled frame at ~80% width. Optional rewind
+  // icon in the bottom-right corner of the screen to signal "this is a replay"
+  // (used when the broll asset is a video clip from a prior video; see
+  // VISUALS.md § Previous-video broll framing).
   return (
     <AbsoluteFill style={{backgroundColor: "#2a2a2a"}}>
       <div
@@ -313,17 +326,52 @@ const TVFrameWrapper: React.FC<{children: React.ReactNode}> = ({children}) => {
         }}
       >
         {children}
+        {playbackIcon ? (
+          <div
+            style={{
+              position: "absolute",
+              right: 18,
+              bottom: 14,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 12px",
+              borderRadius: 8,
+              backgroundColor: "rgba(0,0,0,0.55)",
+              backdropFilter: "blur(2px)",
+              fontFamily: "monospace",
+              fontSize: 22,
+              fontWeight: 700,
+              letterSpacing: 1,
+              color: "#ff4a4a",
+              textShadow: "0 0 6px rgba(255,74,74,0.35)",
+              pointerEvents: "none",
+            }}
+          >
+            <svg
+              width="26"
+              height="22"
+              viewBox="0 0 26 22"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <polygon points="13,2 2,11 13,20" fill="#ff4a4a" />
+              <polygon points="25,2 14,11 25,20" fill="#ff4a4a" />
+            </svg>
+            <span>REC</span>
+          </div>
+        ) : null}
       </div>
     </AbsoluteFill>
   );
 };
 
 const BumperRenderer: React.FC<{chunk: Chunk}> = ({chunk}) => {
-  const frame = useCurrentFrame();
-  const opacity = interpolate(frame, [0, 8], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  // Bumpers are title cards — they snap in at full opacity. A fade-in
+  // against a white bg produces an all-white first frame (the audit
+  // catches that as a flash). Chapter headings don't need a soft entrance
+  // anyway; the hard cut IS the "new act starts" signal.
+  const opacity = 1;
   const title = chunk.act_title ?? "";
   // Rough estimate of text width so the underline scales proportionally to
   // the title. 140px font with Caveat averages ~0.5em per glyph.
@@ -377,7 +425,10 @@ const BumperRenderer: React.FC<{chunk: Chunk}> = ({chunk}) => {
   );
 };
 
-const ChunkRenderer: React.FC<{chunk: Chunk}> = ({chunk}) => {
+const ChunkRenderer: React.FC<{chunk: Chunk; priorChunk: Chunk | null}> = ({
+  chunk,
+  priorChunk,
+}) => {
   if (chunk.boundary_kind === "bumper") {
     return <BumperRenderer chunk={chunk} />;
   }
@@ -395,6 +446,18 @@ const ChunkRenderer: React.FC<{chunk: Chunk}> = ({chunk}) => {
 
   const inWipeIn = wipeIn > 0 && frame < wipeIn;
   const inWipeOut = wipeOut > 0 && frame >= wipeOutStart;
+
+  // Crossfade: entrance-side effect. When entrance === "crossfade" and we
+  // have a priorFinalImageSrc, render the prior chunk's last frame as an
+  // underlay and ramp this chunk's opacity from 0 → 1 over the first
+  // crossfadeInFrames. See VISUALS.md § Inter-chunk transition vocabulary.
+  const crossfadeIn = chunk.crossfadeInFrames ?? 0;
+  const entrance = chunk.entrance ?? "cut";
+  const isCrossfadeEntrance = entrance === "crossfade" && crossfadeIn > 0;
+  const crossfadeInOpacity = isCrossfadeEntrance
+    ? Math.min(1, Math.max(0, frame / crossfadeIn))
+    : 1;
+  const inCrossfadeIn = isCrossfadeEntrance && frame < crossfadeIn;
 
   let srcPath = chunk.imageSrc;
   if (hasFrames && !isBrollVideo && inWipeIn) {
@@ -416,6 +479,12 @@ const ChunkRenderer: React.FC<{chunk: Chunk}> = ({chunk}) => {
   const transform = cameraTransform(cam, width, height);
 
   // --- content: either video playback (broll) or image ---
+  // TV-frame wrapping applies to sibling-video / self-reject broll regardless
+  // of whether the asset is a video clip or a still (see VISUALS.md §
+  // Previous-video broll framing). Schema value "tv-screen" is the canonical;
+  // legacy "tv" is accepted as an alias.
+  const wantsTvFrame =
+    chunk.brollFraming === "tv-screen" || chunk.brollFraming === "tv";
   let content: React.ReactNode;
   if (isBrollVideo) {
     content = (
@@ -425,8 +494,10 @@ const ChunkRenderer: React.FC<{chunk: Chunk}> = ({chunk}) => {
         style={{width: "100%", height: "100%", objectFit: "contain", display: "block"}}
       />
     );
-    if (chunk.brollFraming === "tv") {
-      content = <TVFrameWrapper>{content}</TVFrameWrapper>;
+    if (wantsTvFrame) {
+      // Video broll gets the REC indicator — it's a moving playback of a
+      // prior recording, and the icon signals "this is a replay."
+      content = <TVFrameWrapper playbackIcon>{content}</TVFrameWrapper>;
     }
   } else {
     const useLetterbox = LETTERBOX_SOURCES.has(imageSource);
@@ -443,6 +514,12 @@ const ChunkRenderer: React.FC<{chunk: Chunk}> = ({chunk}) => {
         <Img src={staticFile(srcPath)} style={style} />
       </div>
     );
+    if (wantsTvFrame) {
+      // Still broll (broll_image): no REC indicator — a still frame can't
+      // be "playing," so the indicator would feel wrong. The frame itself
+      // carries the "this is from another video" signal.
+      content = <TVFrameWrapper>{content}</TVFrameWrapper>;
+    }
   }
 
   // Letterboxed content needs a black background; illustrated (cover) content
@@ -450,9 +527,46 @@ const ChunkRenderer: React.FC<{chunk: Chunk}> = ({chunk}) => {
   const useLetterbox = LETTERBOX_SOURCES.has(imageSource);
   const bg = useLetterbox ? "#000000" : "#ffffff";
 
+  // Prior-frame underlay: visible only during the crossfade-in window, below
+  // this chunk's fading-in content. The underlay applies the PRIOR chunk's
+  // FINAL camera transform — if the prior chunk was mid-zoom-in, we render
+  // it at its end-state zoom, not at 1.0. Otherwise the crossfade snaps
+  // from zoomed → un-zoomed → new chunk (jarring). See DESIGN_NOTES for
+  // the failure case we fixed here.
+  const priorFinalSrc = chunk.priorFinalImageSrc;
+  const showPriorUnderlay =
+    inCrossfadeIn && priorFinalSrc && priorFinalSrc.length > 0;
+  const priorFinalTransform = priorChunk
+    ? cameraTransform(
+        computeCamera(priorChunk, Math.max(0, priorChunk.durationFrames - 1), fps),
+        width,
+        height,
+      )
+    : "translate(0px, 0px) scale(1)";
+
   return (
     <AbsoluteFill style={{backgroundColor: bg, overflow: "hidden"}}>
-      <div style={{width: "100%", height: "100%", opacity: wipeOutOpacity}}>
+      {showPriorUnderlay ? (
+        <AbsoluteFill style={{opacity: 1 - crossfadeInOpacity}}>
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              transform: priorFinalTransform,
+              transformOrigin: "50% 50%",
+            }}
+          >
+            <Img src={staticFile(priorFinalSrc)} style={IMG_STYLE} />
+          </div>
+        </AbsoluteFill>
+      ) : null}
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          opacity: wipeOutOpacity * crossfadeInOpacity,
+        }}
+      >
         {content}
         <OverlayLayer
           overlays={chunk.overlays || []}
@@ -471,15 +585,14 @@ export const SpoolcastComposition: React.FC = () => {
 
   return (
     <AbsoluteFill style={{backgroundColor: "#ffffff"}}>
-      {chunks.map((chunk) => (
+      {chunks.map((chunk, i) => (
         <Sequence
           key={chunk.id}
           from={chunk.startFrame}
           durationInFrames={chunk.durationFrames}
         >
-          <ChunkRenderer chunk={chunk} />
+          <ChunkRenderer chunk={chunk} priorChunk={i > 0 ? chunks[i - 1] : null} />
           {chunk.beats.map((beat) => {
-            // Skip audio for placeholder beats (broll chunks with no narration mp3).
             if (!beat.audioSrc) return null;
             return (
               <Sequence

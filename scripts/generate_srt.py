@@ -60,14 +60,25 @@ def generate_srt(session: str, out_path: Path | None) -> Path:
     # Build beat-id → narration text map from the shot-list (preview-data has
     # narration too, but the shot-list is authoritative).
     narration_by_beat: dict[str, str] = {}
+    # Chunk-level on_screen_text (the literal words that appear on the
+    # rendered frame). Included as bracketed cues so deaf/muted-viewer
+    # captions reflect everything visible on screen, not just narration.
+    on_screen_by_chunk: dict[str, list[str]] = {}
     for chunk in shot_list.get("chunks", []):
         for beat in chunk.get("beats", []):
             narration_by_beat[beat.get("id", "")] = (beat.get("narration") or "").strip()
+        osts = chunk.get("on_screen_text") or []
+        if isinstance(osts, list):
+            cleaned = [s.strip() for s in osts if isinstance(s, str) and s.strip()]
+            if cleaned:
+                on_screen_by_chunk[chunk.get("id", "")] = cleaned
 
     fps = preview["fps"]
     cues: list[tuple[float, float, str]] = []
     for chunk in preview["chunks"]:
         chunk_start = chunk["startFrame"]
+        chunk_end = chunk_start + chunk["durationFrames"]
+        chunk_id = chunk.get("id", "")
         for beat in chunk["beats"]:
             text = narration_by_beat.get(beat["id"], (beat.get("narration") or "").strip())
             if not text:
@@ -75,6 +86,22 @@ def generate_srt(session: str, out_path: Path | None) -> Path:
             abs_start = (chunk_start + beat["startFrameInChunk"]) / fps
             abs_end = (chunk_start + beat["endFrameInChunk"]) / fps
             cues.append((abs_start, abs_end, text))
+
+        # On-screen text cue: spans the full chunk, bracketed so the viewer
+        # reads it as "this is what's visible on the frame" rather than
+        # dialogue. Lets sound-off viewers (YouTube mobile, captions
+        # dashboards, accessibility readers) see every rendered word.
+        osts = on_screen_by_chunk.get(chunk_id)
+        if osts:
+            abs_start = chunk_start / fps
+            abs_end = chunk_end / fps
+            label = " / ".join(osts)
+            cues.append((abs_start, abs_end, f"[on-screen: {label}]"))
+
+    # Sort cues chronologically. The narration loop adds beat cues in-order
+    # then the chunk's on-screen-text cue at the end; without a sort they'd
+    # appear in chunk-interleaved rather than strictly time-ordered.
+    cues.sort(key=lambda c: (c[0], c[1]))
 
     # Write SRT.
     if out_path is None:

@@ -1,25 +1,31 @@
 #!/usr/bin/env python3
-"""Pairwise narration audit of a spoolcast shot-list.
+"""Narration audit of a spoolcast shot-list.
 
-For every adjacent beat pair, checks whether beat N+1 is a natural continuation
-of beat N from the viewer's perspective (bridge test). For every beat, checks
-whether it's overweight/packed with decorative density (overload test). Uses
-Claude Haiku via the Anthropic SDK.
+Runs four passes via Qwen (OpenRouter):
+- bridge: every adjacent beat pair is a natural continuation, or a bridge is needed
+- overweight: each beat is load-bearing and sized right for its position
+- layman: each beat is understandable to a non-technical viewer without having
+  read any rule file or technical doc
+- alignment: each beat actually serves the session's locked core message
+
+Default provider is openrouter (Qwen). Anthropic is kept as an optional
+fallback for environments without an OpenRouter key.
 
 Usage:
   scripts/.venv/bin/python scripts/audit_narration.py \\
       --session spoolcast-explainer \\
       [--out audit-report.json] \\
-      [--model claude-haiku-4-5-20251001] \\
+      [--provider openrouter] [--model qwen/qwen-2.5-72b-instruct] \\
       [--parallel N]
 
 Reads: ../spoolcast-content/sessions/<session>/shot-list/shot-list.json
+       ../spoolcast-content/sessions/<session>/session.json (core_message)
 Writes: ../spoolcast-content/sessions/<session>/working/narration-audit.json
 
 Exit codes:
   0 = no flags
-  1 = at least one bridge flag raised
-  2 = at least one overweight flag raised (overrides 1 if both, takes precedence)
+  1 = bridge flags only
+  2 = any overweight / layman / alignment flag raised (takes precedence)
 """
 
 from __future__ import annotations
@@ -53,10 +59,10 @@ except ImportError:
     OpenAI = None  # type: ignore[assignment,misc]
 
 
-DEFAULT_PROVIDER = "anthropic"
+DEFAULT_PROVIDER = "openrouter"
 DEFAULT_MODEL_BY_PROVIDER = {
-    "anthropic": "claude-haiku-4-5-20251001",
     "openrouter": "qwen/qwen-2.5-72b-instruct",
+    "anthropic": "claude-haiku-4-5-20251001",  # optional fallback only
 }
 # OpenRouter is OpenAI-SDK-compatible; just point base_url at their endpoint.
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -229,6 +235,50 @@ Apply the overload test:
    should be slow.)
 3. Could half the words be cut without losing the argument? Is jargon stacked?
    Are multiple concepts packed in when they'd land better spread out?
+
+Always reply with a single JSON object. No prose outside the JSON."""
+
+
+LAYMAN_SYSTEM_PROMPT = """You are an accessibility reviewer for an explainer video.
+
+Your job: for each beat, decide whether a non-technical viewer can understand
+it from the narration alone — without having read any rule file, technical doc,
+or the project's glossary. Jargon, unexplained acronyms, terms-of-art, and
+codey language all fail this test unless the viewer has been given the plain
+version first (either in this beat or in an earlier beat that's still fresh).
+
+Apply the layman test:
+1. Would a smart non-technical viewer (someone who doesn't write code, doesn't
+   know the project) understand what this beat is telling them?
+2. If a technical term appears, is the plain version EITHER (a) given in the
+   same beat, OR (b) clearly established in an earlier beat?
+3. Is the concept being named at all — or is the beat assuming the viewer
+   already knows what X means?
+
+This is a different test from overweight. A beat can be short and clear on
+density yet still use a term the viewer has no frame for (e.g. "the protocol
+surfaces the conflict" — clear pacing, but "protocol" is insider).
+
+Always reply with a single JSON object. No prose outside the JSON."""
+
+
+ALIGNMENT_SYSTEM_PROMPT = """You are a thesis-alignment reviewer for an explainer video.
+
+Your job: for each beat, decide whether it serves the video's LOCKED core
+message, or whether it's decorative / off-thesis / a different story.
+
+The core message is the single sentence the viewer must walk away with. Every
+beat either serves that message or it shouldn't be in the video. Beats can
+serve the message in several ways — setting it up, giving evidence, generalizing
+it, paying it off — but each beat's link to the message should be namable in
+one short sentence.
+
+Apply the alignment test:
+1. What specific job does this beat do toward the core message (setup / evidence
+   / analogy / payoff / generalization / callback)?
+2. If the job is unclear or the beat is off-thesis, flag it.
+3. 'Drift' looks like: a tangent about tooling details, a craft anecdote unrelated
+   to the thesis, a beat that would be equally at home in a different video.
 
 Always reply with a single JSON object. No prose outside the JSON."""
 
@@ -679,6 +729,174 @@ def run_preview_audit(
     return flags
 
 
+def build_layman_prompt(
+    beat: dict[str, Any],
+    beat_index: int,
+    total_beats: int,
+    prior_glossary: list[str],
+) -> str:
+    percentage = int(round((beat_index + 1) / max(total_beats, 1) * 100))
+    glossary_block = (
+        f"Terms introduced earlier in the video (considered 'established' for "
+        f"this beat): {', '.join(prior_glossary) if prior_glossary else 'none'}."
+    )
+    return (
+        f'Scene: "{beat.get("scene_title") or ""}"\n'
+        f"Position in video: {beat_index + 1} of {total_beats} beats "
+        f"(~{percentage}% in)\n\n"
+        f'Beat narration: "{beat["narration"]}"\n\n'
+        f"{glossary_block}\n\n"
+        "Apply the layman test:\n"
+        "1. Would a smart non-technical viewer understand this beat from the "
+        "narration alone?\n"
+        "2. If a technical term appears, is the plain version either in the "
+        "same beat, or clearly established earlier?\n"
+        "3. Is the concept being named or is the beat assuming prior knowledge?\n\n"
+        "Reply in JSON:\n"
+        "{\n"
+        '  "verdict": "ok" | "not_layman",\n'
+        '  "opaque_terms": ["<list of specific terms/phrases the viewer would not understand>"],\n'
+        '  "proposed_plain_version": "<if not_layman: one-sentence rewrite in plain English that preserves the beat\'s job>",\n'
+        '  "reasoning": "<one sentence>"\n'
+        "}"
+    )
+
+
+def build_alignment_prompt(
+    core_message: str,
+    beat: dict[str, Any],
+    beat_index: int,
+    total_beats: int,
+) -> str:
+    percentage = int(round((beat_index + 1) / max(total_beats, 1) * 100))
+    return (
+        f'Core message (locked): "{core_message}"\n\n'
+        f'Scene: "{beat.get("scene_title") or ""}"\n'
+        f"Position in video: {beat_index + 1} of {total_beats} beats "
+        f"(~{percentage}% in)\n\n"
+        f'Beat narration: "{beat["narration"]}"\n\n'
+        "Apply the alignment test:\n"
+        "1. What specific job does this beat do toward the core message?\n"
+        "2. Is that job clear, or is the beat decorative / tangential / "
+        "off-thesis?\n\n"
+        "Reply in JSON:\n"
+        "{\n"
+        '  "verdict": "ok" | "off_thesis",\n'
+        '  "job": "<setup | evidence | analogy | payoff | generalization | callback | unclear>",\n'
+        '  "link_to_core": "<one sentence naming how this beat serves the core message, or empty if off_thesis>",\n'
+        '  "proposed_fix": "<if off_thesis: cut / rewrite-to-serve-thesis / move-elsewhere>",\n'
+        '  "reasoning": "<one sentence>"\n'
+        "}"
+    )
+
+
+def run_layman_audit(
+    client: "ModelClient",
+    model: str,
+    beats: list[dict[str, Any]],
+    parallel: int,
+) -> list[dict[str, Any]]:
+    """Rolling glossary: terms flagged as 'opaque' in beat N are considered
+    established for beats > N (the viewer has heard it at least once). This
+    prevents false-positives on every subsequent use of a term that was
+    technical on first use but is now in the viewer's frame.
+
+    Because the rolling glossary depends on earlier results, the layman pass is
+    sequential — parallel is accepted but ignored for correctness.
+    """
+    total = len(beats)
+    results: list[dict[str, Any] | None] = [None] * total
+    established: list[str] = []
+
+    print(f"Auditing {total} beats for layman accessibility (sequential)...")
+    for i in range(total):
+        prompt = build_layman_prompt(beats[i], i, total, established)
+        parsed = call_claude(client, model, LAYMAN_SYSTEM_PROMPT, prompt)
+        results[i] = parsed
+        if parsed:
+            opaque = parsed.get("opaque_terms") or []
+            if isinstance(opaque, list):
+                for t in opaque:
+                    if isinstance(t, str) and t and t not in established:
+                        established.append(t)
+        if (i + 1) % 10 == 0 or i == total - 1:
+            print(f"  layman: {i + 1}/{total}")
+
+    flags: list[dict[str, Any]] = []
+    for i, parsed in enumerate(results):
+        if parsed is None:
+            continue
+        if parsed.get("verdict") != "not_layman":
+            continue
+        beat = beats[i]
+        flags.append({
+            "beat_id": beat["beat_id"],
+            "chunk_id": beat["chunk_id"],
+            "narration": beat["narration"],
+            "verdict": parsed.get("verdict"),
+            "opaque_terms": parsed.get("opaque_terms") or [],
+            "proposed_plain_version": parsed.get("proposed_plain_version"),
+            "reasoning": parsed.get("reasoning"),
+        })
+    return flags
+
+
+def run_alignment_audit(
+    client: "ModelClient",
+    model: str,
+    beats: list[dict[str, Any]],
+    core_message: str,
+    parallel: int,
+) -> list[dict[str, Any]]:
+    total = len(beats)
+    if not core_message:
+        print("No core_message in session.json — skipping alignment audit.")
+        return []
+    results: list[dict[str, Any] | None] = [None] * total
+
+    def audit_beat(i: int) -> tuple[int, dict[str, Any] | None]:
+        prompt = build_alignment_prompt(core_message, beats[i], i, total)
+        parsed = call_claude(client, model, ALIGNMENT_SYSTEM_PROMPT, prompt)
+        return i, parsed
+
+    print(f"Auditing {total} beats for core-message alignment (parallel={parallel})...")
+    if parallel <= 1:
+        for i in range(total):
+            _, parsed = audit_beat(i)
+            results[i] = parsed
+            if (i + 1) % 10 == 0 or i == total - 1:
+                print(f"  alignment: {i + 1}/{total}")
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as ex:
+            futures = {ex.submit(audit_beat, i): i for i in range(total)}
+            done = 0
+            for fut in concurrent.futures.as_completed(futures):
+                i, parsed = fut.result()
+                results[i] = parsed
+                done += 1
+                if done % 10 == 0 or done == total:
+                    print(f"  alignment: {done}/{total}")
+
+    flags: list[dict[str, Any]] = []
+    for i, parsed in enumerate(results):
+        if parsed is None:
+            continue
+        if parsed.get("verdict") != "off_thesis":
+            continue
+        beat = beats[i]
+        flags.append({
+            "beat_id": beat["beat_id"],
+            "chunk_id": beat["chunk_id"],
+            "narration": beat["narration"],
+            "verdict": parsed.get("verdict"),
+            "job": parsed.get("job"),
+            "link_to_core": parsed.get("link_to_core"),
+            "proposed_fix": parsed.get("proposed_fix"),
+            "reasoning": parsed.get("reasoning"),
+        })
+    return flags
+
+
 def run_overweight_audit(
     client: "ModelClient",
     model: str,
@@ -740,8 +958,12 @@ def print_stdout_report(
     bridge_flags: list[dict[str, Any]],
     overweight_flags: list[dict[str, Any]],
     preview_flags: list[dict[str, Any]] | None = None,
+    layman_flags: list[dict[str, Any]] | None = None,
+    alignment_flags: list[dict[str, Any]] | None = None,
 ) -> None:
     preview_flags = preview_flags or []
+    layman_flags = layman_flags or []
+    alignment_flags = alignment_flags or []
     print()
     print(f"=== Narration audit: {session_id} ===")
     print(f"Total beats: {total_beats}")
@@ -749,7 +971,31 @@ def print_stdout_report(
     print(f"Bridge flags: {len(bridge_flags)}")
     print(f"Overweight flags: {len(overweight_flags)}")
     print(f"Preview-structure flags: {len(preview_flags)}")
+    print(f"Layman-accessibility flags: {len(layman_flags)}")
+    print(f"Core-message alignment flags: {len(alignment_flags)}")
     print()
+
+    for f in alignment_flags:
+        cid = f.get("chunk_id") or "?"
+        bid = f.get("beat_id") or "?"
+        print(f"ALIGNMENT — {cid}/{bid} (job={f.get('job')})")
+        print(f'  "{f.get("narration")}"')
+        if f.get("proposed_fix"):
+            print(f"  Proposed fix: {f['proposed_fix']}")
+        if f.get("reasoning"):
+            print(f"  Why: {f['reasoning']}")
+        print()
+
+    for f in layman_flags:
+        cid = f.get("chunk_id") or "?"
+        bid = f.get("beat_id") or "?"
+        print(f"LAYMAN — {cid}/{bid}")
+        print(f'  "{f.get("narration")}"')
+        if f.get("opaque_terms"):
+            print(f"  Opaque terms: {', '.join(f['opaque_terms'])}")
+        if f.get("proposed_plain_version"):
+            print(f"  Plain rewrite: {f['proposed_plain_version']}")
+        print()
 
     for f in preview_flags:
         cid = f.get("chunk_id") or "?"
@@ -794,8 +1040,9 @@ def print_stdout_report(
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
-            "Pairwise narration audit of a spoolcast shot-list. "
-            "Checks adjacency (bridge) and density (overload) using Claude Haiku."
+            "Narration audit of a spoolcast shot-list via Qwen (OpenRouter). "
+            "Checks bridges, overload, preview-structure, layman-accessibility, "
+            "and core-message alignment."
         ),
     )
     p.add_argument(
@@ -886,6 +1133,14 @@ def main() -> int:
         client, model, shot_list, core_message, args.parallel
     )
 
+    layman_flags = run_layman_audit(
+        client, model, beats, args.parallel
+    )
+
+    alignment_flags = run_alignment_audit(
+        client, model, beats, core_message, args.parallel
+    )
+
     report = {
         "session_id": args.session,
         "total_beats": len(beats),
@@ -893,11 +1148,14 @@ def main() -> int:
         "audited_at": datetime.now(timezone.utc).isoformat(),
         "provider": provider,
         "model": model,
+        "core_message": core_message,
         "bridge_flags_raw_count": raw_bridge_count,
         "bridge_flags_suppressed_count": len(suppressed_flags),
         "bridge_flags": bridge_flags,
         "overweight_flags": overweight_flags,
         "preview_flags": preview_flags,
+        "layman_flags": layman_flags,
+        "alignment_flags": alignment_flags,
         "suppressed_bridge_flags": suppressed_flags,
     }
 
@@ -923,9 +1181,11 @@ def main() -> int:
         bridge_flags,
         overweight_flags,
         preview_flags,
+        layman_flags,
+        alignment_flags,
     )
 
-    if overweight_flags or preview_flags:
+    if overweight_flags or preview_flags or layman_flags or alignment_flags:
         return 2
     if bridge_flags:
         return 1

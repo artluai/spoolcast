@@ -235,9 +235,9 @@ Expected contents:
 The workflow has seven separate stages:
 
 1. source-to-script (editorial, externally owned)
-2. shot-list editing
+2. shot-list editing — structural validation (`validate_shot_list.py`) and narration audit (`audit_narration.py` via Qwen) gate this stage. Both must pass before Stage 4.
 3. chunking (group shot-list rows into illustration units)
-4. scene generation (one AI illustration per chunk)
+4. scene generation (one AI illustration per chunk). Two auditor gates sit around this stage: the narration audit before (script-level) and the scene audit after (`audit_scenes.py` via Qwen-VL, vision-level — catches OCR mismatches between rendered images and declared `on_screen_text`, anatomy/composition failures, and hallucinated text)
 5. scene preprocessing (reveal frame sequences per chunk)
 6. review-board generation (human check)
 7. preview-data generation and video rendering
@@ -254,6 +254,8 @@ Do not blur these stages together.
 Within Stage 4 (scene generation), produce assets in this order:
 
 1. **External / fetched / file-derived assets first.** Anything that's free and reversible: screenshots (via headless browser), B-roll extractions from existing videos, audio A/B samples from existing TTS renders, composite images from existing PNG files, file-format conversions (xlsx → PNG, json → highlighted code image), overlays sourced from brand press kits / SVG libraries. All of these can be produced cheaply and iterated on at zero cost per iteration.
+
+   **Mechanically enforced** by `scripts/batch_scenes.py` pre-flight check: before any paid kie.ai call runs, the script walks the shot-list and verifies every `broll` / `meme` / `external_*` chunk has its `image_path` on disk AND (for motion assets) a verification sidecar per VISUALS.md § Asset Verification Enforcement. If any external is missing, the batch refuses to start and lists the blockers. Override only with `--skip-external-check` (intentional preview-only use). This closes the pattern-match failure where an agent proceeds directly to paid generation because the user said "go" without enforcing the ordering rule.
 2. **Asset QA pass** (see below) — run quality checks on every external asset produced. Fix or flag anything that won't hold up at target display size.
 3. **Re-approve the shot list after external assets + QA are complete.** A screenshot may be illegible at the target size. A B-roll clip may have bad framing. A composite may lack contrast. A converted xlsx may show irrelevant columns. Fix those chunks before proceeding — the chunk may need a different visual approach, a different asset source, or a cropping pass.
 4. **AI-generated assets next.** Submit the kie.ai image batch only after external assets are locked and the shot list has been re-approved. Image generation costs real money per generation and each regeneration is wasteful.
@@ -642,11 +644,13 @@ Known working models are listed in VISUALS.md — Kie Provider Spec.
 
 #### Budget Rule
 
-`ai_budget` is the hard ceiling on image generations for the session.
+`ai_budget` is the hard ceiling on **number of image generations** (count, not dollars) allowed for the session.
 
 - Count every successful generation against the budget.
 - Do not count failures or cache hits.
 - When the budget is exhausted, the pipeline must stop and require explicit config change before continuing.
+
+Approximate dollar-cost translation (for planning): at nano-banana-2 1K resolution, roughly $0.05-0.08 per generation as of 2026-04. A 60-gen session runs ~$3-5 at current rates. The per-project dollar cap is a user/project decision, not a rule in this pipeline — set `ai_budget` to the generation count that fits your dollar target, and rerun the math when kie.ai pricing changes. Do not confuse the field's integer value with dollars.
 
 #### Example
 
@@ -1123,7 +1127,7 @@ Allowed values:
 - `generated` — AI-illustrated scene, produced by the scene-generation stage (default)
 - `proof` — a real image (chart, screenshot, diagram) from the source session's artifacts; used briefly to prove reality. Style-clash with illustrated scenes is intentional.
 - `reuse` — reuses the exact image from a prior chunk (used with `callback-to-<chunk-id>`)
-- `meme` — a real cultural reference image (this-is-fine dog, Wall-E, etc.) used as a recognized punchline
+- `meme` — a cultural-reference punchline artifact. `meme` is a **punchline role**, not a file-format constraint. The classic case is a still image (this-is-fine dog, Wall-E frame, is-this-a-pigeon panel), but animated meme gifs and short cultural-reference video clips (SpongeBob time-card, looping reaction clips) are first-class and route through the broll video pipeline when they are the canonical form. Default to the most engaging form per STORY.md § Broll "Format default: lean toward motion." Whether the asset is a PNG, GIF, or MP4 is a file-format detail — editorially it's all "meme broll" and is governed by the same broll rules (context + attention + spacing + no-repeat)
 - `broll` — a video clip (mp4/mov/webm) plays during this chunk. Requires `context_justification` (see below). See STORY.md § Part 2 for the broll context rule.
 - `broll_image` — a still image from external broll footage (one frame of a real clip); letterboxed like a meme
 - `external_screenshot`, `external_xlsx`, `external_json`, `external_terminal` — cleanly-cropped real UI / file / terminal captures, style-clash intentional
@@ -1165,6 +1169,79 @@ Required when `Image Source` is `broll` (or any non-illustration source). One se
 - callback ("clearly references an earlier established moment")
 
 Empty or "none" → validator rejects. See STORY.md § Part 2 "Broll requires obvious viewer context."
+
+##### `visual_direction`
+Optional per-chunk field. Free-form description of how the image should look and feel — composition, mood, character pose, framing. Sent to the image model as style guidance.
+
+Split out from the legacy `beat_description` field so stage direction doesn't leak into the rendered frame. Does not describe motion; does not contain literal on-screen text. Use `motion_notes` for motion and `on_screen_text` for literal text.
+
+If `visual_direction` is absent, the legacy `beat_description` field is used verbatim (backward compatibility for older sessions). New sessions should populate `visual_direction` explicitly.
+
+##### `on_screen_text`
+Optional per-chunk field. An array of strings, each string being a block of literal text that will appear on the rendered frame exactly as written (title card, caption, label, document text, rule card, meme overlay, handwritten note). Empty array (or missing) means no text on screen.
+
+Used for two purposes:
+1. **Read-time floor check.** The validator computes `total_word_count × 0.35` seconds of required read-time and rejects chunks whose estimated duration falls below the floor. See STORY.md § On-screen text read-time.
+2. **Literal-text rendering.** The scene generator composes a separate "render these exact words on the frame" instruction from this field, instead of hoping the image model extracts text out of prose.
+
+Rule: if a viewer is expected to read text on the frame, declare it here. Do not hide it inside `visual_direction` prose.
+
+**Empty text slots get invented.** If `visual_direction` mentions anything that holds words (card, page, sign, screen, label, document, book, banner, poster, ledger), either write the exact words into `on_screen_text` OR say it's `blank` / `wordless` / `no text` / `out of focus` / `illegible` inside `visual_direction`. Leaving it ambiguous means the generator fills the empty slot with invented text — almost never what you wanted. See VISUALS.md § Prompt Hygiene Rules.
+
+Default (blank/missing): `[]`.
+
+##### `motion_notes`
+Optional per-chunk field. Free-form description of motion the beat is trying to convey — redraws, transitions, state changes, hand movements. **Never sent to the still-image model** — a still image cannot render motion, and attempting it produces simultaneous overlapping frames (phantom limbs, duplicate objects). The reveal/animation layer consumes this field; the scene generator ignores it.
+
+If the motion is the editorial point of the chunk, consider: (a) splitting into two chunks (before + after), (b) using a `reveal_group` across adjacent chunks, or (c) describing only the *end state* in `visual_direction`.
+
+##### `broll_source_kind`
+Required when `image_source` is `broll` or `broll_image`. Declares where the broll footage originated. One of:
+
+- `sibling-video` — clip lifted from a previously shipped video in the same project (e.g. a V1 end-card referenced from V2)
+- `self-reject` — clip generated during an earlier iteration of the *current* video (rejected takes, saga clips, reveal attempts)
+- `external-capture` — real-world footage or third-party video captured for this session
+- `meme` — cultural-reference clip (this-is-fine, SpongeBob time-card, reaction gif)
+- `stock` — generic stock footage
+
+Used by the validator to enforce `broll_framing` rules. See VISUALS.md § Previous-video broll framing.
+
+##### `broll_framing`
+Required when `image_source` is `broll` or `broll_image`. Declares how the clip is composited into the frame. One of:
+
+- `tv-screen` — the clip plays inside a TV or monitor graphic, background dimmed. For video broll, a REC indicator is added to the bottom-right of the TV screen; for still broll, no indicator. **Required** when `broll_source_kind` is `sibling-video` or `self-reject`. Applied at render time by the Remotion `TVFrameWrapper` component (`src/Composition.tsx`) — no AI-gen composite scene needed.
+- `full-frame` — the clip fills the canvas edge-to-edge
+- `inset` — the clip sits inside a letterboxed or framed inset, anchored to a zone
+
+The `tv-screen` requirement for sibling/self-reject broll exists so the viewer reads "that's a clip from another video" without narration labor — see VISUALS.md § Previous-video broll framing.
+
+Schema aliases: the canonical value is `"tv-screen"`. The renderer also accepts the legacy value `"tv"` for backward compatibility with pre-schema-formalization sessions.
+
+##### `punchline`
+Optional boolean. Mark `true` when the chunk's narration is a single deadpan beat (one- to three-word reaction, capstone line, understated aside — e.g. "Obviously.", "That's it."). See STORY.md § Deadpan punchlines.
+
+Rules applied when `punchline: true`:
+- the chunk must contain exactly one beat
+- `image_source` should be `meme` (or `broll_image` for a stamp / reaction gif)
+- the image should be a full-frame cultural-reference artifact, not a style-locked scene
+
+Validator flags any chunk containing a ≤3-word beat that is not the sole beat in its chunk — those beats almost certainly belong in their own `punchline: true` chunk.
+
+##### `not_a_punchline`
+Optional boolean on a chunk or an individual beat. Opts out of the deadpan-punchline validator check when a short beat is structurally NOT a deadpan — the most common case is a short line that previews an enumerated list the following chunks expand, or a callback cue whose short length is deliberate setup rather than comedic punctuation.
+
+Use sparingly. The default behavior (flagging short beats inside multi-beat chunks) catches real failures; most `not_a_punchline` overrides mean the chunk should actually be split. Only set this flag when the short beat truly serves a non-deadpan structural role the regex patterns can't detect automatically.
+
+##### `readtime_override`
+Optional boolean. When `true`, the validator's read-time floor check is bypassed for this chunk. Use when the author has deliberately picked a shorter hold by ear (typical: the card was already seen recently, text is scannable at a glance, or the viewer is meant to glance rather than read). The flag is explicit so the override is recorded as an intentional author decision, not a silent timing shortcut. See STORY.md § Author opt-out.
+
+##### `silent_hold` and `hold_duration_sec`
+Optional fields used for chunks that hold a prior frame silently while the viewer reads on-screen text or absorbs a beat.
+
+- `silent_hold: true` — marks the chunk as an intentional silent hold. Allows the chunk's beats to carry empty narration without tripping the "beat missing narration" validator rule. Typically paired with `image_source: reuse`.
+- `hold_duration_sec: <number>` — explicit duration (in user-facing seconds) the chunk occupies in the timeline. Overrides the validator's default narration-plus-pause estimate so the read-time floor check uses the real hold time.
+
+Common use: a chunk carries a dense on-screen text card (`on_screen_text` with many words) whose `read-time floor = word_count × 0.35s` exceeds what the narrated beat and its `pause_after` can provide. The narrated chunk does its job (intro / setup), then a following silent-hold chunk inherits the same image (`image_source: reuse`) and holds it for the remaining read time. The silent-hold chunk owns the `on_screen_text` declaration (so the floor isn't double-counted across the pair).
 
 ##### `act_title`
 Required when `boundary_kind` is `act-boundary` or `bumper`. The text rendered on the bumper card. No prefix, no number — just the Act name (e.g., `"ANATOMY"`, `"PROOF"`, `"OUTRO"`). Hand-drawn type style.
@@ -1575,10 +1652,26 @@ Typical local render flow:
 3. confirm scene manifest and frame folders exist for every chunk
 4. regenerate preview data if upstream changed
 5. run the render from the repo root
+6. **run `audit_render.py` on the output. render is not "done" until the audit passes.**
 
 The exact render command can vary, but it must:
 - use the current composition entry
 - write output into the content root `renders/` directory
+
+#### Render Audit Rule (load-bearing)
+
+A rendered mp4 is not "done" until `scripts/audit_render.py` passes against it. The audit is a programmatic check of the final artifact (not of intermediate preview-data) that encodes every known failure class: white-flash detection at chunk boundaries, OCR verification of declared `on_screen_text`, overlay-presence checks, duration integrity. The list grows over time — every new user-reported bug class gets added as a check, so the audit gets smarter per session.
+
+Semantics:
+- On pass, audit_render writes a sentinel at `<session>/working/render-audit.passed` recording the mp4 path + audit timestamp.
+- On fail, the sentinel is removed and a report is written at `<session>/working/render-audit.json` with one failure record per issue.
+- Downstream stages (publish, post-process to 1.15x, mark-as-shipped) must require the sentinel's presence + recency. No shipping without audit.
+
+Applies in both modes (PIPELINE.md § Delivery Modes):
+- Human-in-loop: audit fails → Claude reports the failures → user picks fix / accept / override.
+- Autonomous: audit fails → Claude diagnoses and re-renders, up to a bounded retry count. Same-failure short-circuit: if attempt N+1 fails the exact same check as N, stop immediately — the fix isn't working and more retries burn budget without progress.
+
+"Verified" means the audit passed. "Code changed" is not verification; neither is "I extracted a few frames by eye." The audit is the mechanical verification that's the same in both modes.
 
 #### Render Regeneration Rule
 
