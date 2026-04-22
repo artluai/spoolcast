@@ -49,10 +49,11 @@ The repo and content dirs are **separate** so the pipeline is portable across pr
 
 - **Node 22** (not 24 — native-binding failures with Remotion)
 - **Python 3.14+** (the venv at `scripts/.venv` handles dependencies)
-- **ffmpeg** (for Remotion render — `brew install ffmpeg`)
+- **Remotion** (installed automatically via `npm install`; docs at [remotion.dev](https://remotion.dev))
+- **ffmpeg** (for Remotion render + post-processing — `brew install ffmpeg`)
 - API keys (all loaded from `spoolcast/.env`):
   - **`KIE_API_KEY`** — kie.ai image generation (required)
-  - **`GOOGLE_CLOUD_TTS_API_KEY`** — Google Cloud text-to-speech (required)
+  - **A TTS provider** — currently ships with Google Cloud TTS via `GOOGLE_CLOUD_TTS_API_KEY`. The TTS layer is swappable — `scripts/tts_client.py` is a thin wrapper you can adapt to any provider (ElevenLabs, OpenAI TTS, Deepgram, local Piper). **ElevenLabs adapter coming soon.**
   - **`OPENROUTER_API_KEY`** — optional, for the Qwen narration auditor path (~$0.03/run)
   - **`ANTHROPIC_API_KEY`** — optional, for the Claude Haiku narration auditor path (~$0.25/run, cleaner output)
   - **`YOUTUBE_CLIENT_SECRETS_PATH`** — optional, path to Google OAuth client_secret.json if you want to auto-upload to YouTube
