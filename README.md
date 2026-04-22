@@ -4,9 +4,11 @@ Turn a script into a short illustrated video. Each narration sentence maps to on
 
 ## What it produces
 
-Watch an 8-minute example — [**I don't make videos. My AI pipeline does.**](https://artlu.ai/project/what-is-spoolcast) — fully rendered via this pipeline. ~$3 in generation costs, four Acts, 61 chunks, 14,686 frames.
+Most recent — [**Building with AI: how I stopped my AI from silently breaking rules**](https://youtu.be/i3Z480n1k6k) — ~4 min, 50 chunks, rendered on the current pipeline (cut/crossfade transitions, audit-gated, overlay-form meme punchlines).
 
-Earlier 5-minute pilot: [https://youtu.be/hqbmHuEtayM](https://youtu.be/hqbmHuEtayM)
+Earlier work:
+- 8-minute self-referential explainer — [**I don't make videos. My AI pipeline does.**](https://artlu.ai/project/what-is-spoolcast) — four Acts, 61 chunks, 14,686 frames, ~$3 in generation costs
+- 5-minute pilot — [https://youtu.be/hqbmHuEtayM](https://youtu.be/hqbmHuEtayM)
 
 ## Who it's for
 
