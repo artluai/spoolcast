@@ -202,12 +202,17 @@ npx remotion render spoolcast-pilot \
 
 ## Quality gates
 
-One optional but recommended pass before render:
+Two automated gates sit around production. The first runs on the script before images cost money; the second runs on the final mp4 before it's called shipped.
 
-**Narration audit** — LLM reviews every adjacent beat pair for missing bridges and every beat for overweight density.
+**Narration audit** — LLM reviews every adjacent beat pair for missing bridges, every beat for overweight density, and every beat for layman readability + thesis alignment.
 ```bash
 scripts/.venv/bin/python scripts/audit_narration.py \
     --session my-video-v1 --provider openrouter   # or --provider anthropic
+```
+
+**Render audit** — programmatic check against the final mp4. Extracts frames at every chunk boundary, flags any that compress below the white-threshold (pure white is ~13KB at 1080p; real illustrated frames are 70KB+). Writes a sentinel at `working/render-audit.passed` on success. The rule is: **a render is not "done" until the audit passes** — applies in human-in-loop and autonomous modes alike. The check list grows per session; every new bug class becomes a new check.
+```bash
+scripts/.venv/bin/python scripts/audit_render.py --session my-video-v1
 ```
 
 **Publish to YouTube** — once your video is rendered, upload + set thumbnail + description via one command.
@@ -247,9 +252,14 @@ The repo includes one LLM-driven quality-check script (`audit_narration.py`) tha
 
 ## Current state
 
-Shipped: V1 pilot (Meta TRIBE explainer, 5 min) and V2 (*I don't make videos. My AI pipeline does.*, 8 min).
+Shipped:
+- **Pilot** — Meta TRIBE explainer, 5 min ([youtu.be/hqbmHuEtayM](https://youtu.be/hqbmHuEtayM))
+- **Explainer** — *I don't make videos. My AI pipeline does.*, 8 min
+- **Dev-log #1** — *Building with AI: how I stopped my AI from silently breaking rules*, ~4 min ([youtu.be/i3Z480n1k6k](https://youtu.be/i3Z480n1k6k))
 
-The pipeline is in active use — see [DESIGN_NOTES.md](DESIGN_NOTES.md) for the rolling log of what we've learned and killed.
+The dev-log series uses the pipeline to talk about pipeline problems — each video is its own session in `spoolcast-content/sessions/` and is a concrete reference for the rule-file patterns.
+
+The pipeline is in active use — see [DESIGN_NOTES.md](DESIGN_NOTES.md) for the rolling log of what we've learned and killed. Recent additions: cut/crossfade transition vocabulary (paint-on deferred), `audit_render.py` as a mechanical render gate, overlay-form meme punchlines.
 
 ## Contributing
 
