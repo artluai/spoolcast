@@ -293,12 +293,14 @@ Reverse order (regens first, then crops) leaves gaps in the folder and makes the
 
 #### Pipeline Stages
 
-The workflow has seven separate stages:
+The workflow has nine separate stages:
 
 1. source-to-script (editorial, externally owned)
-2. shot-list editing — structural validation (`validate_shot_list.py`) and narration audit (`audit_narration.py` via Qwen) gate this stage. Both must pass before Stage 4.
+1.5. **asset inventory** — survey every real artifact already on disk or easily sourceable that could illustrate a concrete reference in the narration. Output: `sessions/<id>/working/asset-inventory.md`, one-line entries with paths, grouped by kind (prior shipped videos/renders/frames, session files, manifests, style anchors, chat transcripts, existing screenshots). No acquisition here — this is a survey, not a sourcing step. Purpose: collapses the concrete-reference check at Stage 2 from a search into a lookup. See rules.md § Non-Negotiable System Defaults for the check itself.
+1.7. **character / object roster** — after the script is locked and before beat descriptions are written, enumerate every recurring character/object the script names at the role level ("the narrator," "the AI that lied"), then map each to the session's locked style library: existing ref / plan a new ref / one-off prompt-only. Output: `sessions/<id>/working/character-roster.md` mapping `<role> → <library/session ref key>` with chunk/Act coverage. Every Stage 2 beat description consults the roster and names roster entries by their reference key; every matching chunk gets `references: [...]` tags. See rules.md § Mode 1 Gate List for the full contract.
+2. shot-list editing — structural validation (`validate_shot_list.py`) and narration audit (`audit_narration.py` via Qwen) gate this stage. Both must pass before Stage 4. **Before locking the shot list**, run the Concrete-reference check (rules.md § Non-Negotiable System Defaults) per chunk: scan narration for references to specific real things, match against the Stage 1.5 inventory, default each matched cell's visual to broll rather than an AI redraw. Any chunk that picks illustration over a matched real artifact records a one-line justification in the shot-list cell (schema: `context_justification`). Also run the Recurring-reference check (rules.md § Non-Negotiable System Defaults): scan scene descriptions for characters / objects that appear in 2+ chunks, register references, add `references: ["name"]` on matching chunks. `audit_narration.py` enforces this by flagging any chunk whose scene description names a recurring character/object (present in ≥2 chunks) but that has neither a `references` array nor a `context_justification` — exit non-zero on unjustified drift risk.
 3. chunking (group shot-list rows into illustration units)
-4. scene generation (one AI illustration per chunk). Two auditor gates sit around this stage: the narration audit before (script-level) and the scene audit after (`audit_scenes.py` via Qwen-VL, vision-level — catches OCR mismatches between rendered images and declared `on_screen_text`, anatomy/composition failures, and hallucinated text)
+4. scene generation (one AI illustration per chunk, except cells defaulted to broll in Stage 2). Two auditor gates sit around this stage: the narration audit before (script-level) and the scene audit after (`audit_scenes.py` via Qwen-VL, vision-level — catches OCR mismatches between rendered images and declared `on_screen_text`, anatomy/composition failures, and hallucinated text)
 5. scene preprocessing (reveal frame sequences per chunk)
 6. review-board generation (human check)
 7. preview-data generation and video rendering
@@ -740,7 +742,9 @@ The session config controls per-session style consistency.
 
 `preferred_model` sets the default. Any scene may override via its own prompt metadata, but the override should be explicit in the generation request, not silent.
 
-Known working models are listed in VISUALS.md — Kie Provider Spec.
+**Current default (as of 2026-04-23):** `gpt-image-2-text-to-image`. When a chunk has `references: [...]`, `kie_client.py` auto-swaps to `gpt-image-2-image-to-image` (the same family, `input_urls` field). Treat the pair as one logical model.
+
+Known working models are listed in VISUALS.md — Kie Provider Spec. The default can be overridden per-session by setting `preferred_model` in `session.json`, or per-call via `--model` on CLI scripts. All other models (`nano-banana-2`, `nano-banana-pro`, `seedream/5-lite-text-to-image`, `seedream/5-lite-image-to-image`, `wan 2.7 image`) remain fully supported.
 
 #### Budget Rule
 
@@ -750,7 +754,11 @@ Known working models are listed in VISUALS.md — Kie Provider Spec.
 - Do not count failures or cache hits.
 - When the budget is exhausted, the pipeline must stop and require explicit config change before continuing.
 
-Approximate dollar-cost translation (for planning): at nano-banana-2 1K resolution, roughly $0.05-0.08 per generation as of 2026-04. A 60-gen session runs ~$3-5 at current rates. The per-project dollar cap is a user/project decision, not a rule in this pipeline — set `ai_budget` to the generation count that fits your dollar target, and rerun the math when kie.ai pricing changes. Do not confuse the field's integer value with dollars.
+Approximate dollar-cost translation (for planning): at nano-banana-2 1K resolution, roughly $0.05-0.08 per generation as of 2026-04. A 60-gen session runs ~$3-5 at nano-banana rates. GPT Image 2 pricing has not been calibrated in this repo — verify with the first call's credit burn before a full batch.
+
+**Soft dollar cap: ~$3 per video.** Recommended default for a single dev-log-style session. Pick the integer `ai_budget` that lands at or below $3 given the model you've chosen. Harder-to-generate work (larger resolutions, more pricey models, heavy regen needed) will push higher — name the expected overage in chat before starting if the session needs it.
+
+The per-project dollar cap is a user/project decision; the $3 soft cap is a recommended default, not a hard rule. Set `ai_budget` to the generation count that fits your dollar target, and rerun the math when kie.ai pricing changes. Do not confuse the integer value of `ai_budget` with dollars — the field counts generations, not money.
 
 #### Example
 
@@ -758,7 +766,7 @@ Approximate dollar-cost translation (for planning): at nano-banana-2 1K resoluti
 {
   "session_id": "example-session-001",
   "ai_budget": 40,
-  "preferred_model": "nano-banana-2",
+  "preferred_model": "gpt-image-2-text-to-image",
   "style_reference": "loose hand-drawn marker illustration, muted earth tones, single recurring character in soft ink outlines, warm paper texture background",
   "default_style_prompt": "loose hand-drawn marker illustration",
   "reveal_style": "fade",
@@ -1262,15 +1270,14 @@ Required on every chunk. `normal` or `high`. Flag `high` on the promise, preview
 Default (blank): `normal`.
 
 ##### `context_justification`
-Required when `Image Source` is `broll` (or any non-illustration source). One sentence naming the context mechanism that makes this broll obvious to a cold viewer within 2 seconds. One of:
-- spoken setup ("narration immediately before says 'watch this…'")
-- visual continuity ("prior chunk's illustration shows the thing abstractly; this plays the real thing")
-- recognition ("clip is a culturally known artifact — this-is-fine dog / Wall-E")
-- topical match ("narration names the exact thing as the clip plays, clip IS that thing")
-- on-broll label ("caption overlay names the clip")
-- callback ("clearly references an earlier established moment")
 
-Empty or "none" → validator rejects. See STORY.md § Part 2 "Broll requires obvious viewer context."
+Pluralist field — used for three distinct kinds of justification, all one-line:
+
+1. **Broll context** (original use) — when `Image Source` is `broll` or `broll_image`. One sentence naming the context mechanism that makes this broll obvious to a cold viewer within 2 seconds. One of: spoken setup, visual continuity, recognition, topical match, on-broll label, callback. Empty or "none" → validator rejects. See STORY.md § Part 2 "Broll requires obvious viewer context."
+2. **Illustration-over-broll** — when the Concrete-reference check matched a real artifact but the cell stayed `generated`. One sentence explaining why (e.g. layman-legibility, beat requires visual language that real artifact can't carry, abstract schematic). See rules.md § Non-Negotiable System Defaults.
+3. **Illustration-over-reference** — when a recurring character/object appears but the chunk has no `references` entry. One sentence explaining why (e.g. one-off cameo, intentional drift, stylized variant). See rules.md § Non-Negotiable System Defaults.
+
+Broll context (case 1) uses the six named mechanisms above. Cases 2 and 3 are free-text justifications — no enum. The validator only requires *presence* of the field for cases 2 and 3; quality of the justification is agent/human judgment.
 
 ##### `visual_direction`
 Optional per-chunk field. Free-form description of how the image should look and feel — composition, mood, character pose, framing. Sent to the image model as style guidance.

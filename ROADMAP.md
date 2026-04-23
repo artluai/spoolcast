@@ -116,6 +116,32 @@ So per-chunk cost goes up ~3-10x relative to a still. Budget-aware default: chea
 
 ---
 
+## 6. Meme / reaction SFX + non-voice audio per chunk
+
+**What:** extend the audio pipeline so meme / reaction / broll chunks can carry non-voice audio — sound effects (a thud, a ding, a vinyl scratch, a facepalm slap, a laugh track), short music stingers, or burned audio from a broll clip. Currently every chunk expects TTS narration tied to its beats; silent-hold meme chunks pause the video awkwardly (caught on dev-log-02 — silent meme beats felt like dead air).
+
+**Why:** memes and reactions land harder with accompanying audio than with silence. A Surprised Pikachu meme with a brief "huh?!" SFX delivers more than the same image played over silence for 1.5s. The current workaround — consolidating memes into neighboring narration chunks so the meme plays during its topical narration — works but limits where memes can go (they have to piggy-back on a narration beat). Independent punchline timing needs independent audio.
+
+**Spoolcast side:**
+- New chunk field (schema addition): `sfx` (or `punchline_audio`) — path to a short audio file in `source/fetched-assets/sfx/` or `source/generated-assets/sfx/`.
+- Audio source options: (a) manually sourced SFX library (freesound.org and similar), (b) ElevenLabs / Google Cloud TTS for scripted punchline voice lines, (c) extracted audio from broll mp4 clips. Each source category gets its own convention.
+- Validator: chunk with `silent_hold: true` and no narration must have either `sfx` set OR a documented exception.
+- Preview-data + Remotion composition: play `sfx` audio during the chunk's duration alongside (or instead of) narration audio; mix volumes.
+
+**Editorial rules (to codify when this ships):**
+- One SFX per chunk maximum — no stacked audio.
+- SFX duration ≤ chunk duration. Trim or loop appropriately.
+- SFX should serve the meme's register — no generic "cartoon boing" on a doomer beat.
+
+**Not in scope:**
+- Full music tracks / background score. Short stingers only.
+- AI-generated SFX via audio-gen models (deferred; a curated SFX library is cheaper).
+- Mixing multiple SFX per chunk.
+
+**Depends on:** nothing blocking. Sourcing a starter SFX library (20–30 clips covering common reaction registers) is the first step.
+
+---
+
 ## How this file gets updated
 
 ## 5. Remotion-native bumper rendering

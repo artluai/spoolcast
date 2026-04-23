@@ -1048,6 +1048,8 @@ Examples:
 
 If a section had no obvious visual job, it was usually too abstract and needed rewriting.
 
+**Extension — visual-sketch first, text-card last.** When drafting each narration line, sketch the scene in your head alongside the words — *"narrator leaning toward laptop, frustrated"*, not just *"the line the viewer hears."* If you can't picture a scene for a line at writing time, the line is too abstract and should be rewritten before it reaches the shot-list. Text-cards (handwritten line on a clean page) are a *last-resort* visual — valid only for the cold-open hook, the single thesis-landing moment, and the channel sign-off. Everything else gets a visible action / character / scene. Reaching for typography as the default for "important" beats is the anti-pattern — it reads as weighty in the writer's head and as dead air in the viewer's eye. If an important line can be *shown* with a character reacting, an object changing, or a diagram landing — that's almost always better than putting the line on a page.
+
 ##### 6. Tone-control test
 
 Was the piece dry without becoming smug?
@@ -1700,6 +1702,8 @@ The final chunk of the video must do more than land the last narrated line and c
 
 Every video must end with a **deliberate ending sequence**. The exact shape depends on the video's goal, but the rule is: the end must be chosen, not accidental. Several archetypes qualify. Pick the one that fits what the video is trying to do.
 
+**Declare the archetype BEFORE drafting the final Act** — not after the shot-list is written. The choice drives which final chunks get written, not the other way around. The declared archetype is recorded in `session.json`'s `ending_archetype` field (new) AND referenced in the shot-list `notes` on the final chunk. Deciding post-hoc tends to produce endings that "just happen" rather than endings designed to land a specific feeling.
+
 **Ending archetypes (any one of these satisfies the rule):**
 
 1. **Settle-and-hold.** For standalone videos that land a thesis. Final narrated beat is `weight: high`, followed by ≥2.5s of silent visual hold (normal post-beat silence + extra linger). Ideal final frame is a resolution of the cold open — same element, resolved form, viewer's eye completes a loop.
@@ -1713,6 +1717,12 @@ Every video must end with a **deliberate ending sequence**. The exact shape depe
 5. **Open question.** Ends on a question posed to the viewer. Valid when the question is load-bearing (the video doesn't need to answer it because the viewer now has the frame to answer it themselves) and when the question lands on a weighted, held beat.
 
 6. **Quiet payoff.** Minimal or no final narration — just a held visual, possibly with a single word or short phrase. Valid when the thesis has already been landed verbally and the final frame functions as a resolution in itself.
+
+7. **Coda / reframe.** After the thesis has apparently landed, an additional short beat recontextualizes everything — the viewer realizes the video was actually about X, not what they thought. Valid when the reframe is earned (the setup supports both readings) and the coda doesn't exceed ~10s.
+
+8. **Punch-and-cut.** A fast hard stop on the sharpest possible line — no extended silence, no outro card, the cut IS the punctuation. Valid when the final line is strong enough to stand alone and the hard stop is editorially deliberate (not truncation). Skips the ≥2.5s held silence requirement of the universal floor — a declared punch-and-cut opts out of the silence rule specifically. The agent must justify the choice in the shot-list `notes` (e.g. *"punch-and-cut: closing line is strong enough to pierce; silence would dilute"*).
+
+**Opting out of the archetype list.** If none of the eight archetypes fit what the video is trying to do, the agent may decline to declare one — but must record a **one-line editorial justification** in `session.json`'s `ending_archetype` field (e.g. `"none: <reason>"`). An undeclared ending with no justification defaults back to settle-and-hold and will be audited against that archetype. Declining-with-reason is rare and meant for experimental formats; most videos fit one of the eight.
 
 **Universal floor across all archetypes:**
 
@@ -1739,6 +1749,8 @@ A video without a declared ending-sequence archetype is not a finished video. Pi
 ### Broll requires obvious viewer context
 
 **"Broll" covers everything that isn't an anchor-style illustration.** This includes: raw video clips, saga-montage clips, meme stills, meme gifs, reaction clips, cultural-reference images, short archival clips, screenshot captures. The rules in this section and the next (*Broll earns attention*) apply uniformly across sub-types. The punchline "meme" carve-out earlier in this document (STORY.md § 10a) is one sub-type of broll — it inherits every rule here. Do not split memes out as a separate category with its own editorial logic.
+
+**Upstream gate — the Concrete-reference check.** The decision of *which chunks get broll vs illustration* is made upstream at Stage 2 (shot-list drafting), not at Stage 4. See rules.md § Non-Negotiable System Defaults ("Concrete-reference check") and PIPELINE.md § Pipeline Stages (Stage 1.5 asset inventory + Stage 2 check). The rules below govern *how broll earns its place on screen once it's been picked*. They are not the upstream gate that decides broll-vs-illustration per chunk — that's the Concrete-reference check.
 
 B-roll is never played without context. The viewer must know *why the clip is playing* and *what they should see in it* within 2 seconds of it starting.
 

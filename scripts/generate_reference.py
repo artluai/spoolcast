@@ -45,7 +45,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from kie_client import KieClient, KieError, build_input_for_model
+from kie_client import DEFAULT_MODEL, KieClient, KieError, build_input_for_model, resolve_model
 from style_library import (
     CONTENT_ROOT,
     Style,
@@ -113,6 +113,7 @@ def generate_reference(
     no_anchor_ref: bool = False,
     model_override: str | None = None,
     force: bool = False,
+    image_ref_override: str | None = None,
 ) -> Path:
     # Load the target style.
     if not style_exists(style_name):
@@ -137,11 +138,14 @@ def generate_reference(
         return dest
 
     prompt = _compose_prompt(style, description, raw=raw_description, is_anchor=is_anchor)
-    image_refs = _image_refs_for_reference(style, no_anchor_ref or is_anchor)
+    if image_ref_override:
+        image_refs = [image_ref_override]
+    else:
+        image_refs = _image_refs_for_reference(style, no_anchor_ref or is_anchor)
 
     # Pull kie config from the style's hint or sensible defaults. (Sessions
     # have their own config; the style library uses a fixed default here.)
-    model = model_override or "nano-banana-2"
+    model = resolve_model(model_override or DEFAULT_MODEL, image_refs)
     quality = "1K"
     aspect_ratio = "1:1" if not is_anchor else "16:9"
     output_format = "png"
@@ -254,6 +258,11 @@ def _cli() -> None:
     )
     parser.add_argument("--model", default=None, help="override kie model")
     parser.add_argument("--force", action="store_true", help="regenerate if the file exists")
+    parser.add_argument(
+        "--image-ref",
+        default=None,
+        help="override the image_input URL. By default, a library reference uses the style's anchor as image_ref unless --no-anchor-ref is set. Pass --image-ref <URL> to explicitly anchor against a different image (e.g. to match a sibling library's reference face style).",
+    )
     args = parser.parse_args()
 
     # Resolve style_name: session's style or the --style arg.
@@ -296,6 +305,7 @@ def _cli() -> None:
             no_anchor_ref=args.no_anchor_ref,
             model_override=args.model,
             force=args.force,
+            image_ref_override=args.image_ref,
         )
     except Exception as e:
         print(f"[ref] error: {e}", file=sys.stderr)

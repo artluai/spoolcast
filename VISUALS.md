@@ -126,6 +126,7 @@ Directory layout:
       "name": "wojak-comic",
       "description": "<what this style is for>",
       "default_style_prompt": "<the prompt every generation in this style applies>",
+      "editorial_voice": "<optional — how to pick defaults inside this style>",
       "anchor": {
         "image_path": "anchor.png",
         "image_url": "https://kie.ai/...",      ← kie result URL (ephemeral, ~24h)
@@ -141,6 +142,8 @@ Directory layout:
         }
       }
     }
+
+`editorial_voice` (optional) — one sentence on how the agent should pick defaults when facing a "which way should this go" visual decision inside the style (character variant, prop, visual gag, scene subject). The style-prompt fixes the *look*; the editorial voice fixes the *mood* and decides between plausible options. Not load-bearing at the API level — the generator doesn't pass this into the prompt. Its job is to shape the agent's proposals *before* they reach the shot list. Per-style only; absent → agent defaults to neutral/generic options.
 
 Sessions connect to a style via `session.json`'s `style` field:
 
@@ -170,6 +173,10 @@ First time creating a style:
 After this, `style.anchor` is populated with the kie URL + local path. Every subsequent generation in this style uses the anchor as its base `image_input` unless overridden by a chunk's references (see below).
 
 ###### How to register a character or object
+
+**Default scope is session.** When generating a new reference during a session, default to session-scoped. Before committing, make an explicit decision per-reference: does this character/object have recurrence value beyond this session? If yes, promote to library. If no (or unsure), stay session-scoped. The promotion decision should be surfaced in chat — don't silently bump things to library. Session-specific artifacts that get promoted by default pollute the library with one-off characters that look generic but weren't designed for reuse.
+
+**Library-coherence check (before drafting a new reference).** Before writing the description for a new reference character/object, read the anchor + every existing reference in the style library. Identify what they share — whatever traits are load-bearing for *this* style (linework/shading for a comic style; lighting/lens/color-grade for a photo-realistic style; typography/layout for a poster style — the style's own vocabulary, not a fixed checklist). Derive the new reference's details from that shared contract, not from first-principles "what would an X look like." Don't copy details literally; let the existing set's visual language constrain the design space. A new reference that looks right in isolation but looks off next to the existing set has failed the check. Typical failure mode caught without this rule: designing a new reference in a vacuum from a generic archetype, then having to iterate after the first draft clashes with the library.
 
 Library-scoped (reusable across sessions — keep descriptions neutral, no scene-specific pose):
 

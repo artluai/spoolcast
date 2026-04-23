@@ -31,7 +31,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
-from kie_client import KieClient, KieError, build_input_for_model
+from kie_client import KieClient, KieError, build_input_for_model, resolve_model
 from style_library import (
     resolve_reference,
     session_style,
@@ -231,8 +231,14 @@ def compose_prompt(
     )
     using_structured = visual_direction_has_content or on_screen_text_has_content
     if using_structured:
-        if visual_direction and visual_direction.strip():
-            parts.append(f"Scene: {visual_direction.strip().rstrip('.')}")
+        # Scene description: prefer structured visual_direction, but fall back to
+        # legacy beat_description when on_screen_text forced the structured path
+        # without an explicit visual_direction. Otherwise a chunk with
+        # beat_description + on_screen_text renders as pure typography (the
+        # beat_description gets silently dropped). Caught on dev-log-02 regen.
+        scene_text = (visual_direction or "").strip() or (beat or "").strip()
+        if scene_text:
+            parts.append(f"Scene: {scene_text.rstrip('.')}")
         if on_screen_text:
             # Filter empty strings, keep author's literal text verbatim.
             texts = [t.strip() for t in on_screen_text if t and t.strip()]
@@ -372,6 +378,11 @@ def generate(
                 print(f"[gen] legacy manifest style anchor applied (no style library)")
 
     client = KieClient()
+    # Resolve model-family variants (e.g. GPT Image 2 text-vs-image-to-image)
+    # BEFORE logging or building the request so the model field sent to kie
+    # matches the input shape. See kie_client.resolve_model.
+    model = resolve_model(model, image_input)
+
     print(f"[gen] session={session_id} chunk={chunk_id}")
     print(f"[gen] model={model} resolution={cfg.get('resolution', '2K')}")
     print(f"[gen] prompt: {prompt}")

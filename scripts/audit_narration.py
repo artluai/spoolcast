@@ -194,10 +194,40 @@ Bridge archetypes (connection_type values):
 - callback: explicit reference to earlier establishment
 - orthogonal-jump: no archetype fits; bridge is missing
 
-Default is "bridge-needed" unless you can justify the pair fits one of the
-non-orthogonal-jump archetypes above. In particular: do NOT mark adjacent
-parallel statements as "tricolon" or "enumerated-list" unless the STRICT
-tests pass.
+Default is "ok" unless there is a real viewer-comprehension gap. This is a
+lenient register — don't flag stylistic preferences. Specifically:
+
+- **Terse parable-style beats are fine without bridges.** A short pivot
+  ("So I pushed." → "I said — if we used the exact same inputs…") is a
+  natural setup-consequence; don't require "But something was off." as
+  filler between them.
+- **Act bumpers and act-openers** carry their own transition through the
+  bumper card (the pause + title card) — the narration immediately after
+  a bumper doesn't need an additional bridge to the narration before the
+  bumper.
+- **Viewer-imperative takeaway stacks** ("Capture it. Replay it. Don't let
+  it remember.") are an intentional held-beat list; they do not need
+  explanatory bridges between the imperatives.
+- **Short hard-cut reveals** ("Here's the dumb part." → "The actual inputs
+  existed.") are a rhythmic beat; a bridge sentence would dilute the cut.
+
+Only flag pairs where a literal-minded first-time viewer genuinely loses
+the thread — not pairs where a more elaborate transition would "feel
+smoother." The explainer register includes hard cuts and terse pivots by
+design.
+
+When a flag IS warranted, say exactly what to DO with the proposed text.
+Possible actions:
+- "insert_between"  — add the proposed bridge as a new sentence between
+  N and N+1; neither N nor N+1 is modified.
+- "replace_n"       — the N beat is weaker than the bridge; replace N
+  with the proposed text.
+- "replace_n1"      — the N+1 beat is the weaker one; replace N+1 with
+  the proposed text.
+
+Do NOT produce a "bridge" that paraphrases N+1's content and implicitly
+replaces it without declaring action="replace_n1". If the proposed text
+would sit better in place of N+1 than between them, say so explicitly.
 
 Always reply with a single JSON object. No prose outside the JSON."""
 
@@ -258,6 +288,27 @@ Apply the layman test:
 This is a different test from overweight. A beat can be short and clear on
 density yet still use a term the viewer has no frame for (e.g. "the protocol
 surfaces the conflict" — clear pacing, but "protocol" is insider).
+
+Pre-approved layman terms — DO NOT flag these as opaque, regardless of whether
+they are explained in the narration. They are common vocabulary for the target
+audience and do not fail the test:
+- "AI" — universally known; this is an AI channel / AI-content series.
+- "shots" — filmmaking-common noun for frames/scenes; every viewer of video
+  content understands this from context.
+- "dev log" — YouTube-native format term; this channel's videos are
+  self-identified as dev logs.
+- "video" — obvious; do not require definition.
+- "code" — common word; do not require an explanation unless the narration
+  is actually calling out a specific code concept.
+- "YouTube", "TikTok", "Reels" — platform names, universally recognized.
+- "prompt" — established by earlier beats in any spoolcast dev-log; also
+  common user-facing terminology for AI tools.
+- "reference image" / "reference" — explained in-beat wherever first used
+  in the spoolcast pipeline; treat as established unless the beat introduces
+  the concept for the first time without explanation.
+
+Apply this allowlist before flagging. If the ONLY reason a beat would fail
+the layman test is a pre-approved term from this list, verdict = "ok".
 
 Always reply with a single JSON object. No prose outside the JSON."""
 
@@ -499,10 +550,15 @@ def build_bridge_prompt(
         '  "viewer_thought_after_n": "<one sentence>",\n'
         '  "connection_type": "<one of: setup-consequence, state-question, '
         "claim-evidence, problem-attempt, problem-solution, comparison, "
-        'tricolon, callback, orthogonal-jump>",\n'
+        'enumerated-list, tricolon, closing-conclusion, callback, '
+        'orthogonal-jump>",\n'
+        '  "action": "<if bridge_needed: one of: insert_between, replace_n, '
+        'replace_n1. else: null>",\n'
         '  "proposed_bridge": "<if bridge_needed: one sentence in the same '
-        'voice as the existing narration. else: null>",\n'
-        '  "reasoning": "<one sentence>"\n'
+        "voice as the existing narration. Its semantics are determined by "
+        '\\"action\\" (insert between, replace N, or replace N+1). Else: null>",\n'
+        '  "reasoning": "<one sentence justifying the flag AND explaining why '
+        'the chosen action is the right semantics>"\n'
         "}"
     )
 
@@ -597,6 +653,7 @@ def run_bridge_audit(
                 "verdict": verdict,
                 "viewer_thought_after_n": parsed.get("viewer_thought_after_n"),
                 "connection_type": parsed.get("connection_type"),
+                "action": parsed.get("action"),
                 "proposed_bridge": parsed.get("proposed_bridge"),
                 "reasoning": parsed.get("reasoning"),
             }

@@ -40,6 +40,28 @@ POLL_TIMEOUT_SECONDS = 300  # 5 minutes per task
 # for an async-submit POST; image downloads override with a longer value.
 REQUEST_TIMEOUT_SECONDS = 60
 
+# Single source of truth for the global default model. Imported by
+# init_session.py, generate_reference.py, and any CLI that falls back when
+# no session / --model override is present. Sessions created before a
+# default change keep their own captured `preferred_model`.
+DEFAULT_MODEL = "gpt-image-2-text-to-image"
+
+
+def resolve_model(model: str, image_refs: Sequence[str] = ()) -> str:
+    """Resolve a family slug to the specific variant needed given image_refs.
+
+    GPT Image 2 is a family with two endpoints; refs presence dictates which
+    one kie.ai accepts. Any caller that builds a request payload must pass
+    this function's output as both the top-level `model` field AND the basis
+    for `build_input_for_model`. Calling with only one side swapped produces
+    silently-broken requests (right shape, wrong endpoint, refs ignored).
+    """
+    if model == "gpt-image-2-text-to-image" and image_refs:
+        return "gpt-image-2-image-to-image"
+    if model == "gpt-image-2-image-to-image" and not image_refs:
+        return "gpt-image-2-text-to-image"
+    return model
+
 
 # ---- types -------------------------------------------------------------
 
@@ -89,7 +111,8 @@ def build_input_from_session(
         raise KieError(f"session config not found: {cfg_path}")
     cfg = json.loads(cfg_path.read_text())
 
-    model = model_override or cfg.get("preferred_model") or "nano-banana-2"
+    model = model_override or cfg.get("preferred_model") or DEFAULT_MODEL
+    model = resolve_model(model, image_refs)
     quality = cfg.get("resolution") or "1K"  # "1K"/"2K"/"4K"
     aspect_ratio = cfg.get("aspect_ratio") or "16:9"
     output_format = cfg.get("output_format") or "png"
@@ -119,6 +142,8 @@ def build_input_for_model(
     """Return the `input` dict shape for the given kie.ai model.
 
     Different kie models require different field names:
+    - gpt-image-2-text-to-image: prompt, aspect_ratio, nsfw_checker (no image refs)
+    - gpt-image-2-image-to-image: prompt, input_urls, aspect_ratio, nsfw_checker
     - seedream/5-lite-text-to-image: prompt, aspect_ratio, quality (no image refs)
     - seedream/5-lite-image-to-image: prompt, image_urls, aspect_ratio, quality
     - nano-banana-2 / nano-banana-pro / wan: prompt, image_input, aspect_ratio,
@@ -126,13 +151,31 @@ def build_input_for_model(
 
     The `quality` arg uses seedream's `basic`/`high` vocabulary OR explicit
     nano-banana `1K`/`2K`/`4K`. For the nano-banana family it maps to
-    `resolution`; for seedream it passes through as `quality`.
+    `resolution`; for seedream it passes through as `quality`. GPT Image 2
+    doesn't accept a quality/resolution knob — the arg is accepted and ignored.
 
     `quality` is REQUIRED with no default because silent defaults caused a
     bug where one-off scripts shipped at 2K instead of the project's 1K
     convention. Always pass session config's `resolution` value (read it
     via `build_input_from_session()` for safety).
     """
+    # GPT Image 2 family: auto-swap between text-to-image and image-to-image
+    # based on whether references are being passed. This lives here (not only
+    # in build_input_from_session) so every caller — direct and session-wrapped —
+    # gets the swap for free.
+    if model in ("gpt-image-2-text-to-image", "gpt-image-2-image-to-image"):
+        if image_refs:
+            return {
+                "prompt": prompt,
+                "input_urls": list(image_refs),
+                "aspect_ratio": aspect_ratio,
+                "nsfw_checker": False,
+            }
+        return {
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "nsfw_checker": False,
+        }
     if model == "seedream/5-lite-text-to-image":
         return {
             "prompt": prompt,
@@ -362,7 +405,7 @@ def _smoke_test() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="kie.ai smoke test")
-    parser.add_argument("--model", default="nano-banana-2")
+    parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument(
         "--prompt",
         default="a simple hand-drawn marker illustration of a single tree on paper",

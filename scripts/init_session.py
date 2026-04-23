@@ -27,6 +27,11 @@ import os
 import sys
 from pathlib import Path
 
+# Script lives next to kie_client.py; add this dir to sys.path so the import
+# works whether the script is invoked directly or as a module.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from kie_client import DEFAULT_MODEL  # noqa: E402
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTENT_ROOT = REPO_ROOT.parent / "spoolcast-content"
@@ -214,8 +219,8 @@ def main() -> None:
     )
     p.add_argument(
         "--model",
-        default="nano-banana-2",
-        help="kie.ai preferred model (default nano-banana-2)",
+        default=DEFAULT_MODEL,
+        help=f"kie.ai preferred model (default {DEFAULT_MODEL}; the image-to-image variant of the GPT Image 2 family is auto-selected by kie_client.py when references are passed)",
     )
     p.add_argument(
         "--style",
