@@ -74,6 +74,50 @@ Workflow → Session config spec → Shot-list spec → Render config.
 
 ## Part 1 — Workflow
 
+### End-to-end flow (decision tree)
+
+Single reference for how a session moves from empty state to shipped. Widescreen (A) is the mandatory path; mobile (A.1) is an optional fork after Stage 8 shipping. Every stage has a mechanical gate that must pass before the next stage starts.
+
+| # | Stage | What it does | Driver | In → Out | Gate | On fail |
+|---|---|---|---|---|---|---|
+| 0 | Scaffold | Creates session dir + config | `init_session.py` | ids, budget, style → `session.json` + subdirs | config parses | fix config |
+| 1a | Core message | Locks the one-sentence takeaway | agent | raw source → locked core message | user confirms (STORY.md § Job E) | surface gap, don't proceed |
+| 1b | Structure | Decides Act / chapter shape | agent | core message → Act structure | user approves | revise |
+| 1c | Screenplay | Drafts v1 → v3 voiceover | agent | structure → `voiceover.md` + drafts | v3 on disk | re-draft |
+| 2 | Shot-list | Per-beat shot-list from screenplay | shot-list editor | v3 → `shot-list.json/.xlsx` | `validate_shot_list.py` = 0 | fix violations |
+| 3 | Chunking | Groups beats into illustration units | agent | beats → chunks | all chunks have `boundary_kind` + `weight` | author chunks |
+| 4a | Narration audit | QA on narration text | `audit_narration.py` | narration → `narration-audit.json` | exit 0 | fix narration |
+| 4b | External pre-flight | Ensures externals + sidecars on disk before any kie call | `batch_scenes.py` pre-flight | shot-list → externals verified | pre-flight passes | source missing asset |
+| 4c | Scene gen | One AI illustration per chunk | `batch_scenes.py` / `generate_scene.py` | shot-list + style → `scenes/*.png` + manifest | PNG + manifest entry per chunk | regen failed chunks |
+| 4d | Scene audit | Vision QA on PNGs (Qwen-VL) | `audit_scenes.py` | PNGs → `scene-audit.json` | exit 0 | regen flagged |
+| 5 | Preprocess | Builds reveal frame sequences | `batch_preprocess.py` | PNGs → `frames/*/` | all frame counts present | re-preprocess |
+| 6 | Review board | Human-review HTML artifact | `build_review_board.py` | shot-list + scenes → `review/shot-review.html` | human review passes | regen flagged |
+| 7 | Render | Remotion assembles the widescreen video | `render_with_audit.sh` | preview-data + frames + audio → `<session>-1.0x.mp4` | `audit_render.py` passes | fix flagged frames |
+| 8a | Rate post-process | Speeds 1.0× → shipped rate (optional) | ffmpeg `setpts` | 1.0× mp4 → `<session>-<rate>x.mp4` | duration matches expected | re-run |
+| 8b | Captions SRT | Full SRT at shipped rate | `generate_srt.py` | preview-data + shot-list → `<session>-<rate>x.srt` | cue count > 0 | regenerate |
+| 8c | Thumbnail | Widescreen YouTube thumbnail | `generate_thumbnail.py` | prompt → `<session>-thumbnail-1920x1080.png` | exactly 1920×1080 | rescale |
+| 8d | Publish | Upload to YouTube | `publish_youtube.py` | Stage 8 artifacts → YouTube URL | Pre-upload checklist (SHIPPING.md § Part 2) ✓ | fix failing items |
+| — | **Decision** | Ship mobile variants? | agent/user | Stage 8 artifacts → branch into A.1 or end | user chooses | widescreen ends |
+| A.1-1 | Prereq | Stage 8 complete | — | — | `render-audit.passed` sentinel | complete widescreen |
+| A.1-2 | Mobile crop fill | Center-crops widescreen scenes → 4:5 | `mobile_export.py` (planned) | `scenes/*.png` → `scenes/mobile/*-mobile.png` | every non-bumper generated chunk has a mobile PNG | re-run crop |
+| A.1-3 | Mobile-crop audit | Vision check on cropped PNGs | `audit_mobile_crops.py` | mobile PNGs → `mobile-crop-audit.json` | report written | re-run |
+| A.1-4 | Regen at 4:5 | Byte-faithful replay, aspect-only override | `replay_mobile.py --aspect 4:5` | flagged + manifest → regen PNGs | regen OR orphan warning logged | orphan → continue; kie fail → retry once |
+| A.1-5 | Re-audit regens | Catches broken regens | `audit_mobile_crops.py --only` | regens → audit | 0 broken after 1 retry | fail loudly at retry limit |
+| A.1-6 | Mobile render | Stitches mobile PNGs at shipped rate | `mobile_export.py` (planned) | mobile PNGs + master + SRT → per-part MP4(s) | exact 1080×1920, duration matches rate | re-run |
+| A.1-7 | Burn captions | Baked into step 6 via libass | `caption_assets.py` + ffmpeg | rate-matched SRT → captioned MP4 | no font-fallback warnings | verify fontsdir |
+| A.1-8 | Duration / split | Split on chunk boundaries if > platform cap | part logic in step 6 | total duration → N parts | each part ≤ platform cap at shipped rate | adjust split |
+| A.1-9 | Thumbnail per part | 1080×1920 full-screen thumbnails | `generate_mobile_thumbnail.py` (planned) | base + title + part → `*-mobile-thumb-pt<n>of<total>.png` | exact 1080×1920, no bars | regen |
+| A.1-10 | Per-part SRTs | Windowed SRTs for accessibility upload | windowing utility (planned) | shipped SRT → `*-mobile-pt<n>of<total>.srt` | duration matches part MP4 | re-window |
+| A.1-11 | Final audit | Mechanical pre-upload checklist | `audit_mobile_publish.py` (planned) | all per-part artifacts → report | SHIPPING.md § A.1 Pre-upload checklist ✓ | fix items |
+| A.1-12 | Publish per part | Upload to platform(s) | platform uploaders (manual) | per-part artifacts → platform URLs | platform accepts | platform troubleshoot |
+
+**Universal principles for the table above:**
+
+- **Mechanical gates are mandatory.** A stage "passed" only when the listed gate passed — never when the code "looks right." See rules.md § Verified = mechanical check passed.
+- **`Driver: agent` is AI-driven by default but human-doable.** Per rules.md § Delivery Modes, the AI agent executes these stages autonomously in autopilot mode, with user confirmation in agent-skill mode. A human reviewer may also drive the stage directly. The stage's gate is what's mandatory, not who drives it.
+- **A.1 never shims A code paths.** When an A.1 stage looks like "extract from widescreen master and scale," check for a mobile-native source first. See SHIPPING.md § A vs A.1 separation.
+- **Failures surface loudly, not silently.** Manifest orphans, rate mismatches, audit regressions — all surface with specific warnings so a reviewer can correlate bad output with the cause (rules.md § Empirical verification beats logical inference).
+
 ### Workflow Rules
 
 #### Purpose
@@ -222,12 +266,29 @@ Expected contents:
 - `source/`: raw session package (transcript, logs, artifacts, notes) plus session media
 - `script/`: screenplay, scene plan, voiceover script, and any intermediate editorial drafts
 - `shot-list/`: canonical shot-list file (workbook or equivalent)
-- `source/generated-assets/scenes/`: per-chunk AI-generated illustration PNGs
+- `source/generated-assets/scenes/`: per-chunk AI-generated illustration PNGs. Widescreen masters (A) at the top level (`<chunk>.png`); mobile-variant PNGs (A.1) under `scenes/mobile/<chunk>-mobile.png` so they stay isolated from the widescreen assets.
 - `source/fetched-assets/`: externally sourced media when running the alternate stock mode
 - `frames/<chunk-id>/`: preprocessor output — numbered PNG sequences per chunk
 - `manifests/`: scene manifests and other deterministic generated metadata
 - `review/`: HTML review boards and local preview media
-- `renders/`: MP4 outputs
+- `renders/`: MP4 outputs. Widescreen (A) masters and their SRTs live at the top level of this directory. If the optional mobile-export chain (A.1) runs, its deliverables land under `renders/mobile/` — see SHIPPING.md § Part 4 for the mobile file-naming convention.
+
+##### Variant outputs in subdirectories
+
+Asset variants (mobile, 4:5, per-platform, future aspects) land under `<canonical>/<variant>/`, not mixed with the canonical root. Widescreen (A) sits at the root; mobile (A.1) under `mobile/`.
+
+- `scenes/<chunk>.png` (widescreen) + `scenes/mobile/<chunk>-mobile.png` (A.1)
+- `renders/<id>-1.0x.mp4` (widescreen) + `renders/mobile/<id>-mobile-9x16.mp4` (A.1)
+
+Keep the variant suffix in the filename too (`-mobile`) — makes a file identifiable when pulled out of its folder context.
+
+##### Fill order for variant folders: crops first, regens second
+
+When populating a variant folder (e.g. `scenes/mobile/`), fill every eligible slot first with the cheap path — typically a post-processed crop of the widescreen master. Then overwrite only the slots where a crop loses content (flagged by audit as `mobile_unsafe`) with a regenerated asset.
+
+Why this order: a regen costs real money per call; a crop is free. Starting with crops means the variant folder is self-sufficient after the cheap pass — every chunk has a mobile PNG on disk. The regen pass then targets exactly the chunks that need a new composition, without re-doing work the crop could have done.
+
+Reverse order (regens first, then crops) leaves gaps in the folder and makes the regen decision unnecessarily early. Concrete cost in this session: we skipped the crop pass and went straight to regens for 9 chunks — even the ones that would have survived a crop fine. Cheaper and simpler to have cropped all first.
 - `working/`: temporary planning artifacts that should not become source of truth
 
 #### Pipeline Stages
@@ -589,6 +650,45 @@ Prefer:
 Avoid:
 - fragile detached launch patterns unless proven stable
 
+### Post-Stage 8: Mobile Export from Widescreen (A.1, optional)
+
+**Scope.** This section covers the *derivation* path — starting from a shipped 16:9 master and producing mobile variants by cropping, caption-burning, and optionally splitting into parts for TikTok. A **mobile-first authoring path** (sessions composed natively at 9:16 from chunk 1, never touching 16:9) is tracked separately in ROADMAP.md as Process B and uses a different chain. The two paths share caption styling, the bundled Caveat font, and the libass prereq — all documented in `SHIPPING.md § Caption Styling` and referenced by both.
+
+**Fully automated chain (runs end-to-end when mobile export is requested; no human gate between steps):**
+
+1. **Prereq:** widescreen master shipped (Stage 8, audit_render mechanical pass).
+2. **Crop** every non-bumper `image_source: generated` widescreen PNG to 4:5 into `scenes/mobile/<chunk>-mobile.png`. Bumpers skipped — ROADMAP item 5 (Remotion-native) handles them.
+3. **Audit** the cropped PNGs via `audit_mobile_crops.py`. Flags broken/clipped chunks. Writes `working/mobile-crop-audit.json`. Note: `audit_scenes.py` on widescreen PNGs covers STRUCTURAL mobile-safety only (split-panels, off-center focals) and misses text-clipping — `audit_mobile_crops.py` is the authoritative legibility check for A.1. Both are useful at different stages.
+4. **Regen** every flagged chunk at native 4:5 via `replay_mobile.py --aspect 4:5`. Byte-faithful: reads the widescreen prompt + image_input from the manifest, only overrides aspect. If any flagged chunk has no manifest entry (orphan — see VISUALS.md § Manifest race condition), the replay logs a warning and skips that chunk; the chain CONTINUES rather than halting. The orphan chunk retains its cropped-from-widescreen version in `scenes/mobile/` as a fallback, and the warning is surfaced at the end so a reviewer can correlate any bad output with the skipped chunks.
+5. **Re-audit** the regens via `audit_mobile_crops.py`. Anything still broken → auto-retry once. Fail loudly at retry limit.
+6. **Render** the mobile video via Remotion at 4:5 canvas: scene PNGs + live-rendered bumpers (ROADMAP item 5) + preprocessor reveal frames.
+7. **Burn captions** via ffmpeg libass using the SHIPPING.md § Part 3 caption style.
+8. **Duration check.** If the result exceeds the target platform cap (Reels ≤3 min algo / TikTok ≤60 s favored / Shorts 60 s hard) → auto-split on chunk boundaries with a "to be continued…" card + part badge.
+9. **Regenerate thumbnail** at mobile aspect (4:5 or 9:16 per platform target).
+10. **Final mechanical audit** (duration match, libass font-fallback check, frame sampling for visible artifacts) + ship.
+
+The widescreen audit runs once per session regardless; the mobile chain runs only when mobile output is requested.
+
+#### Prompt replay vs re-derivation (byte-faithful mobile regen)
+
+The shot-list is mutable on-disk state. Between the original widescreen scene generation and any later mobile regeneration, fields may have been normalized, backfilled, or cleaned — e.g., `on_screen_text=[]` added to chunks that previously had no such field at all. `compose_prompt` reads the CURRENT shot-list, so its output can drift even when the visible chunk semantics haven't changed. A literal "same prompt" claim requires replaying the historical prompt, not re-deriving from today's shot-list.
+
+When the goal is *"produce the same scene as the widescreen, just at a different aspect"*, use `scripts/replay_mobile.py`. It reads the exact `prompt` and `image_input` from the widescreen manifest entry (`role="scene"`) and submits them to kie.ai with only `aspect_ratio` overridden. No re-composition via `compose_prompt`, no shot-list reads, no preamble injection.
+
+Recommended flow:
+1. `scripts/replay_mobile.py --session <id> --chunks <ids> --dry-run` — diffs widescreen vs current `scene-mobile` prompts per chunk and flags drift.
+2. Inspect the diff. Chunks that MATCH are safe to regen either way. Chunks that DIFFER should be replayed, not re-derived.
+3. Run for real with the same `--chunks` list and an `--aspect` override (typical: `--aspect 1:1` if the mobile deliverable will be cropped to 4:5 post-hoc).
+
+Prefer replay when:
+- The widescreen generation is known-good (scene was shipped or reviewed).
+- We want byte-faithful reproduction at a new aspect.
+- The shot-list has been touched since the widescreen was made.
+
+Prefer re-derivation (`batch_scenes.py --mobile-variant`) when:
+- The scene is being regenerated *because* the current shot-list diverges intentionally (audit flagged it, user edited a chunk).
+- The widescreen manifest entry is missing or the image_input URL is dead.
+
 ## Part 2 — Session Config Spec
 
 ### Session Config Spec
@@ -792,6 +892,8 @@ Constraints (enforced at validation time, not render time):
 - Soft cap per video: ~5-10 overlay insertions total. More than that is a design smell — redesign as full-frame scenes.
 
 Typical use: brand-name mention in narration gets the brand's logo inserted at the word's timestamp, top-right corner, ~12% canvas width, fades in and out over ~0.3s.
+
+**A.1 mobile overlay adjustments:** the `Overlays` column's `width` is normalized to widescreen canvas (1920-px). When the mobile export chain (A.1) composites these on the 1080-px mobile canvas, it multiplies `width` by 1.8× (capped at 0.9) — compensates for the tall 4:5 mobile canvas making normalized widths feel visually smaller. Position (x, y) is NOT scaled. SVG overlay sources must be rasterized via `rsvg-convert` before compositing (ffmpeg has no SVG decoder). See SHIPPING.md § Mobile layout conventions + § SVG overlay rasterization.
 
 #### Removed Columns Rule
 
@@ -1299,6 +1401,24 @@ Blank = inherit previous zoom.
 
 ##### `Camera Reason` (required when Camera Target is set)
 One-sentence explanation of why the camera moves on this beat. If you can't state a reason, don't move the camera.
+
+#### Mobile-Export Fields (optional, populated by audit)
+
+These fields support the optional post-render mobile-export chain (Process A.1 — mobile variants derived from the widescreen master). Populated automatically during `audit_scenes.py`, which runs on every session regardless of whether mobile export is ever invoked, so that if a user later decides to produce mobile variants the crop-safety analysis is already on disk.
+
+A mobile-first authoring path (Process B — sessions composed natively at 9:16) is a separate pipeline tracked in ROADMAP.md and does not use these fields.
+
+##### `mobile_focal` (optional)
+Zone from the Camera Target vocabulary (§ Camera Target) indicating where the focal content lives for a 9:16 center-crop of this chunk. Default `center`. Audit may suggest a non-center value when the focal subject or declared `on_screen_text` would fall outside a center-crop; authors may override the audit's suggestion.
+
+##### `mobile_unsafe` (optional, audit-populated)
+Boolean. Audit sets `true` when a 9:16 center-crop at the chunk's `mobile_focal` would lose the focal subject or any declared `on_screen_text`. Authors do not hand-set this field; they regenerate the chunk via `generate_scene.py --mobile-variant` and the audit re-evaluates.
+
+##### `mobile_image_path` (optional)
+Path to a portrait-native regenerated scene (typically `source/generated-assets/scenes/<chunk-id>-mobile.png`). Populated after `generate_scene.py --mobile-variant` runs on a `mobile_unsafe: true` chunk. Falls back to `image_path` when absent.
+
+##### `mobile_overlays` (optional)
+Overlay[] array with 9:16 coordinates, overriding the widescreen overlay positions for mobile export. Omit to inherit widescreen overlays unchanged (coordinates will be remapped by the crop logic, which may or may not land the overlay correctly — override explicitly when the inherited position is wrong).
 
 #### Required Fields For A Valid Beat
 

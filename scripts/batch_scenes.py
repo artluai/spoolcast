@@ -87,6 +87,22 @@ def main() -> int:
             "PIPELINE.md § Stage 4 ordering rule."
         ),
     )
+    p.add_argument(
+        "--mobile-variant",
+        action="store_true",
+        help=(
+            "regenerate chunks at portrait aspect (Process A.1). Writes to "
+            "<chunk>-mobile.png and records mobile_image_path back to the "
+            "shot-list. Skips the pre-flight external check — mobile variants "
+            "reuse the widescreen externals. Typically paired with --only to "
+            "target just the mobile_unsafe chunks from the latest audit."
+        ),
+    )
+    p.add_argument(
+        "--mobile-aspect",
+        default="9:16",
+        help="aspect for --mobile-variant (default 9:16; alternatives: 4:5, 1:1)",
+    )
     args = p.parse_args()
 
     shot_list_path = CONTENT_ROOT / "sessions" / args.session / "shot-list" / "shot-list.json"
@@ -95,7 +111,9 @@ def main() -> int:
 
     # Pre-flight: externals must be sourced + verified before any paid kie call.
     # Enforces PIPELINE.md § Stage 4 ordering rule mechanically.
-    if not args.skip_external_check:
+    # Skipped entirely for --mobile-variant (mobile regens reuse the already-
+    # verified widescreen externals; no new external dependencies).
+    if not args.skip_external_check and not args.mobile_variant:
         session_dir = CONTENT_ROOT / "sessions" / args.session
         blockers = preflight_external_assets(session_dir, chunks)
         if blockers:
@@ -167,6 +185,8 @@ def main() -> int:
                 visual_direction=visual_direction,
                 on_screen_text=on_screen_text,
                 motion_notes=motion_notes,
+                mobile_variant=args.mobile_variant,
+                mobile_aspect=args.mobile_aspect,
             )
             successes.append((cid, str(dest)))
         except Exception as e:
@@ -174,6 +194,28 @@ def main() -> int:
             failures.append((cid, str(e)))
             # brief pause before next to avoid hammering on errors
             time.sleep(2)
+
+    # After mobile regen, write mobile_image_path back to the shot-list so
+    # downstream export_mobile.py knows which chunks have portrait variants.
+    if args.mobile_variant and successes:
+        shot_list = json.loads(shot_list_path.read_text())
+        success_by_cid = dict(successes)
+        session_dir_for_rel = CONTENT_ROOT / "sessions" / args.session
+        updated = 0
+        for chunk in shot_list.get("chunks", []):
+            cid = chunk.get("id")
+            if cid in success_by_cid:
+                dest_abs = Path(success_by_cid[cid])
+                rel = dest_abs.relative_to(session_dir_for_rel)
+                new_path = str(rel)
+                if chunk.get("mobile_image_path") != new_path:
+                    chunk["mobile_image_path"] = new_path
+                    updated += 1
+        if updated:
+            with shot_list_path.open("w") as f:
+                json.dump(shot_list, f, indent=2)
+                f.write("\n")
+            print(f"[batch] wrote mobile_image_path on {updated} chunk(s) in shot-list.json")
 
     print(f"\n[batch] done. {len(successes)} succeeded, {len(failures)} failed.")
     if failures:

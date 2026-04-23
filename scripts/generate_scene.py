@@ -24,10 +24,12 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import fcntl
 import json
 import sys
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from kie_client import KieClient, KieError, build_input_for_model
 from style_library import (
@@ -40,6 +42,19 @@ from style_library import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTENT_ROOT = REPO_ROOT.parent / "spoolcast-content"
+
+
+MOBILE_PREAMBLE = (
+    "This scene is being regenerated for a 9:16 portrait mobile video. "
+    "Compose everything for a tall vertical canvas — the widescreen original "
+    "won't survive a mobile center-crop, so rebuild the scene to fit the "
+    "portrait frame naturally. If the visual direction below describes a "
+    "horizontal layout (side-by-side panels, left/right positioning, "
+    "split-frame), restructure it as a vertical arrangement (stacked panels, "
+    "top/bottom positioning, upper-half / lower-half). Keep all declared "
+    "on_screen_text legible inside the portrait canvas. Existing style "
+    "anchor applies unchanged."
+)
 
 
 def session_dir(session_id: str) -> Path:
@@ -98,6 +113,48 @@ def save_manifest(session_id: str, manifest: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(manifest, f, indent=2)
+
+
+@contextmanager
+def _locked_manifest_rw(session_id: str) -> Iterator[dict[str, Any]]:
+    """Exclusive-lock the manifest file, yield the current state for mutation,
+    and atomically save on exit.
+
+    Serializes concurrent manifest read-modify-write cycles. Fixes the race
+    where two parallel `generate_scene.py` processes each load the same
+    snapshot, each append their own item, each save — and the last writer
+    silently drops the first writer's item. Known to have orphaned 4 chunks
+    (C6, C28, C39, C41) on spoolcast-dev-log when two batch_scenes runs
+    overlapped.
+
+    fcntl.flock is POSIX-only; on non-POSIX platforms this degrades to
+    no-op and the race returns. Not a concern on macOS/Linux hosts.
+    """
+    path = manifest_path(session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Open in a+ so we can create-if-missing, then hold the same descriptor
+    # through the lock / read / write / unlock cycle.
+    with open(path, "a+") as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.seek(0)
+            content = f.read()
+            if content.strip():
+                manifest = json.loads(content)
+            else:
+                manifest = {
+                    "run_name": f"scenes-{_dt.datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                    "session_id": session_id,
+                    "created_at": _dt.datetime.now(_dt.UTC).isoformat(),
+                    "style_anchor": None,
+                    "items": [],
+                }
+            yield manifest
+            f.seek(0)
+            f.truncate()
+            json.dump(manifest, f, indent=2)
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 # ---- prompt composition ------------------------------------------------
@@ -160,7 +217,19 @@ def compose_prompt(
         parts.append(style_text.rstrip("."))
 
     # Prefer structured slots. Fall back to legacy `beat` blob otherwise.
-    using_structured = visual_direction is not None or on_screen_text is not None
+    # Require actual content in at least one structured slot — an empty list or
+    # blank string is treated as "not using structured" so the legacy beat still
+    # provides a scene description. Previously `on_screen_text=[]` (empty list)
+    # routed into the structured path and produced a prompt with no Scene:
+    # section, which caused the model to invent a scene freely.
+    visual_direction_has_content = (
+        isinstance(visual_direction, str) and visual_direction.strip() != ""
+    )
+    on_screen_text_has_content = (
+        isinstance(on_screen_text, list)
+        and any(isinstance(t, str) and t.strip() for t in on_screen_text)
+    )
+    using_structured = visual_direction_has_content or on_screen_text_has_content
     if using_structured:
         if visual_direction and visual_direction.strip():
             parts.append(f"Scene: {visual_direction.strip().rstrip('.')}")
@@ -201,22 +270,45 @@ def generate(
     visual_direction: str | None = None,
     on_screen_text: list[str] | None = None,
     motion_notes: str | None = None,
+    mobile_variant: bool = False,
+    mobile_aspect: str = "9:16",
 ) -> Path:
     cfg = load_session_config(session_id)
     scenes = scenes_dir(session_id)
     scenes.mkdir(parents=True, exist_ok=True)
-    dest = dest_override if dest_override is not None else (scenes / f"{chunk_id}.png")
+    # Mobile variants land in scenes/mobile/<chunk>-mobile.png so they stay
+    # isolated from the widescreen scenes/<chunk>.png. Both coexist; each is
+    # consumed by its own export path. Mirrors the renders/mobile/ convention.
+    if mobile_variant:
+        mobile_scenes = scenes / "mobile"
+        mobile_scenes.mkdir(parents=True, exist_ok=True)
+        default_dest = mobile_scenes / f"{chunk_id}-mobile.png"
+    else:
+        default_dest = scenes / f"{chunk_id}.png"
+    dest = dest_override if dest_override is not None else default_dest
     model = model_override or cfg["preferred_model"]
 
     if dest.exists() and not force:
-        print(f"[gen] {chunk_id} already exists at {dest}. Use --force to regenerate.")
+        print(f"[gen] {chunk_id}{'-mobile' if mobile_variant else ''} already exists at {dest}. Use --force to regenerate.")
         return dest
+
+    # For mobile variants at 9:16 or 4:5, prepend the mobile preamble to the
+    # visual_direction so the model restructures horizontal layouts into
+    # vertical ones. 1:1 (square) skips the preamble — a square is close
+    # enough to the widescreen's central content that restructuring isn't
+    # needed, and keeping the prompt identical to the widescreen source
+    # preserves character / style consistency with the original scene.
+    # on_screen_text and narration are unchanged in all cases.
+    effective_visual_direction = visual_direction
+    if mobile_variant and mobile_aspect != "1:1":
+        base = (visual_direction or "").strip()
+        effective_visual_direction = f"{MOBILE_PREAMBLE}\n\n{base}" if base else MOBILE_PREAMBLE
 
     prompt, image_input = compose_prompt(
         cfg,
         narration,
         beat,
-        visual_direction=visual_direction,
+        visual_direction=effective_visual_direction,
         on_screen_text=on_screen_text,
         motion_notes=motion_notes,
     )
@@ -289,11 +381,12 @@ def generate(
     # Pass session's resolution verbatim as `quality`. build_input_for_model
     # accepts both seedream-style ("basic"/"high") and explicit ("1K"/"2K"/"4K")
     # and maps to each target model's vocabulary.
+    aspect_ratio = mobile_aspect if mobile_variant else cfg.get("aspect_ratio", "16:9")
     input_dict = build_input_for_model(
         model,
         prompt=prompt,
         image_refs=image_input,
-        aspect_ratio=cfg.get("aspect_ratio", "16:9"),
+        aspect_ratio=aspect_ratio,
         quality=cfg.get("resolution", "1K"),
         output_format=cfg.get("output_format", "png"),
     )
@@ -308,10 +401,12 @@ def generate(
         print(f"[gen] FAILED: {e}")
         raise
 
+    item_id = f"{chunk_id}-mobile" if mobile_variant else chunk_id
+    item_role = "scene-mobile" if mobile_variant else "scene"
     item = {
-        "id": chunk_id,
+        "id": item_id,
         "chunk_id": chunk_id,
-        "role": "scene",
+        "role": item_role,
         "model": model,
         "prompt": prompt,
         "task_id": result.task_id,
@@ -319,43 +414,47 @@ def generate(
         "local_path": str(dest.relative_to(CONTENT_ROOT)),
         "mime_type": "image/png",
         "status": "success",
-        "aspect_ratio": cfg.get("aspect_ratio", "16:9"),
+        "aspect_ratio": aspect_ratio,
         "resolution": cfg.get("resolution", "1K"),
         "output_format": cfg.get("output_format", "png"),
         "image_input": list(image_input),
     }
 
-    # Replace any existing entry for this chunk (regeneration is explicit).
-    manifest["items"] = [
-        i for i in manifest["items"] if i.get("chunk_id") != chunk_id
-    ] + [item]
+    # Manifest update under exclusive lock — re-reads the current manifest
+    # state, replaces the (chunk_id, role) entry, updates style_anchor if
+    # first scene, then atomically saves. Serializes with any concurrent
+    # generate_scene.py process writing to the same manifest. The load +
+    # mutate + save must stay inside the lock block; pulling any of them
+    # out re-opens the race.
+    with _locked_manifest_rw(session_id) as manifest:
+        manifest["items"] = [
+            i for i in manifest["items"]
+            if not (i.get("chunk_id") == chunk_id and i.get("role") == item_role)
+        ] + [item]
 
-    # First-scene style anchor recording.
-    if manifest.get("style_anchor") is None:
-        style_ref = cfg.get("style_reference")
-        if isinstance(style_ref, str) and style_ref.startswith(("http://", "https://")):
-            manifest["style_anchor"] = {"kind": "image_url", "value": style_ref}
-        elif result.result_urls:
-            # Use the kie-hosted result_url as the anchor so subsequent
-            # generations can reference it directly via image_input. NOTE:
-            # kie.ai result URLs are temporary — they remain valid for some
-            # hours. For batches generated in sequence this works fine; for
-            # sessions generated across days, a more permanent host would
-            # be needed for the anchor.
-            manifest["style_anchor"] = {
-                "kind": "image_url",
-                "value": result.result_urls[0],
-                "local_path": str(dest.relative_to(CONTENT_ROOT)),
-                "source_prompt": style_ref or cfg.get("default_style_prompt", ""),
-            }
-        else:
-            manifest["style_anchor"] = {
-                "kind": "local_image",
-                "value": str(dest.relative_to(CONTENT_ROOT)),
-                "source_prompt": style_ref or cfg.get("default_style_prompt", ""),
-            }
+        # First-scene style anchor recording. Only tracked from widescreen
+        # generations — mobile variants inherit the widescreen anchor and do
+        # not reset it.
+        if not mobile_variant and manifest.get("style_anchor") is None:
+            style_ref = cfg.get("style_reference")
+            if isinstance(style_ref, str) and style_ref.startswith(("http://", "https://")):
+                manifest["style_anchor"] = {"kind": "image_url", "value": style_ref}
+            elif result.result_urls:
+                # kie-hosted result_url is temporary but valid for some hours —
+                # fine for sequential batches, not for sessions spanning days.
+                manifest["style_anchor"] = {
+                    "kind": "image_url",
+                    "value": result.result_urls[0],
+                    "local_path": str(dest.relative_to(CONTENT_ROOT)),
+                    "source_prompt": style_ref or cfg.get("default_style_prompt", ""),
+                }
+            else:
+                manifest["style_anchor"] = {
+                    "kind": "local_image",
+                    "value": str(dest.relative_to(CONTENT_ROOT)),
+                    "source_prompt": style_ref or cfg.get("default_style_prompt", ""),
+                }
 
-    save_manifest(session_id, manifest)
     print(f"[gen] wrote {dest}")
     print(f"[gen] manifest updated: {manifest_path(session_id)}")
     # Machine-parseable last line — lets batch drivers capture the result URL
@@ -409,6 +508,16 @@ def _cli() -> None:
         default=None,
         help="structured slot: motion description for the reveal layer. ACCEPTED BUT IGNORED by the image model (still images can't render motion).",
     )
+    parser.add_argument(
+        "--mobile-variant",
+        action="store_true",
+        help="regenerate this chunk at portrait aspect (Process A.1). Prepends a mobile-composition preamble to visual_direction, writes to scenes/<chunk>-mobile.png, adds a 'scene-mobile' manifest entry without clobbering the widescreen one.",
+    )
+    parser.add_argument(
+        "--mobile-aspect",
+        default="9:16",
+        help="aspect ratio for mobile variant (default 9:16; alternatives: 4:5 for IG Feed, 1:1 square). Only used when --mobile-variant is set.",
+    )
     args = parser.parse_args()
 
     references_list: list[str] | None = None
@@ -440,6 +549,8 @@ def _cli() -> None:
             visual_direction=args.visual_direction,
             on_screen_text=on_screen_text_list,
             motion_notes=args.motion_notes,
+            mobile_variant=args.mobile_variant,
+            mobile_aspect=args.mobile_aspect,
         )
     except Exception as e:
         print(f"[gen] error: {e}", file=sys.stderr)

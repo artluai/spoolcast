@@ -68,7 +68,84 @@ So per-chunk cost goes up ~3-10x relative to a still. Budget-aware default: chea
 
 ---
 
+## 3. Mobile export from widescreen (Process A.1)
+
+**What:** post-render optional chain that turns the shipped 16:9 master into polished 9:16 / 1:1 variants for Reels / TikTok / Shorts, with burned captions and — for long videos targeting TikTok — multi-part splits with "to be continued…" cards and per-part badges.
+
+**Why:** platform auto-captions are inadequate (timing drift, no style control, strip off when sound is muted). Professional creators on Reels/TikTok/Shorts burn captions directly into the video and lock the composition to the target aspect. The existing pipeline already produces all the ingredients — rendered master, SRT, per-chunk scenes, style library, audit — so mobile export is the last mile.
+
+**Spoolcast side:**
+- Shot-list fields: `mobile_focal`, `mobile_unsafe`, `mobile_image_path`, `mobile_overlays` (all optional, audit-populated — see PIPELINE.md § Mobile-Export Fields).
+- `audit_scenes.py` extended with mobile-crop safety check — runs on every session, not just mobile-bound ones, so the data is on disk when needed.
+- `generate_scene.py --mobile-variant` for regenerating portrait-native scenes for `mobile_unsafe` chunks.
+- `generate_srt.py --exclude-onscreen-cues` for burn-in captions (strips the `[on-screen: …]` bracketed cues since the frame already shows the text).
+- `scripts/burn_captions.py` — ffmpeg libass burn-in using the Caveat Bold caption style.
+- `scripts/export_mobile.py` — crop, caption burn, optional split, part badge.
+- `generate_thumbnail.py` extended with `--aspect 9:16|1:1 --part-badge "1/3"`.
+- Caveat-Bold.ttf bundled at `scripts/assets/fonts/`.
+
+**Not in scope (v1):**
+- Auto-trim-to-highlights (trimming is manual)
+- Per-platform distinct caption styles (one style fits all)
+- CapCut-style word-by-word caption highlighting
+- YouTube Shorts auto-upload
+- Vertical-native Remotion composition (that's Process B below)
+
+**Depends on:** ffmpeg with libass (homebrew-ffmpeg tap, not default brew formula — see SHIPPING.md § Part 3 Prerequisites).
+
+---
+
+## 4. Mobile-first authoring (Process B)
+
+**What:** a parallel pipeline where sessions are composed at 9:16 (or 1:1) from chunk 1 — Remotion canvas is mobile, every scene is AI-generated at mobile aspect, captions burn in natively at mobile dimensions, no 16:9 master ever exists. Not a mode switch on the existing pipeline; a sibling pipeline that shares atoms (caption style, font, libass prereq, publish logic) but owns its own composition, audit, and render configs.
+
+**Why:** some content is natively mobile-first — TikTok-style explainers, phone-screen walkthroughs, vertical demos. Deriving these from a widescreen master (Process A.1) forces compromises in composition, leaves ~40% of the pixel budget unused after a 9:16 crop, and requires regen passes that mobile-first authoring avoids entirely.
+
+**Spoolcast side (sketch — design when the work starts):**
+- Session config: `aspect_ratio: "9:16"` or `"1:1"` drives canvas dimensions everywhere downstream.
+- Scene generation: passes the mobile aspect to kie.ai from the first chunk; no `--mobile-variant` flag needed.
+- Remotion: a sibling composition for the mobile canvas.
+- Audit: existing scene audits run; the mobile-crop audit (A.1's) is inapplicable and skipped.
+- Publish: reuses the caption-styling atoms from SHIPPING.md § Part 3; skips the crop + focal + regen chain. Split-into-parts may still be useful for long TikTok uploads and can reuse A.1's split implementation.
+
+**Not in scope (B v1 when it lands):**
+- Cross-compiling a mobile session back into a 16:9 master. If both are needed, run A.1 and B as separate sessions.
+- Shared session metadata between A.1 and B renders (they're independent sessions with independent shot-lists).
+
+**Depends on:** A.1 shipped first (to prove the caption / font / libass atoms work end-to-end), then B takes over the composition + scene-gen aspect plumbing.
+
+---
+
 ## How this file gets updated
+
+## 5. Remotion-native bumper rendering
+
+**What:** bumpers (`boundary_kind="bumper"` chunks) render directly in Remotion as styled text compositions — not as kie.ai-generated PNGs. A "THE INCIDENT" bumper becomes a Remotion component with Caveat Bold at size N on the current canvas, centered; no rasterized image involved.
+
+**Why:** bumpers are pure text cards (e.g. "THE INCIDENT", "THE FIX", "PAYOFF"). Rasterizing them via kie.ai creates two avoidable failure modes:
+
+1. **Aspect-specific clipping** — the rasterized PNG is fixed at one aspect; cropping it for mobile clips the letter edges. This session's B3 "PAYOFF" clipped to "PAYOF" at 4:5.
+2. **Stochastic letter-form variance** — kie.ai occasionally produces slight misalignment, uneven letter weight, or artifacts that a text renderer wouldn't.
+
+Remotion-rendered text re-lays-out per aspect automatically, and every character is pixel-perfect. Cost: $0 per bumper vs ~$0.05 at kie. Explicit mobile requirement: when mobile export runs, bumpers compose natively at the mobile canvas (the 1080×1350 4:5 content area centered on the 1080×1920 frame), NOT by scaling a widescreen bumper PNG. Each bumper renders fresh per export-target aspect.
+
+**Fontsize rule (canvas-agnostic):** Caveat Bold, fontsize chosen so the rendered text fits within 85% of canvas width. Formula: `fontsize = min(canvas_safe_max, int((canvas_w * 0.85) / (len(text) * 0.55)))`, where `canvas_safe_max` is a ceiling (e.g. 220 for widescreen, 200 for mobile) and `0.55` is the average Caveat Bold char-width-per-fontsize ratio. For mobile 1080-wide canvas this fits "THE INCIDENT" (12 chars) at ~140 px and shorter titles at up to 200 px. Never hardcode to a specific bumper text.
+
+**A.1 temporary path:** until this lands, the A.1 mobile stitcher uses ffmpeg `drawtext` to live-render bumpers on white background at the mobile canvas, applying the same fontsize formula above. That implementation should migrate to Remotion-native rendering when this item ships, and the `drawtext` fallback removed from the A.1 stitcher.
+
+**Spoolcast side:**
+- `boundary_kind: bumper` chunks skip kie.ai generation entirely — no scene PNG written.
+- Remotion composition adds a `BumperCard` component that reads the chunk's `on_screen_text` and renders Caveat Bold text sized for the current canvas.
+- Preprocessor skips bumpers (no reveal frames; the card just holds).
+- `validate_shot_list.py` forbids `image_source: generated` on chunks with `boundary_kind: bumper` (post-migration). Pre-migration, warn-but-accept.
+
+**Not in scope:**
+- Bumpers with non-text elements (photos, backgrounds). If a bumper needs imagery beyond text, it stays kie.ai-generated.
+- Migrating existing shipped sessions. New sessions start Remotion-native; shipped sessions keep their generated bumper PNGs.
+
+**Depends on:** Caveat font already bundled via `@remotion/google-fonts/Caveat` — no new asset work.
+
+---
 
 When an item here becomes in-flight, move the relevant details into DESIGN_NOTES (for rationale that will persist) + into the actual code / rule files (for current-state rules). Delete the item from here once it's shipped. Add new items as they come up.
 

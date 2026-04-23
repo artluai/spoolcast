@@ -74,17 +74,70 @@ CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "spoolcast-conten
 
 SYSTEM_PROMPT = """You are a vision reviewer for a spoolcast illustrated video.
 
-Your job: inspect a single generated scene image and flag four failure classes:
+Your job: inspect a single generated scene image and flag four failure classes
+(plus one informational check at the end):
 
 1. **ocr_missing** — the shot-list says specific text should appear on the
    frame (field `on_screen_text`). Does that exact text appear, legible, in
    the image? Flag if any declared text is missing, garbled, or substantively
    different.
 
-2. **text_hallucination** — is there legible text on the frame that was NOT
-   declared in `on_screen_text`? This happens when the generator renders
-   stage-direction prose as literal text, or invents its own quote. Flag the
-   specific words that shouldn't be there.
+2. **text_hallucination** — is the generator putting legible prose into the
+   frame's FOCAL element that was not declared and reshapes what the
+   narrative communicates?
+
+   Spoolcast uses a "one rule per scene" convention in `on_screen_text`: a
+   chunk whose declared text is just one line (e.g. one rules.md rule)
+   typically renders as a card/document/page displaying MANY plausible
+   lines — because cards with only one line look fake. These extra lines
+   are scene-filling, not hallucination. The declared rule is the one the
+   NARRATION quotes; the others are set dressing that gives the card weight.
+
+   DO NOT flag as text_hallucination:
+
+   - Additional plausible lines on a declared document, card, page, sticky
+     note, terminal, or screen. When `on_screen_text` declares one line
+     and the scene shows a full populated card, the extra lines are
+     expected and correct.
+   - Garbled / gibberish text like "MOTIVATIONAL IS GREATFUL OF THE SIORT"
+     — this is stylistic wall-filler. Viewer won't read it.
+   - Small background text on posters, sticky notes, wall calendars,
+     bookshelves, or other decor in the periphery.
+   - Monitor / terminal / screen content thematically consistent with the
+     scene. A code editor showing code, a chat app showing a message, a
+     dashboard showing numbers — all scene context, not hallucination.
+   - Document titles / section headers (e.g. "rules.md", "CASE 2") that
+     name a declared document or card; these are labels, not prose.
+
+   DO flag as text_hallucination VERY SPARINGLY, only when the extra text
+   directly contradicts or replaces the declared narrative. High bar.
+
+   - A foreground title card or bumper whose WORDS ARE WRONG — declared
+     title was "PAYOFF" but the frame shows a DIFFERENT word. (Extra
+     supporting text on the same card is not a hallucination.)
+   - A frame with MULTIPLE prominent unrelated prose blocks (three or
+     more separate dialogue bubbles / big captions) that collectively
+     push a narrative the declared text did not describe.
+   - Text that's obviously generator-error: stage-direction prose
+     ("character looks surprised") rendered as literal words in the frame.
+
+   DO NOT flag:
+
+   - A single AI dialogue line in a chat bubble when the visual_direction
+     implies an AI/chat interaction (spoolcast convention: scenes show
+     the AI replying even when the specific reply isn't in the shot-list;
+     the CONCEPTUAL interaction is declared, the exact words are filler).
+   - Any single line of prose. Single-line text, however "prominent",
+     does not cross the bar alone. Need at least 2-3 undeclared prominent
+     lines AND they reshape the narrative.
+   - Text the model itself is describing rather than quoting (e.g., if
+     your flag reads "The page contains bullets that were not declared",
+     that's a meta-description, not a hallucinated text item — reject it).
+
+   Final test: "would I regenerate this scene just to remove this text?"
+   If no (the scene is fine, the extra text is set dressing), skip. If
+   yes (the text meaningfully changes what the narration is saying),
+   flag.
 
 3. **anatomy** — extra limbs, malformed faces or hands, duplicate characters
    where only one was intended, phantom body parts floating in the frame,
@@ -94,6 +147,93 @@ Your job: inspect a single generated scene image and flag four failure classes:
 4. **composition_overload** — are there so many competing focal subjects that
    the viewer's eye doesn't know where to land? Multi-panel chunks are OK if
    clearly partitioned; flag only when elements clutter without structure.
+
+5. **mobile_unsafe** (informational — does NOT affect overall_verdict) — the
+   widescreen master may optionally be exported to 9:16 mobile by center-crop
+   (keeping roughly the middle 56% of the horizontal, discarding left and
+   right edges).
+
+   CRITICAL: the question is holistic, not categorical. Don't look for
+   named failure modes (split-frame, side-third prop, wide text). Look
+   at the scene and ask: after removing 22% from each side, how much of
+   what the scene is trying to COMMUNICATE is gone?
+
+   Mentally apply the 9:16 center-crop: erase the leftmost 22% and
+   rightmost 22% of the frame. What remains is what the mobile viewer
+   sees. Report the following, in order:
+
+   (a) focal_position — where is the single most important thing in the
+       frame? one of: center, left-third, right-third, top-third,
+       bottom-third, split-panels (two or three distinct panels needed
+       side-by-side), full-width-centered (content spanning the whole
+       horizontal).
+
+   (b) meaning_lost_to_crop — would the 9:16 center-crop remove more than
+       ~10% of the scene's COMMUNICATED MEANING?
+
+       "Communicated meaning" = everything the scene depends on to make
+       its point. This includes:
+       - declared on_screen_text that the viewer is meant to read
+       - focal subjects (characters, objects) positioned to be the eye's
+         target
+       - key props the narration references or that carry the punchline
+       - body prose on cards, pages, documents, checklists the viewer is
+         meant to read
+       - dialogue or speech bubbles
+       - labels on objects, arrows pointing at things, diagrams the viewer
+         is meant to parse
+
+       It does NOT include scene dressing:
+       - background posters, wall calendars, sticky notes in the periphery
+       - ambient desk clutter, bookshelves, wall texture
+       - blurred or garbled stylistic fill the viewer can't read anyway
+
+       Calibration (anchor on these reference points):
+       - ~0% loss: focal subject is centered, dressing is in the periphery,
+         nothing the viewer needs to see lives in the side thirds → no.
+       - ~5% loss: a single word trimmed by one letter in a way the viewer
+         recovers from context (e.g. "DEFAULT" → "DEFAUL") → no.
+       - ~15% loss: a paragraph's first or last word is clipped on every
+         line and the viewer loses word flow; a key prop's label is
+         clipped; a side character the scene needs is half gone → yes.
+       - ~30%+ loss: a split-frame where a whole panel is discarded; a key
+         prop entirely outside the center 56%; the focal subject
+         positioned off-center such that the crop cuts through their face
+         → yes.
+
+       Readability-recoverability tiebreaker: if a casual viewer watching
+       the video at normal speed can reconstruct the meaning despite the
+       clip, no. If they can't, yes. This rule applies equally to text,
+       characters, props, dialogue, and any other content — don't special-
+       case text-heavy scenes.
+
+   Verdict rule: mobile_unsafe = (meaning_lost_to_crop == yes)
+                                 OR (focal_position == split-panels).
+   Otherwise mobile_unsafe = false. split-panels is an automatic flag
+   because side-by-side compositions are structurally unsalvageable by
+   crop regardless of content.
+
+   Suggest mobile_focal_suggestion ONLY when unsafe:
+   - if focal_position is left-third or right-third → that zone name
+     (the crop follows the focal off-center, e.g. "right-third" crop
+     keeps the STOP sign that lives on the right)
+   - (other zones available: top-third, bottom-third, upper-middle,
+     lower-middle, top-left, top-right, bottom-left, bottom-right,
+     top, bottom, left, right — pick the zone where the essential
+     content actually lives)
+   - if focal_position is split-panels → null (regen needed)
+   - if focal_position is full-width-centered → null (regen needed; wide
+     centered content cannot be saved by any single-zone crop)
+   - if focal_position is center but meaning_lost_to_crop is still yes
+     (because e.g. the focal document's body prose extends into both
+     side thirds, or a labeled element needs both sides) → null
+     (regen needed; crop alone cannot recover)
+
+   Never emit mobile_focal_suggestion="center" when mobile_unsafe=true.
+
+overall_verdict is based ONLY on categories 1-4. mobile_unsafe is a separate
+signal that informs future mobile-export runs but never blocks the widescreen
+render.
 
 Always reply with a single JSON object, no prose outside the JSON."""
 
@@ -213,7 +353,10 @@ def build_user_prompt(chunk: dict[str, Any]) -> str:
     return (
         f"Chunk id: {cid}\n"
         f"Visual direction (for context only — not a target): {vd or '(none)'}\n\n"
-        f"Declared on_screen_text (these and only these words should appear as legible text on the frame):\n"
+        f"Declared on_screen_text — at minimum these lines must appear legible on the frame. "
+        "Extra plausible content is acceptable when the declared text is a single line that names or "
+        "implies a document, card, page, terminal, screen, or scene dressing — see system prompt rule 2 "
+        "for when extra content is hallucination vs scene-filling.\n"
         f"{declared_text_block}\n\n"
         "Inspect the attached image. Reply with a single JSON object:\n"
         "{\n"
@@ -222,11 +365,17 @@ def build_user_prompt(chunk: dict[str, Any]) -> str:
         '  "text_hallucination": ["<legible text on the frame that was NOT declared>", ...],\n'
         '  "anatomy_flags": ["<specific anatomy or duplicate-character issue>", ...],\n'
         '  "composition_overload": "<null or one sentence if the frame is cluttered>",\n'
+        '  "focal_position": "center" | "left-third" | "right-third" | "top-third" | "bottom-third" | "full-width-centered" | "split-panels",\n'
+        '  "meaning_lost_to_crop": true | false,\n'
+        '  "mobile_unsafe": true | false,\n'
+        '  "mobile_focal_suggestion": "<zone name from the declared vocabulary, or null>",\n'
+        '  "mobile_reasoning": "<one sentence if mobile_unsafe=true, else null>",\n'
         '  "overall_verdict": "ok" | "regenerate",\n'
         '  "reasoning": "<one to two sentences>"\n'
         "}\n"
         "If a category has no issues, return an empty array (or null for composition_overload).\n"
-        "Set overall_verdict to 'regenerate' only when at least one category has a flag."
+        "overall_verdict = 'regenerate' only when at least one of ocr_missing / text_hallucination / "
+        "anatomy_flags / composition_overload has a flag. mobile_unsafe does NOT affect overall_verdict."
     )
 
 
@@ -284,7 +433,8 @@ def print_report(results: list[dict[str, Any]]) -> None:
             continue
         verdict = r.get("overall_verdict", "?")
         marker = "FLAG" if verdict == "regenerate" else "ok  "
-        print(f"  [{marker}] {cid}")
+        mobile_marker = " [mobile-unsafe]" if r.get("mobile_unsafe") else ""
+        print(f"  [{marker}]{mobile_marker} {cid}")
         for category in ("ocr_missing", "text_hallucination", "anatomy_flags"):
             items = r.get(category) or []
             for it in items:
@@ -292,8 +442,71 @@ def print_report(results: list[dict[str, Any]]) -> None:
         co = r.get("composition_overload")
         if co:
             print(f"      composition_overload: {co}")
+        if r.get("mobile_unsafe"):
+            mf = r.get("mobile_focal_suggestion") or "(none — regen at mobile aspect needed)"
+            mr = r.get("mobile_reasoning") or ""
+            print(f"      mobile_focal_suggestion: {mf}")
+            if mr:
+                print(f"      mobile_reasoning: {mr}")
         if verdict == "regenerate" and r.get("reasoning"):
             print(f"      reasoning: {r['reasoning']}")
+
+
+def apply_mobile_flags_to_shot_list(session: str, shot_list: dict[str, Any], results: list[dict[str, Any]]) -> int:
+    """Write mobile_unsafe / mobile_focal back to the shot-list.
+
+    Only touches `mobile_*` keys. Sparse: only writes when mobile_unsafe=true
+    (or removes stale keys when a previously-unsafe chunk is now safe). Keeps
+    the shot-list diff minimal and the "unsafe" state obvious at a glance.
+    Returns the number of chunks where fields changed.
+    """
+    # Build a lookup from chunk_id -> audit result.
+    audit_by_id: dict[str, dict[str, Any]] = {}
+    for r in results:
+        cid = r.get("chunk_id")
+        if not cid or r.get("skipped") or r.get("error"):
+            continue
+        audit_by_id[cid] = r
+
+    changed = 0
+    for chunk in shot_list.get("chunks", []):
+        cid = chunk.get("id")
+        if cid not in audit_by_id:
+            continue
+        r = audit_by_id[cid]
+        mu_new = bool(r.get("mobile_unsafe"))
+        mf_new = r.get("mobile_focal_suggestion")
+
+        mu_prev = chunk.get("mobile_unsafe", False)
+        mf_prev = chunk.get("mobile_focal")
+
+        if mu_new:
+            # Sparse write: set only when non-default.
+            if mu_prev is not True:
+                chunk["mobile_unsafe"] = True
+                changed += 1
+            if mf_new and mf_new != "center" and mf_prev != mf_new:
+                chunk["mobile_focal"] = mf_new
+                changed += 1
+            elif (not mf_new or mf_new == "center") and "mobile_focal" in chunk:
+                # suggestion is null (needs regen) or center (default) —
+                # clear any stale non-default value.
+                del chunk["mobile_focal"]
+                changed += 1
+        else:
+            # Chunk is safe; clear any stale unsafe/focal keys.
+            if "mobile_unsafe" in chunk:
+                del chunk["mobile_unsafe"]
+                changed += 1
+            if "mobile_focal" in chunk:
+                del chunk["mobile_focal"]
+                changed += 1
+
+    path = CONTENT_ROOT / "sessions" / session / "shot-list" / "shot-list.json"
+    with path.open("w") as f:
+        json.dump(shot_list, f, indent=2)
+        f.write("\n")
+    return changed
 
 
 def parse_args() -> argparse.Namespace:
@@ -311,6 +524,11 @@ def parse_args() -> argparse.Namespace:
         "--out",
         default=None,
         help="output path (default: working/scene-audit.json in the session dir)",
+    )
+    p.add_argument(
+        "--no-write-mobile-flags",
+        action="store_true",
+        help="skip writing mobile_unsafe / mobile_focal back to the shot-list (audit JSON only)",
     )
     return p.parse_args()
 
@@ -368,17 +586,36 @@ def main() -> int:
     print()
     print(f"{flags} flag(s), {skipped} skipped, {len(chunks)} total")
 
+    mobile_unsafe_count = sum(
+        1 for r in results if not r.get("skipped") and not r.get("error") and r.get("mobile_unsafe")
+    )
+
     payload = {
         "session": args.session,
         "provider": args.provider,
         "model": model,
         "audited_at": datetime.now(timezone.utc).isoformat(),
         "results": results,
-        "summary": {"flags": flags, "skipped": skipped, "total": len(chunks)},
+        "summary": {
+            "flags": flags,
+            "skipped": skipped,
+            "total": len(chunks),
+            "mobile_unsafe": mobile_unsafe_count,
+        },
     }
     with out_path.open("w") as f:
         json.dump(payload, f, indent=2)
     print(f"wrote {out_path}")
+
+    if mobile_unsafe_count:
+        print(f"{mobile_unsafe_count} chunk(s) flagged mobile_unsafe (informational, does not block render)")
+
+    if not args.no_write_mobile_flags:
+        changed = apply_mobile_flags_to_shot_list(args.session, shot_list, results)
+        if changed:
+            print(f"wrote {changed} mobile_* field change(s) back to shot-list.json")
+        else:
+            print("no mobile_* field changes to shot-list.json")
 
     return 2 if flags > 0 else 0
 

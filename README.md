@@ -14,6 +14,28 @@ Earlier work:
 
 People who build things and don't want marketing to be a second job. If you ship code, write posts, or run a side project and want explainer-style videos that match the cadence of your work (not a weekend of editing per video), this is the pipeline.
 
+## How the pipeline works
+
+**Widescreen (A) — the mandatory path:**
+
+- **Stage 0 — Scaffold.** Create the session directory and config.
+- **Stage 1 — Source → script.** Extract narration from raw source: core message → Act structure → screenplay v3.
+- **Stage 2 — Shot-list.** Convert screenplay into a per-beat shot-list.
+- **Stage 3 — Chunking.** Group beats into illustration-unit chunks.
+- **Stage 4 — Scene generation.** Narration audit → external-asset pre-flight → AI scene generation → vision audit of scenes.
+- **Stage 5 — Preprocess.** Build per-chunk reveal frame sequences.
+- **Stage 6 — Review board.** Human-reviewable HTML artifact.
+- **Stage 7 — Render.** Remotion assembles the widescreen master; mechanical render audit gates shipping.
+- **Stage 8 — Ship.** Rate post-process, captions, thumbnail, upload to YouTube.
+
+**Mobile (A.1) — optional fork after Stage 8:**
+
+- Crop widescreen scenes to 4:5 into `scenes/mobile/`, audit what's clipped, regenerate broken chunks at native 4:5.
+- Stitch mobile PNGs + shipped-rate audio into per-part 1080×1920 MP4s, burn captions with libass, auto-split on chunk boundaries if over the platform cap.
+- Generate per-part thumbnails and SRTs, upload to TikTok / Reels / Shorts.
+
+Full table with drivers, inputs, outputs, gates, and failure modes: **[PIPELINE.md § End-to-end flow](./PIPELINE.md#end-to-end-flow-decision-tree)**.
+
 ## Repo layout
 
 ```

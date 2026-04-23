@@ -28,6 +28,15 @@ End-of-pipeline: review and publish.
   - [Description structure](#description-structure)
   - [Workflow](#workflow)
   - [What this prevents](#what-this-prevents)
+- [Part 3 — Caption Styling (shared reference)](#part-3--caption-styling-shared-reference)
+  - [Prerequisites](#prerequisites)
+  - [Caption style (burned-in)](#caption-style-burned-in)
+  - [Cue stripping for burn-in](#cue-stripping-for-burn-in)
+- [Part 4 — Mobile Export from Widescreen (A.1, optional)](#part-4--mobile-export-from-widescreen-a1-optional)
+  - [When this applies](#when-this-applies)
+  - [Platform duration](#platform-duration)
+  - [Split mode + part badge](#split-mode--part-badge)
+  - [Mobile thumbnail](#mobile-thumbnail)
 
 ## Part 1 — Review Board
 
@@ -452,3 +461,223 @@ chunk titles + the session name, without reading the script. The
 result mis-sold the video — title implied "AI scores ads" when the
 actual finding was "AI's score and market score disagreed". The user
 caught it; the rule above is the systemic fix.
+
+## Part 3 — Caption Styling (shared reference)
+
+Applies to any burned-in caption path: widescreen-derived mobile (Part 4 below, Process A.1), mobile-first authoring (ROADMAP.md Process B) when it lands, any future subtitle-burn use case. Kept as a standalone reference so both paths consume the same atoms without copy-paste drift.
+
+### Prerequisites
+
+- **ffmpeg with libass.** The default homebrew ffmpeg formula does NOT include libass — the `subtitles` filter will be missing and every burn call will fail with *"No such filter: 'subtitles'"*. Install the libass-enabled build via the `homebrew-ffmpeg` tap:
+
+  ```
+  brew tap homebrew-ffmpeg/ffmpeg
+  brew install homebrew-ffmpeg/ffmpeg/ffmpeg
+  ```
+
+  Verify: `ffmpeg -filters 2>&1 | grep subtitles` must return a match. If it doesn't, the tap wasn't used.
+
+- **Caveat-Bold.ttf.** Bundled at `spoolcast/scripts/assets/fonts/Caveat-Bold.ttf`. Loaded by libass via `fontsdir=` — do NOT rely on system font resolution. Re-fetch from the fontsource CDN if missing: `https://cdn.jsdelivr.net/fontsource/fonts/caveat@latest/latin-700-normal.ttf`.
+
+### Caption style (burned-in)
+
+| Field | Value | Note |
+|---|---|---|
+| Font | Caveat Bold | matches the bumper house font |
+| Fontsize | 56 | libass `Fontsize=56` |
+| Primary colour | white | `PrimaryColour=&H00FFFFFF` |
+| Outline colour | black | `OutlineColour=&H00000000` |
+| Outline | 4 px | readable over any illustrated background |
+| Shadow | 0 | no drop shadow; keeps the mark clean |
+| Alignment | bottom-center | ASS `Alignment=2` (numpad convention) |
+| MarginV | 80 for 1920×1080 widescreen; 250 for 1080×1920 portrait | libass interprets MarginV as distance from the alignment anchor — see `scripts/burn_captions.py` for the known-good defaults per aspect |
+| Line length | max ~32 chars/line, 2 lines max | libass auto-wraps at word boundaries only when `WrapStyle=0` is set in the ASS Script Info. WrapStyle=2 disables word wrap entirely and long cues get clipped at the frame edge (caused visible caption loss like "enough to discover" → "ugh to discover" on our first mobile test). Always use `WrapStyle=0` for burned-in captions. |
+| Case | sentence case | ALL CAPS reads wrong against the quiet spoolcast tone |
+| Punctuation | keep commas + periods | natural narration punctuation; no emoji |
+
+### Cue stripping for burn-in
+
+The canonical SRT includes both narration cues and `[on-screen: …]` bracketed cues (SHIPPING.md § Captions). For burned-in captions, strip the bracketed cues — the frame already shows the on-screen text and repeating it in captions is redundant and clutters the thumb zone:
+
+```
+scripts/.venv/bin/python scripts/generate_srt.py \
+    --session <id> \
+    --exclude-onscreen-cues \
+    --out <working-dir>/<id>-burn.srt
+```
+
+`scripts/burn_captions.py` invokes this automatically when no `--srt` override is provided.
+
+## Part 4 — Mobile Export from Widescreen (A.1, optional)
+
+### When this applies
+
+When the user wants Reels / TikTok / Shorts variants *derived from* a shipped 16:9 video. Skipped entirely for YouTube-only videos, and for sessions authored mobile-first (ROADMAP.md Process B, which has its own chain).
+
+Consumes caption styling, font bundle, and libass prereq from § Part 3. The rest of this Part covers the A.1-specific bits: pipeline separation, output location, duration caps, split-into-parts, part badge, mobile thumbnail, overlay handling.
+
+### A (widescreen) vs A.1 (mobile) — separate pipelines, shared atoms
+
+| | A (widescreen) | A.1 (mobile) |
+|---|---|---|
+| Canvas | 1920×1080 | 1080×1920 (4:5 content centered) |
+| Renderer | Remotion (headless browser) | ffmpeg stitcher |
+| Scene source | `scenes/<chunk>.png` | `scenes/mobile/<chunk>-mobile.png` |
+| Bumper rendering | Remotion live-render (ROADMAP #5) | ffmpeg `drawtext` (A.1 temporary path) |
+| SVG overlay | Browser-native | `rsvg-convert` → PNG → ffmpeg overlay |
+| Meme / reuse composition | Remotion | ffmpeg overlay on parent mobile PNG |
+| Playback rate | 1.15× post-process from 1.0× | 1.15× inherited from A |
+| Captions | Separate SRT shipped alongside | Burned into video via libass |
+| Watermark | None (clean video) | Bottom-bar, fixed position |
+| Output | `renders/<session>-1.0x.mp4` + `-1.15x.mp4` | `renders/mobile/<session>-mobile-*.mp4` |
+
+**Shared atoms** (§ Part 3 Caption Styling): Caveat font bundle, Montserrat Black bundle, JetBrains Mono bundle, Comic Neue Bold bundle, libass prereq, WrapStyle=0, pad-color=black gotcha.
+
+**Separation principle:** A.1 has its own code path. Do not shim widescreen logic into A.1. When an A.1 path looks like "extract from the widescreen master and scale," that's a smell — check for a mobile-native source first (scene PNG, parent mobile PNG, shot-list `image_path`, drawtext live-render) before falling back.
+
+### Output location
+
+A.1 deliverables land under a `mobile/` subdirectory of `renders/` — keeps them conceptually in the session's renders but isolated from the A (widescreen) outputs:
+
+```
+sessions/<id>/
+  renders/
+    <id>-1.0x.mp4                      ← widescreen master (A, unchanged)
+    <id>-1.0x.srt                      ← widescreen SRT (A, unchanged)
+    mobile/
+      <id>-1.0x-mobile-9x16.mp4        ← A.1 mobile export
+      <id>-1.0x-mobile-9x16-pt1of3.mp4 ← split parts (when --split-duration is used)
+      <id>-1.0x-mobile-thumb-9x16.png  ← A.1 mobile thumbnail
+  working/
+    <id>-1.0x-mobile-9x16.ass          ← intermediate burn-ASS, stays in working/
+    <id>-1.0x-burn.srt                 ← intermediate burn-SRT, stays in working/
+```
+
+Intermediate ASS / SRT files stay under `working/` because they're pipeline byproducts, not deliverables.
+
+### Platform duration
+
+| Platform | Technical cap | Algorithm sweet spot |
+|---|---|---|
+| Instagram Reels | 20 min | ≤3 min for non-follower reach; ideal ≤90 s |
+| TikTok | 10 min | ≤60 s favored |
+| YouTube Shorts | 60 s (hard) | — |
+
+A video over a platform's preferred cap uploads fine but won't get pushed to non-followers. For source videos ≥60 s targeting TikTok/Shorts, use `export_mobile.py --split-duration 60` to produce multi-part exports.
+
+### Split mode + part badge
+
+- `--split-duration 60` cuts on chunk boundaries — never mid-sentence.
+- Output files: `renders/<session>-mobile-9x16-pt1of3.mp4`, `-pt2of3.mp4`, `-pt3of3.mp4`.
+- Every non-final part ends with a ~1 s "to be continued…" card (Caveat Bold, clean background) before hard cut. Final part just ends.
+- A "1/3" pill badge (Caveat Bold, top-right corner, white on subtle dark outline) burns into both the video and the mobile thumbnail for that part. The badge uses the same libass style atoms as Part 3 captions.
+
+### Per-part SRT upload files (A.1)
+
+In addition to burning captions into the video, each mobile part gets its own SRT file for upload as the platform's accessibility caption layer.
+
+- **Path:** `renders/mobile/<session>-mobile-pt<n>of<total>.srt`
+- **Content:** narration-only cues (no `[on-screen:]` bracketed cues — matches what's burned into the part's MP4).
+- **Time range:** windowed to the part's shipped-rate time range. Timestamps are rebased so each part's SRT starts at `00:00:00,000` and ends at the part's duration.
+- **Source:** derive from the session's shipped-rate SRT (e.g. `renders/<session>-1.15x.srt` if shipped at 1.15×), stripping `[on-screen:]` cues and windowing to the part's range.
+- **Use:** upload alongside the corresponding `pt<n>of<total>.mp4` to TikTok / Reels / Shorts. The burned captions handle the visual display; the uploaded SRT powers accessibility features (screen readers, auto-caption toggles, language detection).
+
+### Pre-upload checklist (A.1)
+
+Before publishing any mobile part:
+
+1. **Video**: 1080×1920, duration ≤ platform cap (computed at shipped rate), libass burn has no font-fallback warnings.
+2. **Captions**: burned in Montserrat Black, top-anchored at the designated y, WrapStyle=0 active, no clipping at frame edges.
+3. **Watermark**: `artlu.ai` bottom-left, `made by spoolcast` bottom-right present on every frame.
+4. **Part badge**: `part N of M` on top black bar, centered.
+5. **SRT**: per-part file exists, duration matches the MP4, narration-only (no `[on-screen:]` cues).
+6. **Thumbnail**: 1080×1920 full-screen, title + part indicator baked in, no letterbox bars.
+7. **Playback rate**: MP4 duration = widescreen master's duration / shipped-rate × (part fraction). If off by more than 1%, rate parity broke somewhere.
+
+A mismatch on any of (1), (5), (7) is the class of failure most likely to slip through — catch at this checklist stage, not after viewers flag it.
+
+### Pipeline script location (A.1)
+
+- **Production path (planned):** `scripts/mobile_export.py` — replaces the current test stitcher. Uses `scripts/caption_assets.py` for ASS generation, `scripts/replay_mobile.py` for chunk regens at new aspects, `scripts/audit_mobile_crops.py` for legibility audits.
+- **Current state:** `/tmp/build_mobile_test.py` is a session-specific test harness with hardcoded rate and paths. Graduating it to `scripts/mobile_export.py` means parameterizing session id, auto-detecting shipped rate, and wiring into the full Post-Stage 8 chain (PIPELINE.md § Post-Stage 8).
+- **Shared helpers already at scripts/:** `caption_assets.py`, `replay_mobile.py`, `audit_mobile_crops.py`, `burn_captions.py`. Do NOT duplicate logic from these into the stitcher — import and reuse.
+
+### Mobile thumbnail (A.1)
+
+Separate artifact from the video. Key differences from widescreen thumbnail:
+
+- **Full-screen 1080×1920** (9:16) — unlike the video which uses 1080×1920 canvas with 4:5 content + letterbox bars, the thumbnail has NO bars. Covers the entire phone preview area in social feeds.
+- **Per-part** when the mobile export is split. Split into 3 parts → 3 thumbnails. Each thumbnail carries its part's visual identity.
+- **Title + part indicator baked in.** Unlike the widescreen thumbnail (prompt-only, no text overlay), the mobile thumbnail composites BOTH the video's title and a part indicator onto the base image:
+  - **Title** — the video's promotional title. Caveat Bold, large (≈120–160 px at 1080-wide canvas). Positioned upper or lower third depending on base image content.
+  - **Part indicator** — e.g. `PART 1 OF 2`. Montserrat Black, smaller (≈50–70 px). Positioned above OR below the title — consistent placement per session across all parts.
+- **Base image** — either (a) a kie.ai-generated 9:16 thumbnail (prompt-only, matching widescreen convention) or (b) a representative scene scaled-to-cover 9:16. Option (a) is preferred when the video has a distinct cover concept; option (b) is a stopgap using an existing scene asset.
+- **File naming:** `renders/mobile/<session>-mobile-thumb-pt1of2.png`, `-pt2of2.png`, etc. One file per part.
+
+A session that ships N mobile parts publishes N mobile thumbnails — one uploaded per TikTok / Reels / Shorts post.
+
+### Mobile is a separate pipeline from widescreen
+
+Mobile export (A.1) and widescreen export (A) are **separate pipelines**, not a shared one with mobile as a special case. Do not shim widescreen logic into mobile paths. A.1 has its own scene assets (`scenes/mobile/`), its own canvas (1080×1920 with 4:5 content), its own caption geometry, its own bumper rendering, its own meme handling.
+
+When extending A.1, write A.1-native code. Do not default to "extract from the widescreen master and scale." Extracting from widescreen is a fallback only for pure external broll where no mobile-native source exists — everything else (generated scenes, bumpers, memes, reuse chunks) should resolve to a mobile-native asset. Silently reaching for widescreen is how a mobile export ends up looking like a shrunk widescreen.
+
+### Playback rate parity with widescreen
+
+Mobile export plays at the same rate as the shipped widescreen master. **The rate varies per session** — common values are 1.0×, 1.1×, 1.15×, 1.2×. There is no universal mobile rate; read it from session metadata (or infer from the shipped master's duration ÷ the 1.0× archive's duration).
+
+Whatever the shipped rate, all three must match: audio (from the rate-matched master), video (concat at 1.0× then `setpts=PTS/rate`), and captions (rate-matched SRT). Using the 1.0× SRT against a 1.15× master — or any combination — drifts narration vs captions.
+
+### Mobile layout conventions (A.1 only)
+
+Apply to mobile exports only. Widescreen (A) outputs are unaffected.
+
+- **Canvas** 1080×1920; 4:5 content area (1080×1350) centered vertically; 285-px black letterbox bars top and bottom.
+- **Caption anchor (conditional)** — caption alignment depends on estimated line count after wrap:
+  - **1–3 lines (the common case):** top-anchored, ASS `Alignment=8`, caption top edge at y≈1660 (≈25 px gap below the content area bottom at y=1635). Multi-line captions grow DOWNWARD; the first-line position is invariant across 1-, 2-, and 3-line cues.
+  - **4+ lines (rare, long cues):** bottom-anchored, ASS `Alignment=2`, caption bottom baseline at y≈1830 (≈10 px gap above the watermark top). Caption grows UPWARD into the content area, partially overlapping the video frame bottom. Accepted overlap: long cues are rare and the alternative (captions off-screen) is worse.
+  - Heuristic for classification: estimate chars-per-line at ~18 at Fontsize 70 in Montserrat Black in a 1020-px caption area, divide cue text length, round up. If ≥ 4, use bottom-anchored style; else top-anchored.
+- **Caption side margins** `MarginL = MarginR = 30` — captions may stretch close to the horizontal edges but not touch them. Gives the wrap algorithm plenty of width to keep sentences on fewer lines.
+- **Watermark position is invariant across all mobile exports.** `artlu.ai` (JetBrains Mono) bottom-left of the bottom bar, Alignment=1. `made by spoolcast` (Comic Neue Bold) bottom-right, Alignment=3. Never moves, never resizes proportional to caption size. Treat these as fixed brand placement, not tunable parameters.
+- **Part badge** (when `--split-duration` is used) top-center of the top bar, ASS `Alignment=8`, MarginV chosen so badge is centered in the 285-px top bar (≈MarginV=150 at Fontsize=60 in Montserrat Black).
+- **Meme inserts** are composited on top of the chunk's 4:5 scene PNG (or the parent's 4:5 scene when `image_source=reuse`), NOT a scaled-down widescreen composite. If a chunk's widescreen frame was `meme image over scene`, the mobile frame is `meme image over 4:5 scene` — the meme stays at its authored size relative to the mobile canvas, not shrunk by the 1.78→0.80 aspect change.
+- **Overlay width scaling for mobile:** overlays declared in the shot-list's `overlays` field carry widescreen-normalized widths (fraction of 1920-px canvas). On mobile, multiply the declared `width` by 1.8× before compositing, clip to 0.9 max. Rationale: the 4:5 mobile canvas has more vertical real estate than 16:9, so a normalized overlay at the same proportion feels visually smaller. The 1.8× multiplier restores perceptual weight. Positions (x, y) are NOT scaled — only width.
+
+### SVG overlay rasterization (A.1 only)
+
+ffmpeg has no SVG decoder. Widescreen uses Remotion's headless-browser SVG rasterization; A.1 cannot share that. For any overlay declared as SVG in the shot-list's `overlays` field, rasterize to PNG via `rsvg-convert` (from `librsvg`) before compositing:
+
+```
+rsvg-convert --width 1080 --keep-aspect-ratio --output <dest>.png <source>.svg
+```
+
+Cache the rasterized PNG under `working/` during a stitch run. Feed the PNG to ffmpeg's overlay filter.
+
+**Dependency:** `brew install librsvg` (macOS) or equivalent. Verify with `which rsvg-convert`.
+
+### Reuse punchline composition (A.1)
+
+For `image_source: reuse` chunks (e.g. punchline chunks C3P/C10P/C28P that reuse a parent's scene with an overlay on top), the A.1 composition flow is:
+
+1. Resolve the parent chunk id from the shot-list's `image_path` field (e.g. `source/generated-assets/scenes/C3.png` → parent `C3`).
+2. Use `scenes/mobile/<parent>-mobile.png` as the base. If the parent has no mobile PNG yet, fall back to the parent's widescreen PNG scaled-to-fit with black pad (last resort).
+3. For each overlay in the chunk's `overlays` field:
+   - Resolve asset. If SVG, rasterize via `rsvg-convert` (see above).
+   - Width: `overlay.width * 1080 * 1.8` (mobile overlay multiplier, clipped to 0.9 max).
+   - Position: `(overlay.x * 1080, overlay.y * 1350)` anchored at the overlay's center.
+   - Composite via ffmpeg `overlay` filter.
+4. Scale the composited result to 1080×1350 with black pad, write the clip.
+
+**What NOT to do:** extract the composited region from the widescreen master and scale it down. The widescreen composite is at 16:9 proportions; scaling to 4:5 shrinks the overlay and imports the "widescreen-looking" aesthetic into A.1. The overlay must be applied at A.1's native canvas.
+
+### Broll fallback (A.1)
+
+Pure broll chunks (`image_source: broll / external_*`) that have no mobile scene PNG and no overlay list fall back to extracting the chunk's segment from the **1.0× widescreen master** (not the 1.15×), scaled-to-fit 1080×1350 with black pad. Rationale: all other A.1 clips are built at 1.0× durations (image-loops with `-t <dur_1x>`); the final ffmpeg step applies `setpts=PTS/1.15` to speed everything up uniformly to 1.15×. Using the 1.0× master here keeps pace consistent. Using the 1.15× master would double-speed the broll segment.
+
+This is the only acceptable widescreen-master extraction in A.1. Every other chunk source (generated scene, bumper, meme, reuse) must resolve to a mobile-native asset.
+
+### Compositing gotcha: pad color
+
+When scaling scene PNGs into a mobile canvas via `ffmpeg -vf "scale=...:force_original_aspect_ratio=decrease,pad=W:H:X:Y:color=..."`, the scale step can produce sub-pixel rounding (e.g. 820→1080 scale yields 1349.75 → 1349 rendered height instead of the 1350 target). The pad then fills the 1-pixel gap. If `color=white`, a visible white hairline fringe shows up where the scaled content meets the pad.
+
+Fix: set `color=black` on the inner pad so any sub-pixel fringe blends with the outer 9:16 letterbox bars (which are also black). Applies to any compositing step that stacks scale + pad. Noticed on our first mobile test as a 1px white border at the content-bar boundary.

@@ -38,7 +38,7 @@ def fmt_timestamp(sec: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def generate_srt(session: str, out_path: Path | None) -> Path:
+def generate_srt(session: str, out_path: Path | None, exclude_onscreen_cues: bool = False) -> Path:
     preview_path = REPO_ROOT / "src" / "data" / "preview-data.json"
     shot_list_path = CONTENT_ROOT / "sessions" / session / "shot-list" / "shot-list.json"
     if not preview_path.exists():
@@ -91,8 +91,10 @@ def generate_srt(session: str, out_path: Path | None) -> Path:
         # reads it as "this is what's visible on the frame" rather than
         # dialogue. Lets sound-off viewers (YouTube mobile, captions
         # dashboards, accessibility readers) see every rendered word.
+        # Excluded from burned-in mobile captions (the frame already shows
+        # the text — burning it again is redundant and clutters).
         osts = on_screen_by_chunk.get(chunk_id)
-        if osts:
+        if osts and not exclude_onscreen_cues:
             abs_start = chunk_start / fps
             abs_end = chunk_end / fps
             label = " / ".join(osts)
@@ -121,8 +123,17 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Generate an SRT caption file from preview-data + shot-list.")
     p.add_argument("--session", required=True, help="session id")
     p.add_argument("--out", default=None, help="output path (default: sessions/<id>/renders/<id>.srt)")
+    p.add_argument(
+        "--exclude-onscreen-cues",
+        action="store_true",
+        help="omit [on-screen: ...] bracketed cues (for burned-in mobile captions where they'd duplicate rendered frame text)",
+    )
     args = p.parse_args()
-    generate_srt(args.session, Path(args.out) if args.out else None)
+    generate_srt(
+        args.session,
+        Path(args.out) if args.out else None,
+        exclude_onscreen_cues=args.exclude_onscreen_cues,
+    )
 
 
 if __name__ == "__main__":

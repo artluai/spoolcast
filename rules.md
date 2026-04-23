@@ -33,6 +33,7 @@ Violating this protocol is how iteration loops get born — the agent runs ahead
 | Images exist, no `frames/` | Stage 5 — preprocessing | VISUALS.md § Preprocessor |
 | `frames/` + audio + shot-list all present | Stage 7 — render | PIPELINE.md § Render Config |
 | Rendered mp4 exists | Stage 8 — shipping | SHIPPING.md |
+| Rendered 16:9 mp4 exists, mobile variants requested | Post-Stage 8 — mobile export from widescreen (A.1, optional) | SHIPPING.md § Mobile Export from Widescreen |
 
 Run `scripts/validate_shot_list.py --session <id>` at any point to confirm the shot-list is schema-valid before proceeding. `build_preview_data.py` runs the validator automatically before emitting preview-data.
 
@@ -108,7 +109,8 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
 - Shared docs should avoid absolute local paths unless a path is truly required to make something work.
 - **The core message is confirmed with the user before any screenplay or narration drafting.** Propose 2–3 candidates in plain language with tradeoffs, wait for the user to pick or rephrase. See STORY.md § 3 Job E. Guessing the core message and proceeding is the single biggest process failure in Stage 1.
 - **Review artifacts are exactly two things: the short version in chat, and the final shot-list xlsx.** Source analysis, screenplay v1/v2/v3 prose, voiceover scripts — written to disk for traceability but NEVER linked to the user for review. See STORY.md § Review-Artifact Policy.
-- **Lead with the plain-English version when presenting to any viewer — user in chat or YouTube audience.** Technical terms are allowed only after the plain version exists, and only with an in-line explanation on first use. See STORY.md § Layman-first explanation rule. Caught repeatedly: jargon-first fixes forced the user to ask *"can you explain in layman terms"* when the plain version was one sentence away.
+- **Lead with the plain-English version when presenting to any viewer — user in chat or YouTube audience.** Before any technical explanation in chat, write the plain-English version first. Do not gate it on "the user seems technical" or "the context is technical." If the user has already asked for the plain version in this session, assume they want it for every technical topic until they explicitly ask for depth. Technical terms are allowed only after the plain version exists, and only with an in-line explanation on first use. See STORY.md § Layman-first explanation rule. Caught repeatedly: jargon-first presentations force the user to ask *"can you explain in layman terms"* when the plain version was one sentence away.
+- **Bundle pipeline assets (fonts, small binaries, reference weights) in the repo over brew/apt/system installs**, when license and size allow. A fresh clone should run end-to-end without a shopping list of casks and taps. Prereqs that genuinely can't be vendored (e.g. a libass-enabled ffmpeg) live in the relevant rule file's prerequisites section as a named one-liner, not implicit tribal knowledge.
 
 ## If There Is A Conflict
 
@@ -140,6 +142,10 @@ If you need progress visibility on a long command:
 - For background tasks, read the output file directly without piping
 
 If you're sure a command is hanging (no output for >2x expected time), verify with `ps aux | grep <name>` to check if the process is alive and consuming CPU before killing it.
+
+### Diagnostic anti-pattern: silent cwd drift
+
+Bash-tool invocations of local scripts must use absolute paths, or `cd <abs> && ...` first. Relative paths like `scripts/.venv/bin/python ...` silently fail with *"no such file or directory"* when the cwd drifted between calls — often because a prior command changed directories or ran without one. Symptom: task exits 0 with a "not found" error on a script you know exists. Defensive default: `cd /absolute/repo/root && <command>`.
 
 ### User request vs existing rule
 
@@ -191,6 +197,40 @@ Why this matters: causal models of bugs are always partial. A diagnosis that exp
 Failure mode this prevents: agent fixes the mechanisms it diagnosed, declares done based on diagnostic closure, user points out the symptom is still there, cycle repeats. The audit breaks the cycle because the artifact is either passing or not — independent of what the agent believes about its own fix.
 
 Applies in both human-in-loop and autonomous modes. The only difference is who reads the failure report when the audit fails.
+
+### Empirical verification beats logical inference
+
+When claiming two things are equivalent — prompts, configs, outputs, API calls — produce the comparison artifact. Do not produce a logical argument that they should be equivalent. Code inspection cannot detect drift in shared mutable state (shot-lists, session configs, any on-disk input that may have been edited between runs).
+
+Red-flag phrases to self-censor: *"verified in code"*, *"they go through the same code path so they're the same"*, *"the logic looks identical"*. These upgrade "inferred from reading" to "verified" — a small but real dishonesty, and one that makes the bug this category invisible to the user.
+
+When a fast-path logic argument looks sufficient, name the tradeoff explicitly: *"I can verify by code inspection in X seconds, or by actual output diff in Y seconds"* — let the user pick.
+
+Concrete pattern that caused the rule:
+- Widescreen scene generated months ago with `on_screen_text=None`.
+- Cleanup script later set `on_screen_text=[]` (empty list) on the same chunk.
+- Mobile regen run today went through the "same code path" but took a different branch on `[]` vs `None`, producing a prompt WITHOUT the Scene section.
+- Model invented a scene. Checklist said "verified in code." Nothing was actually verified.
+
+Setup-heavy beats workflow-corrupted: a slower, more explicit setup pays off across the whole downstream workflow. Shortcut at setup = drift everywhere downstream.
+
+### Recon before plan, plan before build
+
+For any non-trivial feature: (1) recon pass over the relevant rule files and the scripts the feature touches, (2) write the implementation plan in chat — schema additions, new scripts, build order, rule-file updates — and wait for sign-off, (3) build. Skipping step 2 is how "I thought we agreed on X" cycles start. The recon is cheap; the wrong-code retraction is expensive.
+
+The plan is a contract, not a doc. It states what will change, where, and in what order. If the plan changes mid-build (a constraint is discovered, a design turns out to be wrong), surface the revision in chat before continuing — the user signed off on the old contract, not the new one.
+
+This applies to feature work that touches more than one file, more than one stage, or introduces new fields/scripts. Trivial changes (one-line fix, typo, local edit inside a single function) do not need a recon pass.
+
+### Prompt-engineering stall signal
+
+When a prompt loop stalls after 2–3 iterations producing the same failure mode, stop iterating on the prompt and question whether the INPUT is right. Change the input, not the prompt.
+
+Concrete: four `audit_scenes.py` prompt revisions failed to catch text-clipping in 9:16 center-crops because the model was being asked to imagine the crop (a geometric task Qwen-VL is unreliable at — strong "centered = safe" bias). Inverting the input — pre-crop the image and audit the cropped result — worked on the first try. `scripts/audit_mobile_crops.py`.
+
+### Test on one before the batch
+
+For any paid-per-call operation (kie.ai regen, vision audit, render), run on a single item and visually verify before the full batch. Catches drift, prompt bugs, and composition regressions for the cost of one unit. Pattern: `--only <one>` → inspect → `--only <all>`. Applies whenever the loop body incurs real money or long render time per iteration.
 
 ### Pre-Pass Rule
 

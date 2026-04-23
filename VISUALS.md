@@ -249,7 +249,30 @@ Generated scenes fail most often on three failure classes, all preventable at pr
 3. **Prefer simple poses over clever ones.** Current image models reliably break on poses where the character's anatomy is partially occluded, contorted, or holding multiple things — heads under hoods, hands gripping multiple props, characters mid-motion, face obscured by objects. The first move is to simplify the pose in `visual_direction` rather than fight the model. If a specific pose is editorially required and keeps breaking, use a reference image for the character (declared in the chunk's `references`) — but that's the escape hatch, not the default.
 4. **Empty text slots get invented.** If the visual mentions anything that holds words (card, page, sign, screen, label, document, book, banner, poster, ledger), either write the exact words into `on_screen_text` OR say it's `blank` / `wordless` / `no text` / `out of focus` / `illegible` inside `visual_direction`. Never leave it ambiguous — the generator will fill the empty slot with invented text, and the invention is almost never what you wanted.
 
-Post-generation check: `audit_scenes.py` runs a vision pass (Qwen-VL) on every generated scene and flags extra limbs, malformed faces/hands, duplicate characters, missing declared on-screen text, hallucinated text, and composition overload. A non-empty audit blocks render the same way `audit_narration.py` does.
+Post-generation check: `audit_scenes.py` runs a vision pass (Qwen-VL) on every generated scene and flags extra limbs, malformed faces/hands, duplicate characters, missing declared on-screen text, hallucinated text, composition overload, and **structural mobile-safety** (split-panels, focal in a side-third). A non-empty audit blocks render the same way `audit_narration.py` does — except the mobile flags, which do not block the widescreen render but populate `mobile_unsafe: true` and a suggested `mobile_focal` on the shot-list chunk.
+
+The widescreen-based mobile-safety check is a coarse first pass. It does NOT reliably catch text-clipping on text-heavy scenes — the model has a strong "centered = safe" bias and will not imagine the crop to inspect what lives in the side thirds. For the authoritative legibility check, run `audit_mobile_crops.py` on the already-cropped mobile PNGs (see `scripts/audit_mobile_crops.py`). That audit looks at what the mobile viewer actually sees and flags chunks where essential content was clipped at the frame edge. Writes `working/mobile-crop-audit.json`.
+
+**A.1 audit flow in full:** (1) `audit_scenes.py` widescreen pass — catches structural + flags coarse mobile-safety, (2) crop all widescreen scenes to `scenes/mobile/` per the A.1 fill-order rule, (3) `audit_mobile_crops.py` on the cropped outputs — this is the authoritative legibility check. The widescreen pass alone is not sufficient for mobile shipping; always run the post-crop audit before mobile export.
+
+##### Mobile-variant scene generation (A.1)
+
+When a chunk is flagged `mobile_unsafe: true` and the user runs the optional mobile-export chain (SHIPPING.md § Part 4), `generate_scene.py --mobile-variant` produces a portrait-native scene for that chunk. The generator passes the target mobile aspect ratio (9:16 or 1:1) to the provider so the model composes the scene *for* the mobile canvas — it does not crop a 16:9 render. Existing prompt-hygiene rules apply unchanged; there is no special hygiene rule for mobile regens because the generator is already composing at the mobile aspect, so crop-margin concerns don't apply.
+
+A mobile-first authoring path (ROADMAP.md Process B — sessions composed natively at 9:16 from chunk 1) skips this flag entirely: every scene in a Process B session is generated at the mobile aspect from the start, and `mobile_unsafe` / `mobile_focal` are meaningless there because no cropping ever happens.
+
+##### Aspect ratio is a compositional input
+
+The same prompt at different aspect ratios produces different compositions. The model adapts to fill the canvas — taller canvases tend to get additional invented elements (extra panels, extra characters, extra dialogue) that weren't in the prompt. Byte-identical prompts at 16:9 vs 1:1 vs 4:5 are NOT interchangeable: replaying a widescreen prompt at a mobile aspect does not produce "the widescreen image cropped" — it produces a new composition.
+
+Two non-interchangeable paths when mobile output is needed:
+
+- **Identical content at a new aspect** → crop the existing widescreen asset (lossy, may lose edge content).
+- **New composition optimized for the aspect** → regenerate with the new aspect (may diverge from the widescreen narrative).
+
+A feature or script that involves aspect change must document which path it uses. Never conflate.
+
+Concrete example from this session: C25 had a prompt describing 3 side-by-side option cards. At 16:9 the model drew exactly that. At 1:1, with the same prompt, the model added 2 bottom sub-panels with invented character dialogue to fill the taller canvas.
 
 ##### Previous-video broll framing
 
@@ -291,7 +314,8 @@ An asset is not valid if it is:
 #### Canonical Asset Output Locations
 
 Generated scenes:
-- `../spoolcast-content/sessions/<session-id>/source/generated-assets/scenes/`
+- `../spoolcast-content/sessions/<session-id>/source/generated-assets/scenes/` — widescreen masters (`<chunk>.png`)
+- `../spoolcast-content/sessions/<session-id>/source/generated-assets/scenes/mobile/` — mobile-variant PNGs (`<chunk>-mobile.png`) when Process A.1 regeneration has run
 
 Fetched external assets (alternate mode only):
 - `../spoolcast-content/sessions/<session-id>/source/fetched-assets/`
@@ -318,9 +342,9 @@ Required top-level fields:
 - `items`
 
 Required per-item fields:
-- `id` — scene id, typically equal to `chunk_id`
+- `id` — scene id; equals `chunk_id` for widescreen items, `<chunk_id>-mobile` for mobile variants
 - `chunk_id`
-- `role` — allowed values: `scene`
+- `role` — allowed values: `scene` (widescreen A master), `scene-mobile` (A.1 mobile variant)
 - `model` — kie.ai model name used
 - `prompt` — the full prompt sent to the provider
 - `task_id`
@@ -335,6 +359,28 @@ Optional per-item fields:
 - `output_format`
 - `image_input` — references to anchor images used
 - `notes`
+- `post_processing` — object recording any transform applied to the kie.ai delivery (crop, scale, letterbox, color-correct). Shape: `{"step": "<short-name>", "<param>": "<value>"}`. Example: `{"step": "center-crop-1x1-to-4x5", "crop": "820:1024:102:0"}`. Makes the asset's full transformation history reproducible without re-deriving from code.
+- `replay_source_task_id` — for items produced by `replay_mobile.py`, the `task_id` of the widescreen manifest entry whose prompt + image_input were replayed.
+
+##### Manifest race condition (known failure mode)
+
+`generate_scene.py`'s manifest write is a read-modify-save sequence, not an atomic transaction. When two processes run `generate_scene.py` (or `batch_scenes.py`) concurrently against the same session, both load the same manifest snapshot, each appends its item to its own in-memory copy, and each saves — the second writer's save silently drops the first writer's item. The orphaned chunk keeps its PNG on disk but loses its manifest entry.
+
+Consequence: orphaned chunks cannot be byte-faithfully replayed at a new aspect (`replay_mobile.py` requires a manifest entry with the original prompt + image_input). They fall back to re-derivation via `batch_scenes.py`, which carries drift risk since the shot-list can have mutated since the original run.
+
+Mitigation currently in `generate_scene.py`: the manifest read + mutate + write is wrapped in an exclusive `fcntl.flock` on the manifest file (`_locked_manifest_rw`). Serializes concurrent writers — one waits while the other finishes the full cycle. POSIX-only; on non-POSIX hosts the race returns. Not a concern on macOS/Linux.
+
+Known incident: `spoolcast-dev-log` found with 4 chunks (C6, C28, C39, C41) orphaned. Root cause was two parallel `batch_scenes.py` runs writing to the manifest concurrently. The lock fix above landed after this incident.
+
+##### Manifest is ground truth for historical generations
+
+The shot-list is mutable — fields drift via backfill, normalization, audit write-backs. The manifest is append-only per generation and records the exact `prompt` + `image_input` sent to kie.ai.
+
+- Reproducing or replaying a past call → read manifest.
+- Current authoring intent → read shot-list.
+- Byte-faithful replay requires the manifest; `compose_prompt` re-derives from the current shot-list and can diverge silently when shot-list fields have been edited since the original generation.
+
+See `scripts/replay_mobile.py` — submits the manifest's widescreen prompt + image_input verbatim to kie.ai with only `aspect_ratio` overridden, bypassing `compose_prompt` entirely.
 
 #### Kie Provider Spec
 
