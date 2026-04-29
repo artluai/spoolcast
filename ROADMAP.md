@@ -142,6 +142,33 @@ So per-chunk cost goes up ~3-10x relative to a still. Budget-aware default: chea
 
 ---
 
+## 7. Split-focus camera tricks for mobile re-framing
+
+**What:** when a widescreen scene has 2+ subjects laid out horizontally (builder + ai-figure across desk, side-by-side panels, before/after composites) and the chunk's duration is long enough (≥6s), the mobile re-frame animates a Ken-Burns-style pan from subject A in the first half to subject B in the second half — instead of cropping both into a single 9:16 frame and losing comprehension.
+
+**Why:** the mobile-crop comprehension audit (SHIPPING.md § Mobile-crop audit) flags chunks where 2-subject horizontal compositions get gutted by the 9:16 crop (caught broadly on dev-log-03 mobile — C13 side-by-side, C17 builder+ai-figure, C18 balance scale). Today the only fix is to regenerate at 9:16 native with vertical compositions, which sometimes fights the editorial intent. A timed pan keeps the original framing and uses chunk duration as the editorial unit.
+
+**Spoolcast side:**
+- New chunk field (schema addition): `mobile_pan` (or similar) — `{from: "left", to: "right", ease: "smooth"}` or `{focus_a_until_sec: 4.0}`.
+- Preprocessor extension: when `mobile_pan` is set, generate frame sequences that translate the source 16:9 image across the 9:16 viewport over the chunk's duration.
+- Audit recognition: `audit_mobile_crops.py` accepts pan-equipped chunks as a valid alternative to vertical regen — judges comprehension across the full pan, not a single frame.
+- Editorial gate: only valid for chunks ≥6s; shorter chunks revert to regen.
+
+**Editorial rules (to codify when this ships):**
+- One pan per chunk maximum; no chained pans.
+- Pan direction is editorial — left-to-right for "this happened then this," right-to-left rare.
+- Pan timing splits chunk duration cleanly — first half on subject A, hold ~0.5s, smooth pan to B for second half.
+- Not a fallback for everything — use deliberately on high-impact 2-subject moments. Vertical regen is still the default for crowded compositions, race-line scenes, etc.
+
+**Not in scope:**
+- Multi-subject (3+) pans.
+- 3D parallax.
+- Mid-chunk cuts (use chunk-split instead).
+
+**Depends on:** Remotion composition supporting per-chunk transform animations driven by chunk metadata.
+
+---
+
 ## How this file gets updated
 
 ## 5. Remotion-native bumper rendering

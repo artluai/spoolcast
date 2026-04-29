@@ -314,7 +314,7 @@ class VisionClient:
         try:
             response = self._client.chat.completions.create(
                 model=self.model,
-                max_tokens=700,
+                max_tokens=3000,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {

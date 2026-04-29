@@ -309,6 +309,7 @@ Each stage must have:
 - a known input
 - a known output
 - a clear validation step
+- **an audit pass before declaring done.** A stage isn't done until its audit script passes (`audit_mobile_crops.py`, `audit_render.py`, `audit_narration.py`, etc.). Production-script exit-0 is necessary, not sufficient.
 
 Do not blur these stages together.
 
@@ -325,6 +326,10 @@ Within Stage 4 (scene generation), produce assets in this order:
 5. **TTS batch last.** Narration text is locked by now; any script edit triggered by a visual issue would have been caught in step 3.
 
 Why the ordering: external assets are real-world constraints. If one doesn't work, the chunk has to change, and any AI generation done against the old chunk spec is wasted. Front-loading the zero-cost work protects the spend on the variable-cost work.
+
+##### Audit-gated stage outputs
+
+Production scripts with associated audits must gate output on the audit. `mobile_export.py` runs `audit_mobile_crops.py`; `render_with_audit.sh` already does this for widescreen render. Pattern: pre-flight (refuse to start) or post-flight (refuse to publish). Override only with an explicit `--skip-audit` flag for intentional preview-only iterations.
 
 ##### Asset QA pass (within Stage 4)
 
@@ -724,6 +729,7 @@ Every session must have a session config at:
 - `scene_fps` — integer. Default: `30`.
 - `resolution` — string. Default: `2K`. Allowed: `1K`, `2K`, `4K`.
 - `aspect_ratio` — string. Default: `16:9`.
+- `mobile_aspect` — string. Default: `9:16`. Allowed: `9:16` (full-frame portrait), `1:1` (square letterboxed inside the 1080×1920 mobile canvas). Declared at Stage 0 because the choice affects scene composition (1:1 preserves more horizontal layouts; 9:16 accepts more aggressive vertical reframing), the mobile-crop comprehension audit's expectations, and how thumbnails should be staged. Late-binding aspect at mobile-export time means scenes get composed for one aspect and cropped to a different one, breaking the audit. Pick once at Stage 0; pick holistically — the mobile aspect, the widescreen aspect, and the thumbnail aspect should be considered together (e.g. a 9:16 thumbnail constrains the mobile choice toward 9:16).
 - `output_format` — string. Default: `png`.
 - `notes` — string. Human notes, not read by any pipeline.
 

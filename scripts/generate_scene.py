@@ -46,14 +46,18 @@ CONTENT_ROOT = REPO_ROOT.parent / "spoolcast-content"
 
 MOBILE_PREAMBLE = (
     "This scene is being regenerated for a 9:16 portrait mobile video. "
-    "Compose everything for a tall vertical canvas — the widescreen original "
-    "won't survive a mobile center-crop, so rebuild the scene to fit the "
-    "portrait frame naturally. If the visual direction below describes a "
-    "horizontal layout (side-by-side panels, left/right positioning, "
-    "split-frame), restructure it as a vertical arrangement (stacked panels, "
-    "top/bottom positioning, upper-half / lower-half). Keep all declared "
-    "on_screen_text legible inside the portrait canvas. Existing style "
-    "anchor applies unchanged."
+    "Render the SAME single-scene composition the visual direction below "
+    "describes, just framed for a tall vertical canvas instead of widescreen. "
+    "Do NOT produce a multi-panel comic strip, a sequence of frames, or a "
+    "before/after time-lapse — render ONE single scene matching the beat. "
+    "Only if the beat description explicitly names a horizontal side-by-side "
+    "layout (e.g. 'left panel ... / right panel ...', 'A vs B' compared "
+    "side-by-side), restack those two panels vertically (top/bottom). For "
+    "every other beat — single-character scenes, single-prop scenes, "
+    "diagrams with one focal subject — keep it as ONE scene, recomposed "
+    "vertically with the subject filling the portrait frame. Keep all "
+    "declared on_screen_text legible inside the portrait canvas. Existing "
+    "style anchor applies unchanged."
 )
 
 

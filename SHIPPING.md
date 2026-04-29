@@ -430,6 +430,14 @@ the viewer can already see in the title.
 6. Generate captions via `generate_srt.py` — both narration AND on-screen
    text are included (see Captions rule below)
 
+#### Publish order when mobile parts exist: widescreen first, then mobile
+
+When a session ships both a widescreen master AND mobile parts (A.1 split), the widescreen uploads first and its URL is the source-of-truth reference. Any mobile-part caption that links back to the full video (typically Part 2's caption pointing at the widescreen) gets the URL filled in ONLY AFTER the widescreen is live.
+
+Do NOT pre-fill placeholder URLs in mobile-part captions. A guess like `youtu.be/xxxxxxx` that turns out wrong ships viewers to the wrong video (or a sibling session's URL from an old tracker entry). If the mobile parts are drafted before the widescreen publishes, leave the URL slot as a literal `{{widescreen_url}}` token in the draft — substitute after publish, verify by clicking, then upload mobile.
+
+Caught on dev-log-02: Part 2 caption drafted with the previous dev-log's URL reused as a placeholder. Would have shipped viewers from Part 2 to dev-log-01 if not caught.
+
 #### Captions (SRT) must include on-screen text
 
 The caption file ships both **narration** and **on-screen text** as cues. Narration alone isn't enough — a large share of YouTube viewers watch with sound off (mobile, autoplay, work-safe), and any text rendered inside the video's frames (rule cards, labels, stamps, titles) is invisible to them unless the caption includes it.
@@ -479,21 +487,57 @@ Applies to any burned-in caption path: widescreen-derived mobile (Part 4 below, 
 
 - **Caveat-Bold.ttf.** Bundled at `spoolcast/scripts/assets/fonts/Caveat-Bold.ttf`. Loaded by libass via `fontsdir=` — do NOT rely on system font resolution. Re-fetch from the fontsource CDN if missing: `https://cdn.jsdelivr.net/fontsource/fonts/caveat@latest/latin-700-normal.ttf`.
 
-### Caption style (burned-in)
+- **Tesseract + pytesseract** (required for A.1 smart-crop). Used by `smart_crop_mobile.py` to deterministically locate text regions — overrides Qwen's text-bbox predictions, which drift spatially by 0.3–0.5 of the frame width and produce bad crops for any chunk with a speech bubble, label, or readable artifact. The code wraps `import pytesseract` in try/except (so `smart_crop` won't hard-fail without it), but without OCR it regresses to Qwen-only text localization — the exact failure mode we fixed with `text-bbox-via-OCR` this session. Install:
+
+  ```
+  brew install tesseract
+  scripts/.venv/bin/pip install pytesseract
+  ```
+
+  Verify: `which tesseract` returns `/opt/homebrew/bin/tesseract` (or equivalent), and `scripts/.venv/bin/python -c "import pytesseract; print(pytesseract.get_tesseract_version())"` returns a version string.
+
+### Caption style (burned-in, mobile A.1)
+
+Currently burned captions only exist on mobile exports (widescreen master ships with a separate SRT, not burned). These specs are the mobile caption style.
 
 | Field | Value | Note |
 |---|---|---|
-| Font | Caveat Bold | matches the bumper house font |
-| Fontsize | 56 | libass `Fontsize=56` |
+| Font | Montserrat Black | wide, heavy sans-serif — high legibility at mobile sizes |
+| Fontsize | 72 | rendered at 1080×1920 canvas |
+| ScaleX / ScaleY | 100 / 100 | **natural proportions — letters are NOT compressed**. Do not reduce ScaleY to fake tight line spacing; it smushes the text. Use per-line positioning (see below) instead |
 | Primary colour | white | `PrimaryColour=&H00FFFFFF` |
 | Outline colour | black | `OutlineColour=&H00000000` |
-| Outline | 4 px | readable over any illustrated background |
-| Shadow | 0 | no drop shadow; keeps the mark clean |
-| Alignment | bottom-center | ASS `Alignment=2` (numpad convention) |
-| MarginV | 80 for 1920×1080 widescreen; 250 for 1080×1920 portrait | libass interprets MarginV as distance from the alignment anchor — see `scripts/burn_captions.py` for the known-good defaults per aspect |
-| Line length | max ~32 chars/line, 2 lines max | libass auto-wraps at word boundaries only when `WrapStyle=0` is set in the ASS Script Info. WrapStyle=2 disables word wrap entirely and long cues get clipped at the frame edge (caused visible caption loss like "enough to discover" → "ugh to discover" on our first mobile test). Always use `WrapStyle=0` for burned-in captions. |
-| Case | sentence case | ALL CAPS reads wrong against the quiet spoolcast tone |
-| Punctuation | keep commas + periods | natural narration punctuation; no emoji |
+| Outline | 7 px | thick black stroke for high contrast against any scene |
+| Shadow | 0 | no drop shadow |
+| Case | **ALL CAPS** | narration text is uppercased before rendering. Wide caps at mobile scale read punchier than sentence-case lowercase |
+| Line wrap | 31 chars / line (Python-side pre-wrap) | narrow enough to fit 1080px canvas at fontsize 72, wide enough that lines span near edge-to-edge |
+| MarginL / MarginR | 10 / 10 | near-edge horizontal margin, maximizes usable width |
+| Line positioning | **per-line `{\an5\pos(x,y)}` events** | each wrapped line is emitted as its own Dialogue event, anchored center at `(canvas_w/2, margin_v + i * LINE_STEP)`. Bypasses libass's default font-metric leading (which produces too-loose line gaps) |
+| LINE_STEP | 45 px | baseline-to-baseline distance. Lines stack nearly touching — cap-to-cap gap is <4px |
+| margin_v (first line y-top) | **9:16 full-bleed: 1300. 1:1 mobile or 16:9 mobile letterbox: 1558.** | See "Caption position by mobile aspect" below. |
+| Alignment style field | 5 | Default style uses Alignment=5 (middle-center anchor), paired with inline `{\an5\pos()}` overrides |
+
+The per-line positioning matters: libass doesn't reliably honor `LineSpacing` as a Script_Info extension across all builds, so tight line gaps via style-level metrics are unreliable. Explicit `\pos()` per line gives deterministic pixel-accurate stacking.
+
+#### Caption position by mobile aspect
+
+Captions land at one of two positions depending on the session's mobile aspect mode. The rule applies to mobile-canvas (1080×1920) burns only — widescreen 16:9 desktop ships a separate SRT and is not subject to this rule.
+
+**Captions stay at one consistent position throughout a video — they do not jump per-chunk** even if individual chunks have different aspects (e.g. a 16:9 letterbox SVG chart inside an otherwise-1:1 session uses the session's caption position, not a per-chunk override).
+
+**9:16 full-bleed mobile sessions** — `margin_v = 1300`. Captions overlay the lower portion of the content area, above the TikTok/IG/Shorts bottom-overlay UI zone (which extends to roughly y=1500–1600). Captions sit ON the image; outline keeps them legible.
+
+**1:1 mobile or 16:9 mobile letterbox sessions** — `margin_v = 1558`. Captions live just below the image, near the top of the bottom letterbox bar:
+- Content area for 1:1 ends at y=1500; for 16:9 mobile letterbox ends at y=1264. Below that is empty letterbox bar.
+- Caption outline top ≈ y=1515, **15px below the 1:1 image bottom** — caption reads as part of the image's lower frame.
+- Caption line stack runs y=1558 (line 1) → y=1603 (line 2) → y=1648 (line 3 if needed).
+- Sits at the boundary of the platform UI overlay zone (y=1500–1600) but accepts brief overlap on the strictest platforms; gives priority to image-pairing legibility over UI-zone strictness.
+
+**Why this margin_v:** the 15px gap between image bottom and caption-outline top makes the caption read as part of the image's lower frame, not floating in the bar. Wider gaps (25px+, 50px+) make the caption feel less integrated; this tight gap is the empirical sweet spot from pilot iteration.
+
+**Choosing which position:** session-wide signal, not per-chunk. If the majority of a session's mobile assets are letterboxed (1:1 or 16:9 mobile), the whole session uses just-below-image bottom-bar captions. If the majority are 9:16 full-bleed mobile, the whole session uses over-content captions. Mixing positions across chunks within one video reads as inconsistent — pick one and commit.
+
+**Why this rule exists:** pilot session was authored 16:9-native and retrofitted to A.1 with 1:1 letterbox as the dominant mobile aspect. Captions at the 9:16 default (1300) landed inside the 1:1 content area, covering visual punchlines (e.g. the question-mark circle in C13's "A vs B?" composition). Bottom-bar position keeps the comprehension-critical part of the image clean.
 
 ### Cue stripping for burn-in
 
@@ -516,6 +560,16 @@ When the user wants Reels / TikTok / Shorts variants *derived from* a shipped 16
 
 Consumes caption styling, font bundle, and libass prereq from § Part 3. The rest of this Part covers the A.1-specific bits: pipeline separation, output location, duration caps, split-into-parts, part badge, mobile thumbnail, overlay handling.
 
+### Input precondition — A must be finished
+
+**A.1 begins where A ends.** Its sole input is a shipped widescreen master from the A pipeline (`renders/<id>-<rate>x.mp4` plus the matching SRT, scene manifest, shot list, and per-chunk scene PNGs). Producing that master is A's job, not A.1's.
+
+If a session lacks a shipped master — only a roughcut, a partial preview, or pre-pipeline experiment assets exist — A is incomplete. **Finish A first**, then start A.1. Do NOT treat "assemble a master from old assets so A.1 can consume it" as part of A.1; that work is closing out A.
+
+Conversely, once a clean shipped master exists, every step from there to mobile parts is A.1 — scene mobile-cropping, stitcher, captions, chrome, splitting, thumbnails, per-part SRTs, pre-upload checklist.
+
+The boundary test: if the artifact you're producing is reusable for the widescreen ship (a scene PNG, the master mp4, the rate-matched SRT), it belongs to A. If it only exists to make a mobile export (`scenes/mobile/`, burn-ASS, part badges, mobile thumbnails), it belongs to A.1.
+
 ### A (widescreen) vs A.1 (mobile) — separate pipelines, shared atoms
 
 | | A (widescreen) | A.1 (mobile) |
@@ -523,7 +577,7 @@ Consumes caption styling, font bundle, and libass prereq from § Part 3. The res
 | Canvas | 1920×1080 | 1080×1920 (4:5 content centered) |
 | Renderer | Remotion (headless browser) | ffmpeg stitcher |
 | Scene source | `scenes/<chunk>.png` | `scenes/mobile/<chunk>-mobile.png` |
-| Bumper rendering | Remotion live-render (ROADMAP #5) | ffmpeg `drawtext` (A.1 temporary path) |
+| Bumper rendering | Remotion live-render | Remotion live-render at 1080×1920 (text-only bumpers are regenerated through Remotion at the mobile canvas, not cropped from the widescreen render and not re-typeset via ffmpeg `drawtext`) |
 | SVG overlay | Browser-native | `rsvg-convert` → PNG → ffmpeg overlay |
 | Meme / reuse composition | Remotion | ffmpeg overlay on parent mobile PNG |
 | Playback rate | 1.15× post-process from 1.0× | 1.15× inherited from A |
@@ -533,7 +587,109 @@ Consumes caption styling, font bundle, and libass prereq from § Part 3. The res
 
 **Shared atoms** (§ Part 3 Caption Styling): Caveat font bundle, Montserrat Black bundle, JetBrains Mono bundle, Comic Neue Bold bundle, libass prereq, WrapStyle=0, pad-color=black gotcha.
 
-**Separation principle:** A.1 has its own code path. Do not shim widescreen logic into A.1. When an A.1 path looks like "extract from the widescreen master and scale," that's a smell — check for a mobile-native source first (scene PNG, parent mobile PNG, shot-list `image_path`, drawtext live-render) before falling back.
+**Separation principle:** A.1 has its own code path. Do not shim widescreen logic into A.1. When an A.1 path looks like "extract from the widescreen master and scale," that's a smell — check for a mobile-native source first (scene PNG, parent mobile PNG, shot-list `image_path`, Remotion live-render for bumpers) before falling back.
+
+### Portrait-safe composition — A.1 scope only
+
+When a session is **planned for A.1 mobile export** (not otherwise), beat descriptions for generated scenes should be authored with portrait-safety in mind so the 16:9 → 9:16 crop doesn't break them:
+
+- **Prefer a single focal point**, supporting elements stacked vertically (above / below) rather than horizontally (left / right).
+- **Avoid side-by-side / split-panel / two-panel / virgin-vs-chad layouts** unless the beat editorially requires an explicit contrastive comparison. Split-panel layouts fundamentally don't survive a 9:16 crop — header/footer text clips at panel seams, the contrastive structure breaks when one side partially leaves frame, and per-panel readability doesn't mean the overall scene reads.
+- **Avoid full-width text banners** spanning the entire frame — wrap long on-screen text into two or three stacked lines instead.
+- When a split-panel IS editorially required, note it explicitly in the `beat_description` so the A.1 pipeline knows to **regenerate the chunk at 9:16 from scratch** via `replay_mobile.py` instead of attempting a center-crop.
+
+**This rule applies ONLY to sessions planned for A.1 mobile export.** Widescreen-only videos (no mobile variant planned) keep split-panel compositions fully available — they often land harder at 16:9 and remain valid editorial choices.
+
+### Smart-crop element resolution — A.1 scope only
+
+**Applies only to A.1 mobile export.** `smart_crop_mobile.py` uses a two-stage pipeline: Qwen-VL identifies visual elements (characters, text, objects) + their bboxes, comprehension-importance, and face_bbox for characters. Python computes the best 9:16 crop center geometrically via subset search + progressive tolerance.
+
+#### The alone-crop test (how Qwen picks the focal)
+
+For each element in the scene, ask: *"If the final 9:16 crop contained ONLY this element and the viewer also heard the narration, would the scene still make sense?"* Only elements that pass this test are candidates for **focal** (the element the crop aims at). Text is never focal when a character or key object is in frame — text alone cannot anchor a scene.
+
+Focal-selection tiebreakers when multiple elements pass the test:
+
+- **Action scenes** (narration is "someone doing something"): the actor character is focal.
+- **Handoff / exchange scenes** (narration centers on a transfer or artifact): the RECIPIENT of the action is focal, NOT the deliverer. The deliverer is interchangeable (any messenger works); the recipient is the subject of the scene.
+- **Solo monologue**: the speaker is focal.
+- **Pure text cards** (no characters or objects): text becomes focal.
+
+Decorative text (book titles, poster slogans, mug inscriptions) that does not carry the current narration's meaning is importance 4+ or omitted entirely — never primary.
+
+#### Constraints (Python's fit logic)
+
+- **Focal element** — must be ≤10% clipped. Character faces use `face_bbox` (tight head region, provided by Qwen), NOT the full body bbox. A character's body can clip more than 10% as long as the face stays within tolerance.
+- **Text** — must have a **5% padding margin** from crop edges. Text touching the edge reads visually the same as clipped text, so padding prevents visual strain. Fall-back: ≤10% clip if padding impossible given other constraints.
+- **Secondary characters** — faces ≤15% clip. Can be fully dropped from frame.
+- **Decorative / contextual elements** — ≤20%, drop first when space is tight.
+
+#### Fit algorithm (subset search + progressive tolerance)
+
+Python explores all subsets of non-focal elements, preferring larger subsets that keep text. For each candidate subset, try passes in order:
+
+1. **Pass 1: text padding (5%) + progressive focal-face tolerance** — try focal face at 10% → 12% → 15%. Text padding takes priority over strict focal face; if text padding requires the focal face to clip up to 15%, that's acceptable. Characters remain readable at 15% face clip.
+2. **Pass 2: relaxed text (≤10% clip) + focal face 10%** — fallback when no padding configuration fits.
+3. **Pass 3: focal alone** — last resort when geometry makes any combination impossible.
+
+The subset search (rather than linear drop-by-priority) is important because sometimes a specific secondary element blocks the fit, not the lowest-importance one. Example: `[focal_char, text, other_char]` fails because `other_char` conflicts with focal — but `[focal_char, text]` works. Linear drop would remove text first; subset search tries `[focal_char, text]` directly.
+
+#### OCR override
+
+For elements where the bbox location is anchored to visible text (any `kind: text` element, plus objects/characters whose description references text — `"sticky note labeled 'redo'"`, `"book saying X"`, etc.), the bbox from Qwen is **replaced with Tesseract OCR's detected text region**. Qwen has high spatial error on small text (reports bbox positions off by 0.3–0.5 in fractional coordinates); OCR is deterministic.
+
+Qwen handles semantic roles (what's a character, what's a text, what's the focal). Python + OCR handle geometric positioning.
+
+#### Tiered Qwen calls (cost optimization)
+
+1 Qwen call by default. Escalate to median-of-3 only for chunks where:
+
+- 2+ characters are present (spatial variance matters most in crowded scenes)
+- OR Qwen reports low/medium confidence
+- OR the first-pass resolver drops to focal-only (fit failure — retry to see if better bboxes unlock a fuller fit)
+
+Typical cost: ~$0.13 per 49-chunk session. Blanket median-of-3 would be ~$0.33; blanket single-call would be ~$0.10 but unstable on complex scenes.
+
+#### What Qwen is NEVER passed
+
+The chunk's pre-render `beat_description` brief. It can disagree with the final render ("no character" in brief, but the model drew two characters). Qwen receives the image + narration (the audible ground-truth line) only. This pixels-as-ground-truth posture is load-bearing.
+
+Widescreen (A) rendering is unaffected — no cropping happens there.
+
+Caught on dev-log-02 C1 + C9: these chunks exposed every failure mode in turn — speaker-midpoint bias, bbox hallucination on text location (fixed by OCR), importance misranking between deliverer and recipient (fixed by alone-crop test), face vs body constraint confusion (fixed by face_bbox), text-edge-touching (fixed by 5% padding with progressive focal tolerance). The current algorithm resolves all of them.
+
+Caught on dev-log-02 mobile pass: 3 chunks (C14, C21, C44) generated as split-panel wojak layouts, Qwen's mobile-crop audit under-rated two of them because it evaluated each panel in isolation and missed that the overall composition broke. The upstream fix here (portrait-safe default at Stage 2 when mobile is planned) prevents the class of breakage before it reaches audit.
+
+### Mobile-crop audit — comprehension test
+
+`audit_mobile_crops.py` grades each cropped mobile scene against a single primary question:
+
+> **While the viewer hears this chunk's narration, does the cropped image still communicate the message that the script / beat is trying to convey?**
+
+If the answer is no, the chunk fails — regardless of whether any individual element looks "clipped" in isolation. Visual edge-clipping, split-panel halving, severed sequential relationships (arrow → diagram, before → after, A vs B), and lost contrastive comparisons are all the **same failure mode**: the meaning of the moment is gone.
+
+**Inputs the audit must receive per chunk:**
+- the cropped mobile PNG (post-crop, what the viewer actually sees)
+- the chunk's **narration** (concatenated beat narrations — the audible ground-truth line)
+- the chunk's **beat_description** (the intended visual scaffolding)
+- the chunk's **on_screen_text** (declared text the scene is supposed to render)
+
+The audit grades the image against narration + beat, not the image in isolation. A frame that looks visually intact but no longer lands the beat (e.g. an "A vs B" comparison where B got cropped to a sliver) is broken.
+
+**Common ways comprehension fails** (not an exhaustive list — anything that breaks the script-to-image link counts):
+
+1. **Text clipped mid-word or mid-line** so the meaning is lost. A single compact word trimmed by one letter (e.g. "DEFAULT" → "DEFAUL") is recoverable from context — not broken.
+2. **Key prop partially clipped at the edge** (STOP sign, red X, labeled object, arrow tip). Background scene dressing clipping is not broken; only focal props count.
+3. **Character cut off** in a way that breaks the scene (face bisected by frame edge, body truncated such that the action no longer reads).
+4. **Split-frame composition where the comparison is lost** — side-by-side or before/after layouts where one panel got discarded. A cropped split-panel is NOT automatically broken if the surviving panel alone still conveys the beat. Flag only when the surviving fragment no longer communicates without its missing pair.
+5. **Severed sequential / relational composition** — narration describes "X leading to Y" or "X compared with Y" but the crop cut the connection between elements, leaving them visually disconnected.
+6. **Any other essential scene element visibly truncated** in a way that changes what the scene communicates relative to the narration.
+
+**Lean toward catching real failures over avoiding flags.** A false positive costs one regen call (~$0.04). A false negative ships a chunk where the viewer doesn't understand the moment — much more expensive. When uncertain, flag.
+
+The audit's verdict per chunk: `broken` (true/false), `broken_reason` (one sentence tying the failure to the narration / beat), `element_clipped` (what specifically broke the scene, if any), `severity` (low / medium / high — how much meaning is lost).
+
+**Caught on pilot:** Qwen's earlier audit prompt did not receive narration, evaluated images standalone, and was anchored toward false negatives by a "lean conservative" instruction. Two chunks (C13 split-panel A vs B halved, C21 severed arrow → diagram) passed audit but visibly broke the beat. The comprehension-test framing above replaces the visual-clipping-only framing.
 
 ### Output location
 
@@ -561,16 +717,17 @@ Intermediate ASS / SRT files stay under `working/` because they're pipeline bypr
 |---|---|---|
 | Instagram Reels | 20 min | ≤3 min for non-follower reach; ideal ≤90 s |
 | TikTok | 10 min | ≤60 s favored |
-| YouTube Shorts | 60 s (hard) | — |
+| YouTube Shorts | 3 min (hard, since Oct 2024) | ≤60 s for the Shorts shelf algorithm sweet spot; 60 s–3 min still qualifies as a Short but is pushed less aggressively |
 
 A video over a platform's preferred cap uploads fine but won't get pushed to non-followers. For source videos ≥60 s targeting TikTok/Shorts, use `export_mobile.py --split-duration 60` to produce multi-part exports.
 
 ### Split mode + part badge
 
 - `--split-duration 60` cuts on chunk boundaries — never mid-sentence.
+- **Split boundary cannot land on a meme chunk, and cannot split a meme from its setup narration.** The split must fall AFTER the meme's full companion narration chunk, never on or immediately before a meme. Why: memes depend on the setup narration chunk to land — if a part ends with the setup line and the next part opens cold with the meme (or the meme lives at the end of Part 1 without its setup), the punchline fails. The meme + its setup must always live in the same part. When picking the split point, scan forward from the target duration for the next chunk boundary that is NOT on a meme, NOT immediately after a meme's setup narration, and NOT immediately before a meme.
 - Output files: `renders/<session>-mobile-9x16-pt1of3.mp4`, `-pt2of3.mp4`, `-pt3of3.mp4`.
 - Every non-final part ends with a ~1 s "to be continued…" card (Caveat Bold, clean background) before hard cut. Final part just ends.
-- A "1/3" pill badge (Caveat Bold, top-right corner, white on subtle dark outline) burns into both the video and the mobile thumbnail for that part. The badge uses the same libass style atoms as Part 3 captions.
+- A "Part 1 of 3" pill badge (Caveat Bold, top-right corner, white on subtle dark outline) burns into both the video and the mobile thumbnail for that part. Always written in full ("Part 1 of 3", not "1/3") because the spelled-out form reads as familiar mobile-platform convention. The badge uses the same libass style atoms as Part 3 captions. Sized to be readable in a phone-grid feed.
 
 ### Per-part SRT upload files (A.1)
 
@@ -598,9 +755,10 @@ A mismatch on any of (1), (5), (7) is the class of failure most likely to slip t
 
 ### Pipeline script location (A.1)
 
-- **Production path (planned):** `scripts/mobile_export.py` — replaces the current test stitcher. Uses `scripts/caption_assets.py` for ASS generation, `scripts/replay_mobile.py` for chunk regens at new aspects, `scripts/audit_mobile_crops.py` for legibility audits.
-- **Current state:** `/tmp/build_mobile_test.py` is a session-specific test harness with hardcoded rate and paths. Graduating it to `scripts/mobile_export.py` means parameterizing session id, auto-detecting shipped rate, and wiring into the full Post-Stage 8 chain (PIPELINE.md § Post-Stage 8).
-- **Shared helpers already at scripts/:** `caption_assets.py`, `replay_mobile.py`, `audit_mobile_crops.py`, `burn_captions.py`. Do NOT duplicate logic from these into the stitcher — import and reuse.
+- **Production path:** `scripts/mobile_export.py` — handles Stage 1–4 of the mobile stitcher (asset resolution, per-chunk clip build, concat + audio mux, burn captions, split into parts) for any session via `--session <id>`. Uses `scripts/caption_assets.py` for ASS generation, `scripts/smart_crop_mobile.py` for 9:16 / 1:1 scene crops, `scripts/replay_mobile.py` for chunk regens at new aspects, `scripts/audit_mobile_crops.py` for legibility audits.
+- **Split mode** (`--split-duration <sec>`): cuts the unburned `concat-audio.mp4` at chunk boundaries, windows + rebases the burn SRT per part, builds per-part ASS with the correct `Part N of M` badge, burns each part separately. Outputs `<session>-mobile-pt<n>of<total>.mp4` and `<session>-mobile-pt<n>of<total>.srt` per part. Helpers: `compute_chunk_ranges`, `find_split_indexes` (skips meme boundaries), `cut_mp4`, `window_srt`. Graduated from a one-off `/tmp/split-mobile.py` written for dev-log-02 (caught on pilot when the helper had been lost).
+- **Still in /tmp — needs to graduate:** `/tmp/gen-mobile-thumbs.py` — composites the widescreen thumbnail concept into 1080×1920 with `PART N OF M` badge overlay. Hardcodes session paths. Functions to lift: `make_thumb`. Should become `mobile_export.py --thumbnails` so a new session doesn't have to recreate them.
+- **Shared helpers already at scripts/:** `caption_assets.py`, `smart_crop_mobile.py`, `replay_mobile.py`, `audit_mobile_crops.py`, `burn_captions.py`. Do NOT duplicate logic from these into the stitcher — import and reuse.
 
 ### Mobile thumbnail (A.1)
 
@@ -613,6 +771,7 @@ Separate artifact from the video. Key differences from widescreen thumbnail:
   - **Part indicator** — e.g. `PART 1 OF 2`. Montserrat Black, smaller (≈50–70 px). Positioned above OR below the title — consistent placement per session across all parts.
 - **Base image** — either (a) a kie.ai-generated 9:16 thumbnail (prompt-only, matching widescreen convention) or (b) a representative scene scaled-to-cover 9:16. Option (a) is preferred when the video has a distinct cover concept; option (b) is a stopgap using an existing scene asset.
 - **File naming:** `renders/mobile/<session>-mobile-thumb-pt1of2.png`, `-pt2of2.png`, etc. One file per part.
+- **Grid-safe area: top ~70% of the 9:16 frame.** TikTok / Reels / Shorts grid views center-crop the thumbnail to roughly square (4:5 or 1:1). All critical content — caption, figure, part badge, key visual — must live in the upper ~1344 px of the 1920 px frame. The bottom ~30% is bonus content visible only on full-tap view. Designs that put the punchline element (struck-out text, hand-lettered tagline, key annotation) in the bottom band lose it on grid.
 
 A session that ships N mobile parts publishes N mobile thumbnails — one uploaded per TikTok / Reels / Shorts post.
 
@@ -632,14 +791,16 @@ Whatever the shipped rate, all three must match: audio (from the rate-matched ma
 
 Apply to mobile exports only. Widescreen (A) outputs are unaffected.
 
-- **Canvas** 1080×1920; 4:5 content area (1080×1350) centered vertically; 285-px black letterbox bars top and bottom.
-- **Caption anchor (conditional)** — caption alignment depends on estimated line count after wrap:
-  - **1–3 lines (the common case):** top-anchored, ASS `Alignment=8`, caption top edge at y≈1660 (≈25 px gap below the content area bottom at y=1635). Multi-line captions grow DOWNWARD; the first-line position is invariant across 1-, 2-, and 3-line cues.
-  - **4+ lines (rare, long cues):** bottom-anchored, ASS `Alignment=2`, caption bottom baseline at y≈1830 (≈10 px gap above the watermark top). Caption grows UPWARD into the content area, partially overlapping the video frame bottom. Accepted overlap: long cues are rare and the alternative (captions off-screen) is worse.
-  - Heuristic for classification: estimate chars-per-line at ~18 at Fontsize 70 in Montserrat Black in a 1020-px caption area, divide cue text length, round up. If ≥ 4, use bottom-anchored style; else top-anchored.
-- **Caption side margins** `MarginL = MarginR = 30` — captions may stretch close to the horizontal edges but not touch them. Gives the wrap algorithm plenty of width to keep sentences on fewer lines.
-- **Watermark position is invariant across all mobile exports.** `artlu.ai` (JetBrains Mono) bottom-left of the bottom bar, Alignment=1. `made by spoolcast` (Comic Neue Bold) bottom-right, Alignment=3. Never moves, never resizes proportional to caption size. Treat these as fixed brand placement, not tunable parameters.
-- **Part badge** (when `--split-duration` is used) top-center of the top bar, ASS `Alignment=8`, MarginV chosen so badge is centered in the 285-px top bar (≈MarginV=150 at Fontsize=60 in Montserrat Black).
+- **Canvas** 1080×1920 full-bleed (no letterbox bars around the content). Scene PNGs are 9:16 native (from `smart_crop_mobile.py` or regenerated at 9:16 via kie.ai) and fill the canvas.
+- **Captions** — see § Caption style (burned-in, mobile A.1) for the full spec. Summary: Montserrat Black, ALL CAPS, fontsize 72, natural ScaleY, per-line `\pos()` positioned events with LINE_STEP=45 px, top of first line at `margin_v=1300`, thick 7 px outline, near-edge-to-edge horizontal margins.
+- **Top-row chrome** (row 1 of the frame): a single horizontal strip at `MarginV=30` from top containing three elements on the same baseline:
+  - `artlu.ai` — top-left, JetBrains Mono, Fontsize=32 (= `watermark_size`), 65 % opacity (alpha 0x59).
+  - `Part N` — top-center, Montserrat Black, Fontsize=42 (= `part_badge_size`, slightly larger than watermarks for a hint of hierarchy), 65 % opacity. Only drawn when `--split-duration` is used.
+  - `made by spoolcast` — top-right, Comic Neue Bold, Fontsize=32, 65 % opacity.
+  - Rationale: moved from bottom to top so TikTok/IG/Shorts platform UI (caption, username, audio, share buttons) — which overlays the bottom of the frame — doesn't obscure brand/part-badge.
+- **Text-only title cards letterbox instead of crop.** When a chunk is text-only (no character, no narrative object — typography as content), smart-crop cannot produce a 9:16 crop that preserves the text; the text is inherently wider than the crop window. For these chunks, scale-to-fit the widescreen source into the 1080×1920 mobile canvas with paper-color (or transparent) bars top and bottom, rather than cropping. Caught on dev-log-02 C4: a title card *"how I caught an AI lying"* was cropped at the middle and only *"I caught"* was visible on mobile. Letterboxing shows the full title at smaller scale — every word visible. `smart_crop_mobile.py` detects this case (focal element kind=text AND text bbox wider than crop + tolerance) and emits a `letterbox` signal; `mobile_export.py`'s stitcher honors it by scaling-to-fit instead of cropping.
+- **Meme inserts** are composited on top of the chunk's 9:16 scene PNG (or the parent's 9:16 scene when `image_source=reuse`), NOT a scaled-down widescreen composite. If a chunk's widescreen frame was `meme image over scene`, the mobile frame is `meme image over 9:16 scene` — the meme stays at its authored size relative to the mobile canvas.
+- **Overlay width scaling for mobile:** overlays declared in the shot-list's `overlays` field carry widescreen-normalized widths (fraction of 1920-px canvas). On mobile, multiply the declared `width` by 1.8× before compositing, clip to 0.9 max. Positions (x, y) are NOT scaled — only width.
 - **Meme inserts** are composited on top of the chunk's 4:5 scene PNG (or the parent's 4:5 scene when `image_source=reuse`), NOT a scaled-down widescreen composite. If a chunk's widescreen frame was `meme image over scene`, the mobile frame is `meme image over 4:5 scene` — the meme stays at its authored size relative to the mobile canvas, not shrunk by the 1.78→0.80 aspect change.
 - **Overlay width scaling for mobile:** overlays declared in the shot-list's `overlays` field carry widescreen-normalized widths (fraction of 1920-px canvas). On mobile, multiply the declared `width` by 1.8× before compositing, clip to 0.9 max. Rationale: the 4:5 mobile canvas has more vertical real estate than 16:9, so a normalized overlay at the same proportion feels visually smaller. The 1.8× multiplier restores perceptual weight. Positions (x, y) are NOT scaled — only width.
 

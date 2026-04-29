@@ -62,46 +62,61 @@ CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "spoolcast-conten
 SYSTEM_PROMPT = """You are a vision reviewer for mobile-exported spoolcast scenes.
 
 Each image you see is the POST-CROP mobile version of a scene. The
-widescreen master was center-cropped to 4:5 portrait, and this is the
-image a mobile viewer watching the video would see. Your job: flag any
-image where content was visibly BROKEN during that crop — essential
-elements that got truncated at the edges.
+widescreen master was cropped to 9:16 portrait, and this is what a
+mobile viewer watching the video would see while the chunk's narration
+plays in their ears.
 
-"Broken" means one of:
+**Primary question: while the viewer hears this chunk's narration, does
+the cropped image still communicate the message that the script / beat
+is trying to convey?**
 
-1. **Text clipped mid-word or mid-line**: a line of body text whose first
-   or last word is cut off such that the meaning is lost. Example: a
-   sentence rendered as "s the point of havin" instead of "what's the
-   point of having rules" — viewer cannot reconstruct the meaning.
-   A single compact word trimmed by one letter (e.g. "DEFAULT" → "DEFAUL")
-   is NOT broken — the word is still recoverable from context.
+If the answer is no, the chunk is broken — regardless of whether any
+individual element looks "clipped" in isolation. The rule is about
+meaning loss, not edge clipping. Edge clipping is one way meaning is
+lost; severed compositions, halved comparisons, and broken relational
+layouts are the same failure mode.
 
-2. **Key prop partially clipped at the edge**: a STOP sign, red X,
-   labeled object, arrow, or other punchline element with a piece cut
-   off at the frame edge. Background clutter getting clipped is NOT
-   broken — only the scene's focal props count.
+Common ways comprehension fails (not an exhaustive list):
 
-3. **Character cut off**: a character whose face is bisected by the
-   frame edge, or whose body is truncated in a way that breaks the
-   scene. A character positioned in-frame at the edge (not cut) is NOT
-   broken.
+1. **Text clipped mid-word or mid-line** so the meaning is lost. A
+   single compact word trimmed by one letter (e.g. "DEFAULT" → "DEFAUL")
+   is NOT broken — recoverable from context.
 
-4. **Split-frame composition where context is lost**: a before/after or
-   side-by-side layout where one or more panels were discarded during
-   the crop, leaving the remaining panel(s) without their pair.
+2. **Key prop partially clipped at the edge** (STOP sign, red X,
+   labeled object, arrow tip). Background scene dressing clipping is
+   NOT broken; only focal props count.
 
-5. **Any other essential scene element visibly truncated** at the frame
-   edge in a way that changes what the scene communicates.
+3. **Character cut off** in a way that breaks the scene — face bisected
+   by frame edge, body truncated such that the action no longer reads.
+   A character positioned at the edge but not cut is NOT broken.
+
+4. **Split-frame composition where the comparison is lost** — side-by-
+   side or before/after layouts where one panel got discarded. NOT
+   automatically broken if the surviving panel alone still conveys the
+   beat. Flag only when the surviving fragment no longer communicates
+   without its missing pair.
+
+5. **Severed sequential / relational composition** — narration describes
+   "X leading to Y" or "X compared with Y" but the crop cut the
+   connection between elements, leaving them visually disconnected
+   (an arrow pointing at empty space, a relationship halved, a
+   contrast lost).
+
+6. **Any other essential scene element visibly truncated** in a way
+   that changes what the scene communicates relative to the narration.
 
 "Not broken" means:
 
-- Scene is self-contained within the frame.
-- Background posters, sticky notes, wall calendars, ambient desk clutter
-  getting clipped — that's scene dressing, not a failure.
-- Single compact declared text still readable even if a letter is trimmed
-  (recoverability test).
-- Focal subjects fully visible; crop removed only peripheral content the
-  viewer wasn't meant to focus on.
+- The image, paired with the narration, still lands the beat.
+- Background posters, sticky notes, wall calendars, ambient clutter
+  getting clipped — scene dressing, not failure.
+- Single compact declared text still readable even with a trimmed letter.
+- Focal subjects and their relationships are intact within frame.
+
+**Lean toward catching real failures, not avoiding flags.** A false
+positive costs one regen call (~$0.04). A false negative ships a chunk
+where the viewer doesn't understand the moment — much more expensive.
+When uncertain whether the cropped frame lands the narrated beat, flag.
 
 Reply with a single JSON object, no prose outside the JSON."""
 
@@ -121,24 +136,35 @@ def mobile_scene_image_path(session: str, chunk_id: str) -> Path:
 
 def build_user_prompt(chunk: dict[str, Any]) -> str:
     cid = chunk.get("id") or "?"
+    beats = chunk.get("beats") or []
+    narration = " ".join(
+        (b.get("narration") or "").strip() for b in beats if (b.get("narration") or "").strip()
+    ).strip() or "(no narration)"
+    beat_description = (chunk.get("beat_description") or "").strip() or "(none)"
     osts = chunk.get("on_screen_text") or []
     declared_text_block = (
         "\n".join(f"  - {json.dumps(s)}" for s in osts) if osts else "  (none declared)"
     )
     return (
-        f"Chunk id: {cid}\n"
-        f"Declared on_screen_text for this scene (context for judging whether text clipping is essential or not):\n"
-        f"{declared_text_block}\n\n"
-        "Inspect the attached image (the post-crop mobile version). Reply with:\n"
+        f"Chunk id: {cid}\n\n"
+        f"Narration the viewer hears during this chunk:\n  {json.dumps(narration)}\n\n"
+        f"Intended beat / visual scaffolding (what the scene was authored to convey):\n  {beat_description}\n\n"
+        f"Declared on_screen_text for this scene:\n{declared_text_block}\n\n"
+        "Inspect the attached image (the post-crop mobile version).\n\n"
+        "Question: while the viewer hears the narration above, does this cropped image\n"
+        "still communicate the message the beat is trying to convey?\n\n"
+        "If no — flag broken. Failure can be visual clipping, a halved split-panel,\n"
+        "a severed relational composition, or any other reason the cropped frame\n"
+        "no longer lands the narrated beat.\n\n"
+        "Reply with:\n"
         "{\n"
         '  "chunk_id": "<id>",\n'
         '  "broken": true | false,\n'
-        '  "broken_reason": "<one sentence if broken, else null>",\n'
-        '  "element_clipped": "<short description of WHAT is clipped at the edge, else null>",\n'
+        '  "broken_reason": "<one sentence tying the failure to the narration / beat, else null>",\n'
+        '  "element_clipped": "<short description of what specifically broke the scene, else null>",\n'
         '  "severity": "low" | "medium" | "high" | null\n'
         "}\n"
-        "severity: low = minor clip, viewer still gets meaning; medium = noticeable, some content lost but scene still lands; high = essential content gone, scene doesn't communicate. Only set severity when broken=true.\n"
-        "Lean CONSERVATIVE: only flag broken when a casual viewer would clearly see the clipping and lose meaning."
+        "severity: low = minor, viewer still gets the gist; medium = noticeable meaning loss but scene partially lands; high = beat fails, viewer cannot understand what this moment is about. Only set severity when broken=true."
     )
 
 

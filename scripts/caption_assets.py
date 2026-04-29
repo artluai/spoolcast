@@ -50,6 +50,11 @@ def srt_to_ass(
     # at mobile screen sizes. Caveat (the handwritten house font) was too soft
     # for mobile caption duty; still used elsewhere for in-scene text and
     # bumpers.
+    # Caption style: Montserrat Black, ALL CAPS text, thick outline, natural
+    # ScaleY (letters not compressed). Margins tight (10px) so lines stretch
+    # near edge-to-edge. Individual lines are emitted as separately-positioned
+    # events (via \pos() overrides below) so line spacing is controlled directly
+    # in pixels, bypassing libass's default font-metric line-height.
     style_line = (
         "Style: Default,Montserrat Black,"
         f"{font_size},"
@@ -59,35 +64,41 @@ def srt_to_ass(
         "&H00000000,"          # BackColour (unused, no shadow)
         "-1,"                  # Bold (-1 = true)
         "0,0,0,"               # Italic, Underline, StrikeOut
-        "100,100,"             # ScaleX, ScaleY
+        "100,100,"             # ScaleX, ScaleY (natural — letters not compressed)
         "0,0,"                 # Spacing, Angle
         "1,"                   # BorderStyle (1 = outline + drop shadow)
-        f"{outline_px},"       # Outline (px)
+        "7,"                   # Outline (px — thick black stroke)
         "0,"                   # Shadow (px; 0 = no shadow)
-        "8,"                   # Alignment (8 = top-center) — caption top-edge anchored
-        "30,30,"               # MarginL, MarginR (px) — captions stretch close to edges
-        f"{margin_v},"         # MarginV (px from TOP of canvas for top-anchored)
+        "5,"                   # Alignment (5 = middle-center anchor for \pos())
+        "10,10,"               # MarginL, MarginR (near edge-to-edge)
+        "0,"                   # MarginV (unused — \pos() overrides position)
         "1"                    # Encoding
     )
 
-    # Part badge: top-center of the TOP letterbox bar. Renders on black.
+    # Shared size for watermarks; part badge gets its own slightly-larger size
+    # so it reads more prominently than the brand watermarks but still sits
+    # below the caption weight (slight hierarchy: caption > part badge > watermarks).
+    watermark_size = max(40, font_size - 40)
+    part_badge_size = max(watermark_size + 10, font_size - 10)
+
+    # Part badge: top-center, same row as watermarks but slightly larger.
     part_badge_style_line = (
         "Style: PartBadge,Montserrat Black,"
-        "60,"
-        "&H00FFFFFF,"
+        f"{part_badge_size},"
+        f"&H{watermark_alpha_hex}FFFFFF,"
         "&H00000000,"
-        "&H00000000,"
+        f"&H{watermark_alpha_hex}000000,"
         "&H00000000,"
         "-1,"
         "0,0,0,"
         "100,100,"
         "0,0,"
         "1,"
-        "4,"    # outline
+        "3,"    # outline (match watermarks)
         "0,"
         "8,"    # Alignment 8 = top-center
         "40,40,"
-        "150,"  # MarginV from top — centers badge in the 285-tall top bar
+        "160,"  # MarginV 160 from top — clears TikTok/IG search-bar UI chrome (~100-150px). Same row as artlu.ai + made by spoolcast.
         "1"
     )
 
@@ -122,7 +133,6 @@ def srt_to_ass(
     # JetBrains Mono for "artlu.ai" (terminal feel), Comic Neue Bold for
     # "made by spoolcast" (chalkboard feel). Both ~65% opacity; size set
     # close to the caption size so they read as a credit row.
-    watermark_size = max(40, font_size - 40)
     watermark_left_style_line = (
         "Style: WatermarkLeft,JetBrains Mono,"
         f"{watermark_size},"
@@ -137,9 +147,9 @@ def srt_to_ass(
         "1,"
         "3,"    # 3px outline
         "0,"
-        "1,"    # Alignment 1 = bottom-LEFT
+        "7,"    # Alignment 7 = TOP-LEFT
         "40,40,"
-        "30,"   # MarginV 30 from bottom (sits in bottom bar)
+        "160,"  # MarginV 160 from top — clears TikTok/IG search-bar UI chrome (~100-150px). 30 was empirically too high (caught on dev-log-03 mobile).
         "1"
     )
     watermark_right_style_line = (
@@ -156,9 +166,9 @@ def srt_to_ass(
         "1,"
         "3,"
         "0,"
-        "3,"    # Alignment 3 = bottom-RIGHT
+        "9,"    # Alignment 9 = TOP-RIGHT
         "40,40,"
-        "30,"
+        "160,"  # MarginV 160 from top — clears TikTok/IG search-bar UI chrome (~100-150px). Matches WatermarkLeft + PartBadge.
         "1"
     )
 
@@ -200,6 +210,31 @@ def srt_to_ass(
         s = sec % 60
         return f"{h}:{m:02d}:{s:05.2f}"
 
+    # Per-line positioned captions:
+    #  - Uppercase the narration (ALL CAPS on mobile reads better at small sizes)
+    #  - Wrap to CHARS_PER_LINE characters per line
+    #  - Emit ONE Dialogue event PER wrapped line with {\an5\pos(x, y)}
+    #    anchored center of each line at (play_res_x/2, line_top + i*line_step).
+    #  - Line step controls the gap directly (bypasses libass's font-metric
+    #    default, which had too-loose natural leading for this use case).
+    CHARS_PER_LINE = 31
+    LINE_STEP = 45  # px — tight stacking, lines nearly touching
+
+    def _wrap_uppercase(text: str) -> list[str]:
+        text = text.upper()
+        words = text.split()
+        out: list[str] = []
+        cur = ""
+        for w in words:
+            if cur and len(cur) + 1 + len(w) > CHARS_PER_LINE:
+                out.append(cur)
+                cur = w
+            else:
+                cur = (cur + " " + w) if cur else w
+        if cur:
+            out.append(cur)
+        return out
+
     cues: list[str] = []
     text = srt_path.read_text().replace("\r\n", "\n")
     for block in text.strip().split("\n\n"):
@@ -219,14 +254,15 @@ def srt_to_ass(
         end_sec -= cue_offset_sec
         start = _sec_to_ass(start_sec)
         end = _sec_to_ass(end_sec)
-        content = "\\N".join(lines[2:])
-        # Pick style based on estimated line count. 1020-px caption area at
-        # Fontsize 70 fits ~18 chars/line. 4+ lines → bottom-anchored to
-        # avoid running off the frame bottom; else top-anchored.
-        char_count = sum(len(l) for l in lines[2:])
-        est_lines = max(1, (char_count + 17) // 18)
-        style_name = "BottomCaption" if est_lines >= 4 else "Default"
-        cues.append(f"Dialogue: 0,{start},{end},{style_name},,0,0,0,,{content}")
+        cue_body = " ".join(lines[2:])
+        wrapped = _wrap_uppercase(cue_body)
+        for i, line_text in enumerate(wrapped):
+            y = margin_v + i * LINE_STEP
+            # \an5 = middle-center anchor; \pos(x,y) anchors the line center there.
+            cues.append(
+                f"Dialogue: 0,{start},{end},Default,,0,0,0,,"
+                f"{{\\an5\\pos({play_res_x // 2},{y})}}{line_text}"
+            )
 
     if watermark:
         cues.append(

@@ -661,3 +661,31 @@ Paint-on is deferred from the transition vocabulary (`cut` + `crossfade` only fo
 During a `build_preview_data.py` refactor, a `for i, chunk in enumerate(chunks_out):` loop got simplified to `for chunk in chunks_out:` — but the body still referenced `i` (which was leaking from a prior `enumerate` loop). Every chunk ended up computing its prior-frame underlay from `chunks_out[49]` (the last `i` value) — all 50 chunks inherited the final chunk's image as their underlay.
 
 Rule: when simplifying a loop that drops `enumerate`, grep the loop body for lone `i` / `idx` / `j` references before committing. Python won't warn you — it'll silently use the leaked variable from the enclosing scope.
+
+### Caption position varies by mobile aspect
+
+Pilot was authored 16:9-native and retrofitted to A.1 with 1:1 letterbox as the dominant mobile aspect. The default mobile caption position (`margin_v=1300`) was tuned for 9:16 full-bleed — captions sit over the lower portion of content, above the platform UI zone. With 1:1 content (y=420 to y=1500), `margin_v=1300` lands captions inside the content area, covering visual punchlines (e.g. C13's "A vs B?" question-mark circle).
+
+Fix: caption position depends on session aspect mode. 9:16 full-bleed mobile → margin_v=1300 (over content, above UI zone). 1:1 mobile or 16:9 mobile letterbox → margin_v=1558 (just below image, top of letterbox bar). Captions are session-uniform, not per-chunk — jumping caption position between chunks reads as inconsistent. Rule scope is mobile-canvas (1080×1920) only — widescreen 16:9 desktop ships a separate SRT and is unaffected.
+
+Initial proposal was margin_v=1620 (clearly below platform UI zone y=1500–1600). User pushed back: at 1620 the caption floats disconnected from the image (~77px gap from image bottom to outline top). Iterated through 50px gap (1593) → 25px gap (1568) → 15px gap (1558). At 25px the caption reads as part of the image's lower frame rather than floating in the bar. Trade-off: caption sits inside the platform UI zone on strictest platforms; accepted in favor of image-pairing legibility.
+
+Implemented as `--caption-margin-v` flag on `mobile_export.py` (default 1300; override per session). SHIPPING.md § Caption position by mobile aspect captures the rule.
+
+### Mobile-crop audit comprehension test
+
+Pilot's mobile pass exposed two false negatives in `audit_mobile_crops.py`: C13 (split-panel A vs B where B got halved to a sliver) and C21 (sequential arrow → diagram where the crop severed the relationship, leaving an arrow pointing at empty white space and a partial frame on the far edge). Qwen passed both as `broken: false`. The user's eye caught both immediately.
+
+Root cause: the audit prompt graded each frame as a standalone visual against an edge-clipping checklist, never received the chunk's narration or beat description, and ended with "lean CONSERVATIVE" — which together pushed Qwen toward false negatives on relational/compositional failures. The rule had been "look for visible clipping at edges"; it should have been "does this image, with the narration playing, still communicate the beat?"
+
+Fix: rewrote `SYSTEM_PROMPT` and `build_user_prompt` so the audit receives narration + beat_description + on_screen_text, leads with the comprehension test, and treats clipping as one of several ways comprehension can fail (not the definition of failure). Removed the "lean conservative" anchor; replaced with "lean toward catching real failures — a false negative costs more than a false positive."
+
+SHIPPING.md Part 4 now has a "Mobile-crop audit — comprehension test" section that defines the rule. The narrower SHIPPING.md note that previously said "the audit does NOT auto-flag split-panel layouts" was misleading — it should auto-flag any split-panel where the surviving fragment doesn't communicate without its pair, which is exactly the comprehension test. Updated.
+
+### A / A.1 boundary clarification
+
+When asked to run A.1 on tribe-session-001, I framed the missing widescreen master as an "A.1 gap" with options like "backfill into A.1" or "re-ship through A first." User pushed back: A.1 *starts* from a finished widescreen master — backfilling/re-shipping isn't part of A.1, it's finishing A.
+
+The earlier rule ("derived from a shipped 16:9 video") implied this but didn't make the input precondition load-bearing. Anything that produces the master, scene PNGs, rate-matched SRT, or shot list belongs to A — even when the *motivation* for finishing it is to enable a mobile export. SHIPPING.md § Part 4 now has an "Input precondition — A must be finished" section with a boundary test (reusable for widescreen ship → A; mobile-only → A.1).
+
+Why this matters: collapsing the boundary leads to A.1 code paths that quietly do A's work (e.g. assembling a master from raw assets inside the mobile stitcher), which is how a mobile pipeline ends up brittle and session-specific. Keep A.1 narrow: master in, mobile parts out.

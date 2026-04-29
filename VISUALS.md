@@ -601,6 +601,19 @@ Apply to any asset before it ships to the shot-list — illustrations, broll, me
 
 Failure mode these prevent: agent trusts source-material prose, extracts assets based on label match, ships without content verification, mislabeled assets reach the shot-list, rework required at review or later. Verification is always cheaper than late rework.
 
+#### Annotations as engagement
+
+**Visual annotations (highlights, circles, arrows, zoom-crops, callouts, captions, side-by-sides, etc.) are a good engagement tool — they add variety and direct attention. Plan during script/shot-list, and catch missed spots in review/audit (same as meme/reaction placement).**
+
+#### Annotation Craft on Broll
+
+When annotating an existing image (highlights, circles, arrows, callouts on broll PNGs):
+
+- **Highlighter-style background for "highlighted" — never an underline.** Underlines on text read as strikethrough.
+- **Pad annotations with a slight overshoot, then verify by rendering.** A bit more margin than looks needed by eye — descenders, serifs, and dots exceed the apparent letter bounds. Don't reason about percentages; render once, look, trim only if obviously oversize.
+- **Per-aspect annotation scripts that share logic should share code.** Don't copy PIL coord logic into a second script (e.g. mobile from widescreen) — extract a shared helper. Fixes in one script don't transfer to the other otherwise.
+- **Muted opacity by default — ~40% alpha for fills, ~80% for outlines.** The underlying art needs to remain readable.
+
 #### Asset Verification Enforcement
 
 Rules above describe behavior. The enforcement mechanism — what prevents pattern-matching from silently skipping the rules — is procedural and asset-type-specific.

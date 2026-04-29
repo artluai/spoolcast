@@ -540,6 +540,9 @@ def validate(shot_list: dict[str, Any], session: str | None = None) -> list[tupl
     # Previous-video broll must be TV-framed (VISUALS.md § Previous-video broll framing)
     errors.extend(_check_broll_framing(chunks))
 
+    # Cold-open visual variety (STORY.md § 9a)
+    errors.extend(_check_cold_open_visual_variety(chunks))
+
     # Reveal-group checks (adjacency, size, scene containment, bumper exclusion)
     group_indices: dict[str, list[int]] = {}
     for i, c in enumerate(chunks):
@@ -577,6 +580,48 @@ def validate(shot_list: dict[str, Any], session: str | None = None) -> list[tupl
                      f"reveal_group contains {bk!r} chunk (not allowed)")
                 )
 
+    return errors
+
+
+def _check_cold_open_visual_variety(chunks: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    """STORY.md § 9a: cold-open chunks must each have a distinct visual.
+
+    "Never hold one image across 3+ beats in the cold open." Cold open = all
+    chunks before the first bumper (or the first ~15s if no bumper). Same
+    image_path across 2+ adjacent cold-open chunks is a hard flag.
+    """
+    errors: list[tuple[str, str]] = []
+    # Find cold-open span: chunks 0..first_bumper_idx (exclusive)
+    first_bumper_idx = None
+    for i, c in enumerate(chunks):
+        if (c.get("boundary_kind") or "").strip() == "bumper":
+            first_bumper_idx = i
+            break
+    cold_end = first_bumper_idx if first_bumper_idx is not None else min(len(chunks), 8)
+    cold = chunks[:cold_end]
+    # Walk consecutive image_path equality
+    run_path: str | None = None
+    run_ids: list[str] = []
+    def flush(run_path: str | None, run_ids: list[str]):
+        if run_path and len(run_ids) >= 2:
+            for cid in run_ids[1:]:  # flag every chunk past the first that shares
+                errors.append(
+                    (cid,
+                     f"cold-open chunks share image_path {run_path!r} with prior chunk(s) "
+                     f"{run_ids[:run_ids.index(cid)]!r} — STORY.md § 9a forbids holding one image "
+                     f"across 2+ adjacent cold-open beats. Pre-render distinct variants "
+                     f"(crop / annotation / Ken-Burns) per chunk.")
+                )
+    for c in cold:
+        path = (c.get("image_path") or "").strip()
+        cid = c.get("id") or "<unnamed>"
+        if path and path == run_path:
+            run_ids.append(cid)
+        else:
+            flush(run_path, run_ids)
+            run_path = path
+            run_ids = [cid] if path else []
+    flush(run_path, run_ids)
     return errors
 
 

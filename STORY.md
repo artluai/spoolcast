@@ -720,6 +720,16 @@ Rule:
 - humor lands best when the script stays calm
 - the narration should sound like it is underreacting to something inherently strange
 
+##### 5b. Use script-level inflection cues to give narration a human shape
+
+Use ellipsis, em-dashes, and sentence fragments to give narration a human shape and help the narrative land. They're on the page so TTS honors them, and they carry intent (foreshadowing, skepticism, weight) without reaching for production tricks (TTS prosody overrides, overlays, SFX, chunk-level pacing). Test by reading the line silently — if the cue conveys what you intended, the audio will too.
+
+Example caught on dev-log-03 C8: "Then I started noticing things." read flat on the page; the foreshadow didn't land. "Then... I started noticing things." carried the suspended beat in the silent read, and the rendered audio matched.
+
+Rule:
+- when a line falls flat on the silent read, reach for an inflection cue (ellipsis / em-dash / fragment) before reaching for any production-side fix
+- production fixes (split chunks, hold pauses, SFX, overlays) come AFTER the script-side fix has been tried
+
 ##### 6. Guardrails belong where the viewer is most likely to overinterpret
 
 The line “TRIBE is not reading a real person’s brain” did not exist just because it was accurate.
