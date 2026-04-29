@@ -45,6 +45,7 @@ Read these files in this exact order:
 2. [STORY.md](./STORY.md) — script extraction, pacing, viewer context
 3. [VISUALS.md](./VISUALS.md) — assets, preprocessor, transitions
 4. [SHIPPING.md](./SHIPPING.md) — review board, publishing
+5. [VIDEO_OUTPUT_RULES.md](./VIDEO_OUTPUT_RULES.md) — engine-level video output rules (character cloning, Kling 3.0 gotchas, ffmpeg concat, caption placement, SSML pacing) — supplementary to the procedural stages, learned from running real productions
 
 Delivery modes (agent-skill vs standalone-app, autopilot) are covered inside this file — see § Delivery Modes below.
 
@@ -86,6 +87,20 @@ End-of-pipeline: review and publish.
 Contains:
 - Part 1 — review board HTML contract, per-chunk display rules, layout, validation
 - Part 2 — publishing: title, thumbnail, description rules, YouTube metadata, core-message test
+
+### VIDEO_OUTPUT_RULES.md
+
+Engine-level rules for video output quality, character consistency, and pipeline mechanics — supplementary to the procedural stages. Read when running productions that involve video (vs. PNG-sequence-only renders), recurring characters, or when ffmpeg/caption rendering misbehaves.
+
+Contains:
+- Hard rule on never overwriting style anchors / locked character refs
+- Recurring real-person caricature pipeline (gpt-image-2 two-input redraw, name-free filter bypass, multi-pose character sheets, file naming conventions)
+- Kling 3.0 video gotchas (in-frame text mangle, kling_elements lead-frame flash, multi-image-ref requirements)
+- ffmpeg concat timestamp drift on `-c copy` over variable-duration mp4s
+- ASS subtitle resolution-correct fontsize via `PlayResX`/`PlayResY`
+- Caption placement avoidance (don't cover on-screen text or important imagery)
+- SSML pacing — `<break>` works, `<emphasis>` distorts in Chirp3-HD
+- Variable beat durations driven by narration > fixed-grid clips with padding
 
 ### DESIGN_NOTES.md
 

@@ -1,6 +1,6 @@
 # Video Output Rules
 
-Engine-level rules for video output quality, character consistency, and pipeline mechanics. These were learned the hard way during the news-cartoon-bot Episode 1 build (April 2026, kling-3.0/video + gpt-image-2 + Google Chirp3-HD TTS + ffmpeg) and apply to any video this engine produces.
+Engine-level rules for video output quality, character consistency, and pipeline mechanics. These were learned the hard way during the news-anime-bot Episode 1 build (April 2026, kling-3.0/video + gpt-image-2 + Google Chirp3-HD TTS + ffmpeg) and apply to any video this engine produces.
 
 These rules previously lived in global Claude memory (`behavior_character_cloning.md`, `reference_kling_text_limitation.md`, `feedback_caption_placement.md`, `feedback_never_touch_anchors.md`). Moved here to live with the engine code so they get versioned alongside the pipeline.
 
@@ -23,7 +23,7 @@ Applies to any reference image in a library that other sessions depend on.
 
 ## 2. Recurring real-person caricature pipeline
 
-For projects that need a recurring caricature of a real public figure (news-cartoon-bot, satirical content, editorial illustration):
+For projects that need a recurring caricature of a real public figure (news-anime-bot, satirical content, editorial illustration):
 
 ### 2.1 Source 2–4 reference photos
 Variety matters. Different angles (front, three-quarter), expressions (neutral, smile, animated), settings (casual, formal). Single-photo refs over-fit to whatever expression / hair-day was in that frame.
