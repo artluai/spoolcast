@@ -366,11 +366,20 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
             # source mp4 plays. Useful when multiple chunks share one mp4 and
             # we want them to show different moments.
             "startFromSec": float(chunk.get("start_from_sec", 0) or 0),
+            # Snap overlay end to chunk end when within ~6 frames (200ms) of, or
+            # past, durationFrames. Author-set timing_end_s drifts vs the actual
+            # rendered chunk duration by 2–5 frames; without the snap that gap
+            # reads as a flash where the meme vanishes a beat before the chunk
+            # cuts. Explicit early exits (large gaps) are preserved.
             "overlays": [
                 {
                     "src": _normalize_src(o.get("source", "")),
                     "startFrameInChunk": round(float(o.get("timing_start_s", 0)) * fps_value),
-                    "endFrameInChunk": round(float(o.get("timing_end_s", 0)) * fps_value),
+                    "endFrameInChunk": (
+                        (chunk_end_frame - chunk_start_frame)
+                        if (chunk_end_frame - chunk_start_frame) - round(float(o.get("timing_end_s", 0)) * fps_value) <= 6
+                        else round(float(o.get("timing_end_s", 0)) * fps_value)
+                    ),
                     "x": float(o.get("x", 0.5)),
                     "y": float(o.get("y", 0.18)),
                     "anchor": o.get("anchor", "center"),
@@ -444,26 +453,15 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
         prev = chunks_out[i - 1] if i > 0 else None
         prev_src = (prev or {}).get("imageSource", "")
 
-        # Entrance classifier (simple two-value vocabulary):
-        if src in HARD_CUT_SOURCES:
-            entrance = "cut"
-        elif i == 0:
-            # First chunk of the video: no prior frame to fade from, cut in.
-            entrance = "cut"
-        elif prev_src in HARD_CUT_SOURCES:
-            # Coming out of a meme / broll / reuse / proof insert — cut, not
-            # crossfade. The insert was meant to have no transition on EITHER
-            # side; a crossfade after it breaks that rule (you'd see the
-            # meme's last frame fading under the next illustration for ~0.35s).
-            # See STORY.md § Deadpan punchlines + VISUALS.md § Inter-chunk
-            # transition vocabulary.
-            entrance = "cut"
-        elif not _has_underlay(prev):
-            # Prev is a broll video, bumper, or has no renderable still —
-            # degrade crossfade to cut so we don't fade in from white.
-            entrance = "cut"
-        else:
-            entrance = "crossfade"
+        # Entrance classifier — STORY.md § Visual transition primitives lists
+        # CUT / comicPan / pageFlip / panelSplit. Crossfade is NOT in the spec.
+        # Default is `cut` (hard-cut) for everything; soft transitions are
+        # opt-in via a future shot-list field. Aligns code with STORY.md §
+        # "CUT is the deadpan default" and avoids the visible-wobble flash
+        # when consecutive scenes are visually similar (caught on dev-log-04
+        # C11→C12 — both ai-figure at desk; the 0.35s crossfade made the
+        # similar-but-not-identical scenes appear to flash).
+        entrance = "cut"
         chunk["entrance"] = entrance
 
     # Crossfade is entrance-side only — the incoming chunk fades in over the

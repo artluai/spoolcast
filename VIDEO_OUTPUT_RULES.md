@@ -157,12 +157,15 @@ When stitching multi-clip videos with TTS narration, do not pad each clip to a u
 
 **Right pattern:**
 1. Probe each narration mp3 for duration via ffprobe
-2. Beat target duration = narration duration + tail buffer (default ~0.35s)
-3. Trim or extend the source clip to match the target (freeze-frame extend if narration > clip)
-4. Concat variable-length clips
-5. Generate captions with cumulative timings based on actual durations
+2. Beat target duration = narration duration + tail buffer (default ~0.5s)
+3. **Trim the source clip to the target — do NOT pad audio with silence to fill an arbitrary clip length.** Even when you've paid for a 5s/6s clip from a video model, use only as much as narration + tail asks for. Excess paid footage is sunk; visible dead air is worse.
+4. Freeze-frame extend only when narration genuinely overflows the source clip (rare with correctly-sized prompts)
+5. Concat variable-length clips
+6. Generate captions with cumulative timings based on actual durations
 
-**Per-beat tail-buffer overrides** for comedic-timing beats: punchline beats benefit from longer trailing dwell (e.g., 1.0–1.4s) so the visual lands after the line.
+**Per-beat tail-buffer overrides** for comedic-timing beats: punchline beats benefit from longer trailing dwell (e.g., 1.0–1.8s) so the visual lands after the line. The final beat of an episode also gets a longer trailing dwell (e.g., 1.5–2.0s) since there's no next line to advance to.
+
+**Common bug — inherited from "5s default":** episode 1 of news-anime-bot and ep 2 v1 both shipped with each beat's narration silence-padded to fill the full Kling/Seedance clip duration. Result: viewers hear the line, then 1–3 seconds of silent visual before the next line begins. Reads as broken pacing. The fix is the opposite direction — trim the clip down to narration + small tail, not pad the audio up to fill the clip.
 
 ---
 
@@ -183,3 +186,66 @@ Pricing (kie.ai, no audio):
 - 4K: $0.335/sec
 
 For mobile-shorts work, std/720p/no-audio is the sweet spot.
+
+---
+
+## 10. Seedance 2.0 Fast video — known gotchas
+
+Seedance 2.0 Fast (`bytedance/seedance-2-fast` on kie.ai) is the alternate path when **legible in-frame text** matters — Kling 3.0 mangles text (§3.1), Seedance renders it cleanly. Validated empirically on news-anime-bot ep 2 (`$120B`, `$35B`, `450M`, `3%` all rendered legibly at 480p).
+
+### 10.1 `generate_audio` defaults to `true` — must explicitly set `false`
+
+Unlike Kling (`sound: false`), Seedance's `generate_audio` defaults to `true`. Forgetting to set it false generates AI audio you don't need (the show uses its own TTS) AND inflates per-clip cost. **Always explicitly pass `generate_audio: false`** in the request.
+
+### 10.2 Three reference modes are mutually exclusive
+
+Per the kie.ai API spec, these three modes cannot be combined in one request:
+
+- `first_frame_url` / `first_frame_url + last_frame_url` — Image-to-Video, locks the first (or first+last) frame to the supplied image. Will exhibit the same lead-frame-flash issue as Kling's `kling_elements`.
+- `reference_image_urls` (array, max 9) — Multimodal Reference-to-Video, soft style/character reference, no frame locking.
+- `reference_video_urls` — for motion transfer.
+
+For locked-character beats (the analog of Kling's `kling_elements`), use **`reference_image_urls` only** — passes the locked character sheet as a soft reference without locking it to a specific frame.
+
+### 10.3 No lead-frame flash (unlike Kling)
+
+Seedance with `reference_image_urls` does NOT exhibit Kling's 0.5s lead-frame flash where the input character sheet becomes the literal first rendered frame. Frame 0 is already a natural composition matching the prompt. **No 0.5s lead-skip needed in stitch** — saves engine complexity vs the Kling path.
+
+### 10.4 Request shape and pricing
+
+Required: `model: "bytedance/seedance-2-fast"`, `input.prompt`, `input.aspect_ratio`, `input.duration`. Optional: any one of the three reference modes above.
+
+Allowed values:
+- `resolution`: `480p`, `720p` (Fast tier doesn't support 1080p — that's the standard tier)
+- `aspect_ratio`: `1:1`, `4:3`, `3:4`, `16:9`, `9:16`, `21:9`, `adaptive`
+- `duration`: integer 4–15 (note: Kling uses string; Seedance uses int)
+
+Pricing (kie.ai, no video input — image refs do NOT count as "video input"):
+- 480p: $0.0775/sec
+- 720p: $0.165/sec
+- "with video input" tier ($0.045/$0.10) only applies when `reference_video_urls` is populated
+
+For mobile-shorts work where in-frame text matters, **480p / 9:16 / no audio** is the sweet spot. 480p cel-shaded anime survives platform compression fine; 720p is ~2.1× the per-second cost.
+
+### 10.5 In-frame text — prompt the literal characters
+
+Seedance renders prompted text legibly when the prompt names the **exact** character sequence wanted, e.g. `"glowing magenta neon text reading exactly '$120B' as cinematic anime typography"`. Passing the exact character sequence in single quotes inside the prompt and using "reading exactly" as the framing reliably produces the right glyphs. Vague phrasing ("a dollar amount", "the figure $120 billion") regresses to mangled glyphs.
+
+---
+
+## 11. Parallelize TTS calls — they're independent network requests
+
+Google Cloud TTS (and any per-line TTS API) calls have NO inter-line dependency. Generating 12 narration lines via a sequential `for` loop takes 5–10 minutes wall time at high latency and is prone to mid-loop hangs. Parallel via `ThreadPoolExecutor` finishes the same batch in 30–60 seconds.
+
+**Right pattern (mirrors `run_clips.py`'s parallel video-gen pattern):**
+
+```python
+with ThreadPoolExecutor(max_workers=len(NARRATION)) as ex:
+    futures = [ex.submit(synthesize_one, beat, api_key) for beat in NARRATION]
+    for fut in as_completed(futures):
+        results.append(fut.result())
+```
+
+**Also use `python -u` (unbuffered output)** when piping through `tee` — `tee` line-buffers stdout, and Python's default block buffering combined with TTS I/O waits will hide all progress messages until the entire batch completes (or hangs silently). Unbuffered = visible per-line progress, easier to diagnose hangs.
+
+Caught on news-anime-bot ep 2: sequential TTS took 6+ min for 12 lines, then hung at line 3 with no visible output. Process had to be killed and restarted. Parallel + `-u` would have completed the batch in under a minute with full visibility.

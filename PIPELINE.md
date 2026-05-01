@@ -313,6 +313,16 @@ Each stage must have:
 
 Do not blur these stages together.
 
+##### Stage numbering is a dependency graph, not a queue
+
+The numbered stages above are organized for clarity, not for sequential execution. Read the dependency graph: every stage that has no upstream blocker can fire as soon as its actual prereqs are met.
+
+Concrete: TTS narration synthesis (`batch_tts.py`) is downstream of scene generation in the numbering, but it only reads narration text from the shot-list — zero dependency on scene PNGs. It can fire the moment the shot-list locks, in parallel with kie.ai. Same for thumbnail generation, asset inventory, character roster — independent of scene batch.
+
+The test before queuing a stage: *"what specific input does this stage read, and is that input ready?"* If the input is ready and the stage hasn't fired, fire it now. Don't wait for the next stage number.
+
+The cost of treating numbering as sequential: every stage queued in series adds its full wall-clock duration to total runtime. A 20-minute TTS run blocked behind a 40-minute kie.ai run is 60 minutes when it could have been 40.
+
 ##### Stage 4 ordering rule: external assets before AI generation
 
 Within Stage 4 (scene generation), produce assets in this order:

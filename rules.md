@@ -129,7 +129,7 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
 - **Meme / reaction punchline placement check.** During Stage 2 shot-list build, in addition to the Concrete-reference and Recurring-reference checks, scan for *punchline / reveal / reaction / "all-the-same" / "of course this happens" / facepalm* moments in the script. For each, decide whether a meme or reaction-gif/image insert lands the beat harder than an illustrated chunk. Memes are a third category alongside literal-artifact broll and library-character references — and they're not auto-suggested by either of the other two checks. Source per STORY.md § 10a Punchline visual options. Without this check, dev-log register beats land flat where a culturally-recognized reaction could spike them.
 
   **Meme placement — every meme must have audio playing during its on-screen time. No silent meme beats.** Valid placements:
-    1. **Overlay on an existing narration chunk** — the meme is declared as an entry in the host chunk's `overlays` field, sitting on top of the chunk's main illustration. The host chunk's narration is the audio covering the meme. Required per-overlay fields: `source` (path), `position` (x, y as 0–1 canvas fractions), `size` (width as 0–1 fraction, height auto), `entry_time_sec` (offset from chunk start), `duration_sec` (must fit declared `meme_type`), `exit_style` (`cut` or `fade`), `meme_type`. The scene beneath keeps playing; the meme pops in, holds, pops out. Preferred placement — keeps chunk pacing tight without forcing narration compression.
+    1. **Overlay on an existing narration chunk** — the meme is declared as an entry in the host chunk's `overlays` field, sitting on top of the chunk's main illustration. The host chunk's narration is the audio covering the meme. Required per-overlay fields: `source` (path), `position` (x, y as 0–1 canvas fractions), `size` (width as 0–1 fraction, height auto), `entry_time_sec` (offset from chunk start), `duration_sec` (must fit declared `meme_type`), `exit_style` (`cut` or `fade`), `meme_type`, `mark_on_word` (the narration word the meme syncs to; `"chunk-start"` valid only with one-line reason). The scene beneath keeps playing; the meme pops in, holds, pops out. Preferred placement — keeps chunk pacing tight without forcing narration compression.
     2. **Its own chunk, with narration audio** — the meme is the chunk's `image_path` (`image_source: broll_image`, `broll_source_kind: meme`, `broll_framing: full-frame`), and the chunk has a normal narration beat whose audio plays over the meme for the full chunk duration. Chunk duration = narration duration; author the narration to fit the declared `meme_type` range. When a meme's type doesn't match the companion narration's duration, shorten the narration — don't leave the meme held past its `meme_type` cap.
     3. **Its own chunk, with SFX audio** — same as (2) but the audio is an SFX file instead of narration. **Blocked until `ROADMAP.md` §6 SFX support ships.** Until then, (1) and (2) are the only valid placements.
 
@@ -152,12 +152,13 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
   1. **No single silence moment exceeds 2.0s** — outside the declared ending archetype (which has its own ≥2.5s requirement per STORY.md § Ending sequence). A single `pause_after: "long"` (1.2s) + a chunk's `hold_duration_sec` of 2s stacks into 3.2s+ and will flag.
   2. **Rolling 5-second window check** — scan the timeline; any 5-second continuous stretch where ≥80% of the time is silent (pauses, text-card-holds, bumper-holds, post-narration silences) is flagged as dead-air risk. Silences stack quietly — a 1.2s pause + a 2s hold + a 1.75s bumper sum to a 5s dead-air window without any single piece looking problematic.
   3. **Aggregate cap** — total silent time ≤ 8% of runtime for dev-log-style videos, ≤ 12% for explainer-style (where breathing room is editorially deliberate). If over, audit flags the specific silent moments and requires trimming.
-- **Meme / reaction duration classification.** Every meme / reaction chunk declares a `meme_type` field. Valid values and their duration ranges:
-  - **`quick-react`** — ≤1.0s hold. Reaction faces with no caption to read (Surprised Pikachu, Picard facepalm, Mr. Krabs Blur, wojak reaction crops). The punch lands instantly; holding longer dilutes it.
-  - **`sustained-punchline`** — 1.5–2.5s hold. Memes with caption text the viewer must read (Pam "they're the same picture," First Time Franco, Always Has Been astronaut). Reading time is load-bearing.
-  - **`saga-item`** — 0.6–1.0s hold, part of a run of ≥3 items where the pattern is the point. Spacing rules per STORY.md § Saga-montage carve-out.
-  Stage 2 audit validates the chunk's effective duration matches the declared type. A `quick-react` meme held for 2s is a hard flag; a `sustained-punchline` held for 0.5s is a hard flag. Generalizes: memes have wildly different optimal durations depending on whether the viewer decodes the joke instantly (a face) vs. reads a caption vs. follows a pattern.
-- **Meme-narration alignment.** When a meme is the primary visual for a narration chunk, the chunk's narration must have its emotional-peak moment (the joke, the reveal, the reaction trigger) in the **first 40% of the chunk's total duration** (narration + pauses + holds). The meme appears at chunk-start; if the peak lands near the end, the meme stares back at the viewer for seconds before its audio companion arrives, producing off-beat pacing. Fix options when this fails: (a) shorten the narration so the peak lands early, (b) split the chunk — setup-narration on prior chunk, meme with payoff-narration as its own chunk, (c) move the meme to the following chunk where the peak is earlier. Generalizes: a meme on-screen too early without its audio partner reads as the agent dropping the joke before it landed.
+- **Meme / reaction duration classification.** Every meme declares a `meme_type` field:
+  - **`quick-react-static`** — ≤1.0s. Static reaction faces (Pikachu, Picard, Krabs blur). Punch lands instantly.
+  - **`quick-react-animated`** — 1.2–1.8s. Animated reactions where the motion is the joke (Travolta confused, Eyebrow Rock). Hold ≥ one full motion cycle.
+  - **`sustained-punchline`** — 1.5–2.5s. Memes with caption text to read (Pam, Always Has Been). Reading time is load-bearing.
+  - **`saga-item`** — 0.6–1.0s, part of a run of ≥3 items where the pattern is the point. Spacing per STORY.md § Saga-montage carve-out.
+  `audit_overlays.py` fails on type/duration mismatch.
+- **Meme-narration alignment.** When a meme appears (primary visual or overlay), the narration's peak word — joke, reveal, or reaction trigger — must land inside the meme's on-screen window. Overlays declare `mark_on_word`; `estimate_overlay_timings.py` snaps `timing_start_s` to that word. Primary-visual memes: peak must land in the first 40% of chunk duration (meme appears at chunk-start). On violation: extend the window, shift start, or split the chunk.
 - **Contiguous meme/punchline cluster pacing.** If **3+ memes** appear within any **30-second window**, they are a *meme cluster* and get additional constraints:
   1. Each meme in the cluster is shortened to **0.8–1.0s** maximum, regardless of its declared `meme_type`. The cluster's collective effect supplies the comedic weight; individual dwell time drops.
   2. The cluster is ONE spacing unit per STORY.md § Saga-montage carve-out — no cooling-off inside the cluster, but a mandatory **≥15s gap** before the next meme after the cluster ends.
@@ -188,6 +189,18 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
 - **Verify image annotations by rendering and looking.** Coordinates guessed from a display thumbnail are usually wrong — don't iterate more than twice on coords without viewing the rendered output. See VISUALS.md § Annotation Craft on Broll for visual conventions.
 - **A stage isn't done until its audit script passes.** Production-script exit-0 is necessary, not sufficient. See PIPELINE.md § Pipeline Stages and § Audit-gated stage outputs.
 - **Bundle pipeline assets (fonts, small binaries, reference weights) in the repo over brew/apt/system installs**, when license and size allow. A fresh clone should run end-to-end without a shopping list of casks and taps. Prereqs that genuinely can't be vendored (e.g. a libass-enabled ffmpeg) live in the relevant rule file's prerequisites section as a named one-liner, not implicit tribal knowledge.
+- **Don't crop or position a meme / reaction / broll in a way that hides what the viewer needs to read it.** A meme works because the viewer recognizes the joke (caption + face) AND connects it to the moment underneath. If placement hides the joke, or covers what the meme is reacting to, the viewer can't make the connection and it reads as random. Per-piece check before any overlay ships: (1) Is the meme still recognizable on its own? — caption visible, face/character visible. (2) Does its relationship to the chunk still read? — the thing it's reacting to underneath is still visible. If either fails, resize, reposition, or replace. Caught on dev-log-04: Pam without "they're the same picture" caption, AHB without "always has been" text, Galaxy Brain cropped to empty caption columns — all shipped because nobody asked "what's the must-have part" before placement.
+
+- **Meme viewer-test.** A normal viewer (no tech background, no prior series videos seen) must (a) recognize the meme, (b) get the joke, (c) connect it to the line — in the size and time given. Four checks:
+  - **Recognition.** Universal face/format = fine. Same meme used in any of the prior 2 sessions of the series = stale; swap unless rerun is editorially correct (declare `editorial_rerun_reason` on the overlay to suppress the flag).
+  - **Size.** Width ≥ 0.30 of canvas; ≥ 0.35 if recognition is borderline.
+  - **Connection.** `mark_on_word` declared; the marked word exists in the chunk's narration; peak word lands inside the on-screen window.
+  - **Decode time.** Effective on-screen duration matches declared `meme_type` range.
+  `audit_overlays.py` blocks render on violation.
+
+- **Auditor false-positive registry.** See `STORY.md § Layman-pass false positives` for the canonical 4-class registry (proper nouns / defined-upstream terms / plain-English rewrites / locked core-message line). Flags matching any class surface in the audit report but do NOT block the build, do NOT justify further script iteration. Iterating on them is a stall signal per § Prompt-engineering stall signal.
+
+- **Mobile is post-widescreen-approval.** Mobile variants must NOT be included in any autonomous-mode scope before the widescreen mp4 is rendered AND user-approved. Even when the user grants a broad "go ahead through render," that grant covers widescreen only — mobile is `Post-Stage 8 (optional)` per PIPELINE.md and depends on the widescreen master existing. The right flow: (1) render widescreen mp4 (Stage 7); (2) user approves widescreen; (3) `smart_crop_mobile.py` crops widescreen scenes to 9:16 (free ffmpeg, NO kie.ai cost); (4) `audit_mobile_crops.py` flags chunks where the crop fails (text outside crop box, important content missing); (5) ONLY THEN: `batch_scenes.py --mobile-variant --only <flagged>` regenerates ONLY the failing chunks at 9:16 native via kie.ai. Running `batch_scenes.py --mobile-variant` against ALL chunks (no `--only`) is the wrong move — regenerates every chunk via paid kie.ai when most would have been fine with the free ffmpeg crop. Caught on dev-log-04: ~$1.12 burned regenerating 28 portrait scenes pre-approval.
 
 ## If There Is A Conflict
 
@@ -219,6 +232,32 @@ If you need progress visibility on a long command:
 - For background tasks, read the output file directly without piping
 
 If you're sure a command is hanging (no output for >2x expected time), verify with `ps aux | grep <name>` to check if the process is alive and consuming CPU before killing it.
+
+#### Concrete pattern for long-running batches
+
+For any long-running batch (kie.ai generations, TTS synthesis, render, audit) the right pattern is:
+
+```bash
+cd /repo && set -a && source .env && set +a && \
+  python -u scripts/batch_xxx.py --session SESSION ARGS \
+  > /tmp/batch-xxx.log 2>&1 &
+```
+
+Three things this gets right:
+1. **`python -u`** forces unbuffered stdout. Output streams to the file line-by-line as it happens, not in chunks at exit.
+2. **Redirect to a log file** (`> /tmp/log.txt 2>&1`) instead of piping. The file fills incrementally; `tail -f /tmp/log.txt` shows live progress at any moment without buffering.
+3. **Background the process with `&`** (or via the run_in_background tool). Frees the foreground to inspect state during the run.
+
+#### Disk-state polling beats process-state polling
+
+Don't trust the wrapper script's stdout as ground truth for how much work has happened. Check the actual disk:
+
+```bash
+ls /session/source/audio/ | wc -l    # how many mp3s actually exist
+ls /session/source/generated-assets/scenes/ | wc -l    # how many scenes actually rendered
+```
+
+Disk state is unambiguous and survives crashes/kills. Wrapper-script counts can drift from reality if a worker crashed without printing, if files were written to the wrong path, or if output was lost to pipe buffering.
 
 ### Diagnostic anti-pattern: silent cwd drift
 

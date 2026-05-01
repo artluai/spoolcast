@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures as cf
+import html
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +21,47 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTENT_ROOT = REPO_ROOT.parent / "spoolcast-content"
 TTS_SCRIPT = REPO_ROOT / "scripts" / "tts_client.py"
 PYTHON = REPO_ROOT / "scripts" / ".venv" / "bin" / "python"
+
+
+def apply_pronunciations(text: str, pronunciations: dict[str, str]) -> str:
+    """Apply session pronunciation registry to narration text.
+
+    Default mode: PLAIN-TEXT substitution. The mapped word in the narration
+    is replaced with its alias spelling directly in the text sent to the TTS
+    engine. This bypasses Chirp3-HD's unreliable <sub>/<phoneme> SSML support
+    (caught on dev-log-04: IPA <phoneme> rendered as "art-dash-lu-dot-ai"
+    instead of single-word "artlu").
+
+    Optional SSML mode: if alias starts with `ssml:` the rest of the alias
+    is treated as a raw SSML fragment to inject in place of the word. Only
+    use this with voices known to honor the relevant SSML tags.
+
+    Per STORY.md § Brand pronunciation registry.
+    """
+    if not pronunciations:
+        return text
+    out = text
+    matched_ssml = False
+    # Process longer keys first so compound patterns ("artlu.ai") match before
+    # their substrings ("artlu") — otherwise the substring match would fire and
+    # leave the compound pattern unaddressed.
+    for word, alias in sorted(pronunciations.items(), key=lambda kv: len(kv[0]), reverse=True):
+        if not word or not alias:
+            continue
+        pattern = re.compile(r"\b" + re.escape(word) + r"\b", re.IGNORECASE)
+        if not pattern.search(out):
+            continue
+        if alias.startswith("ssml:"):
+            # SSML opt-in: wrap raw SSML fragment around the word.
+            frag = alias[len("ssml:"):]
+            out = pattern.sub(frag, out)
+            matched_ssml = True
+        else:
+            # Default: plain-text substitution. Most reliable across voices.
+            out = pattern.sub(alias, out)
+    if matched_ssml:
+        return f"<speak>{html.escape(out, quote=False)}</speak>"
+    return out
 
 
 def run_one(beat_id: str, text: str, out_path: Path, voice: str, rate: float, force: bool) -> tuple[str, bool, str]:
@@ -56,6 +99,7 @@ def main() -> int:
     cfg = json.loads(cfg_path.read_text())
     voice = cfg.get("tts_voice", "Puck")
     rate = float(cfg.get("tts_playback_rate", 1.0))
+    pronunciations = cfg.get("pronunciations") or {}
 
     shot_list_path = CONTENT_ROOT / "sessions" / args.session / "shot-list" / "shot-list.json"
     d = json.loads(shot_list_path.read_text())
@@ -76,6 +120,7 @@ def main() -> int:
                 continue
             if only and bid not in only:
                 continue
+            text = apply_pronunciations(text, pronunciations)
             out = audio_dir / f"{bid}.mp3"
             jobs.append((bid, text, out))
 

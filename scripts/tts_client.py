@@ -165,10 +165,15 @@ class TtsClient:
             audio_config["pitch"] = pitch
 
         # Build the input — plain text by default, SSML with marks if requested.
+        # Caller-provided SSML (text already starts with <speak>) is detected and
+        # passed through as ssml; this is the path used by batch_tts.py for
+        # pronunciation-registry SSML <sub alias>/<phoneme> wrapping.
         word_to_markname: dict[str, str] = {}
         if marks:
             ssml, word_to_markname = _build_ssml_with_marks(text, marks)
             input_obj: dict[str, str] = {"ssml": ssml}
+        elif text.lstrip().startswith("<speak>"):
+            input_obj = {"ssml": text}
         else:
             input_obj = {"text": text}
 

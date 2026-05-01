@@ -13,8 +13,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures as cf
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -103,6 +105,22 @@ def main() -> int:
         default="9:16",
         help="aspect for --mobile-variant (default 9:16; alternatives: 4:5, 1:1)",
     )
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help=(
+            "number of concurrent kie.ai generations (default: 1 = serial). "
+            "Each chunk calls generate() independently — no shared mutable state "
+            "during generation, so this is safe to parallelize. kie.ai's documented "
+            "rate limit is 20 new generation requests per 10s, with 100+ concurrent "
+            "running tasks supported per account. For a typical 20-40 chunk batch, "
+            "set this to the chunk count (or 20, whichever is smaller) and the "
+            "whole batch fires at once — wall-clock time becomes ~one generation, "
+            "not N generations. If you hit HTTP 429, reduce. See "
+            "https://docs.kie.ai (Rate Limits & Concurrency)."
+        ),
+    )
     args = p.parse_args()
 
     shot_list_path = CONTENT_ROOT / "sessions" / args.session / "shot-list" / "shot-list.json"
@@ -151,9 +169,12 @@ def main() -> int:
         todo.append(c)
 
     print(f"[batch] session={args.session} todo={len(todo)} chunks "
-          f"(force={args.force})")
-    successes, failures = [], []
-    for i, c in enumerate(todo, 1):
+          f"(force={args.force} workers={args.workers})")
+    successes: list[tuple[str, str]] = []
+    failures: list[tuple[str, str]] = []
+    print_lock = threading.Lock()
+
+    def run_one(idx: int, c: dict) -> tuple[str, bool, str]:
         cid = c["id"]
         bk = c.get("boundary_kind", "")
         references = c.get("references") or []
@@ -173,7 +194,8 @@ def main() -> int:
             else None
         )
         motion_notes = c.get("motion_notes") or None
-        print(f"\n[batch] ({i}/{len(todo)}) {cid} (bk={bk}, refs={references})")
+        with print_lock:
+            print(f"\n[batch] ({idx}/{len(todo)}) {cid} (bk={bk}, refs={references})")
         try:
             dest = generate(
                 session_id=args.session,
@@ -188,12 +210,36 @@ def main() -> int:
                 mobile_variant=args.mobile_variant,
                 mobile_aspect=args.mobile_aspect,
             )
-            successes.append((cid, str(dest)))
+            return cid, True, str(dest)
         except Exception as e:
-            print(f"[batch] {cid} FAILED: {e}")
-            failures.append((cid, str(e)))
+            with print_lock:
+                print(f"[batch] {cid} FAILED: {e}")
             # brief pause before next to avoid hammering on errors
             time.sleep(2)
+            return cid, False, str(e)
+
+    if args.workers <= 1:
+        # Serial path — preserves prior log ordering exactly.
+        for i, c in enumerate(todo, 1):
+            cid, ok, payload = run_one(i, c)
+            if ok:
+                successes.append((cid, payload))
+            else:
+                failures.append((cid, payload))
+    else:
+        # Parallel path — kie.ai accepts concurrent calls; generate() has no
+        # shared mutable state across threads.
+        with cf.ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futures = {
+                ex.submit(run_one, i, c): c["id"]
+                for i, c in enumerate(todo, 1)
+            }
+            for fut in cf.as_completed(futures):
+                cid, ok, payload = fut.result()
+                if ok:
+                    successes.append((cid, payload))
+                else:
+                    failures.append((cid, payload))
 
     # After mobile regen, write mobile_image_path back to the shot-list so
     # downstream export_mobile.py knows which chunks have portrait variants.

@@ -289,10 +289,26 @@ const OverlayLayer: React.FC<{overlays: Overlay[]; canvasWidth: number; canvasHe
               transformOrigin: "center center",
             }}
           >
-            <Img
-              src={staticFile(ov.src)}
-              style={{width: "100%", height: "auto", display: "block"}}
-            />
+            {(() => {
+              const lower = ov.src.toLowerCase();
+              const isVideo = lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
+              if (isVideo) {
+                return (
+                  <OffthreadVideo
+                    src={staticFile(ov.src)}
+                    style={{width: "100%", height: "auto", display: "block"}}
+                    muted
+                    loop
+                  />
+                );
+              }
+              return (
+                <Img
+                  src={staticFile(ov.src)}
+                  style={{width: "100%", height: "auto", display: "block"}}
+                />
+              );
+            })()}
           </div>
         );
       })}

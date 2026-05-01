@@ -243,12 +243,33 @@ STORY.md § Part 2 "Preview structure" requires every preview chunk to:
 
 Minimum to pass: names PLUS either (2) OR (3). Ideal: all three.
 
-Anti-example: "Four layers. Image. Animation. Voice. Render." — names only.
-The viewer has no idea what any layer does or why four.
+CRITICAL — the preview-structure rule ONLY applies to chunks that EXPLICITLY
+preview a list. Signals that a chunk is previewing a list:
+- enumeration phrasing: "four reasons," "three things," "five receipts," "two
+  options," "the X items," etc.
+- forward-pointing language: "here's what we'll cover," "in the next section,"
+  "let me walk through," "I'll explain X then Y then Z"
+- numbered or bulleted preview: explicitly stating multiple items the section
+  will then expand on
 
-Good example: "Four layers. Image makes the pictures. Animation gives them
-motion. Voice narrates. Render stitches everything into an mp4. Each one does
-one thing. Together they make the video." — names + jobs + relationship.
+If the chunk is NOT explicitly previewing a list (it's just an act-boundary
+opener that introduces a single topic, sets a scene, or makes a single
+claim), verdict = "ok" automatically. Act-boundary openers without list
+language are NOT subject to this test. Examples that should pass with no
+flag, regardless of "missing names/jobs/relationship":
+- "I built a tool to update my own projects." — single-claim opener, not a
+  list preview. ok.
+- "I reverted the change. Opened the source code." — narrative beat opener,
+  not a list. ok.
+- "The fix was small. About ten lines." — single-claim opener. ok.
+
+Anti-example (should be flagged): "Four layers. Image. Animation. Voice.
+Render." — names only, no jobs, no relationship.
+
+Good example (should pass): "Four layers. Image makes the pictures. Animation
+gives them motion. Voice narrates. Render stitches everything into an mp4.
+Each one does one thing. Together they make the video." — names + jobs +
+relationship.
 
 Always reply with a single JSON object. No prose outside the JSON."""
 
@@ -307,8 +328,39 @@ audience and do not fail the test:
   in the spoolcast pipeline; treat as established unless the beat introduces
   the concept for the first time without explanation.
 
+Four additional false-positive classes (per STORY.md § Layman-pass false
+positives) — DO NOT flag any of these as opaque:
+
+1. PROPER NOUNS OF REAL THINGS. Names of real tools, projects, products,
+   companies, services, or people (e.g. "artlu.ai", "AWS", "Crowdstrike",
+   "MCP", any product or person name). They are the actual referent — they
+   cannot be made plainer without becoming wrong. NEVER include a proper
+   noun in opaque_terms, regardless of whether the viewer might not know it.
+
+2. TERMS DEFINED EARLIER IN THE SCRIPT. If a term appears in the rolling
+   glossary above ("Terms introduced earlier"), it is established. Do not
+   re-flag a term whose plain definition was given in a prior beat. Do not
+   flag a term that is defined IN THE SAME BEAT (e.g. "an MCP — a small
+   tool that..." defines MCP inline).
+
+3. PLAIN-ENGLISH REWRITES OF JARGON. Figurative phrases, metaphors, and
+   colloquialisms that ARE the layman version of a technical concept must
+   not be flagged. Examples: "stepped outside it" (replacing "verified
+   externally"), "hiding inside other project names" (replacing "substring
+   of others"), "the random label each project gets" (replacing "document
+   ID"). If the phrase reads as everyday English describing a technical
+   thing, that's the rule working — do not propose a more technical
+   rewrite.
+
+4. THE LOCKED CORE-MESSAGE LINE. The core_message field provided in the
+   audit context is the line confirmed at Job E. It is non-negotiable.
+   Never propose a rewrite of the core-message line, even if it is
+   metaphorical. If a beat IS the core-message line (or contains it
+   verbatim), verdict = "ok" automatically.
+
 Apply this allowlist before flagging. If the ONLY reason a beat would fail
-the layman test is a pre-approved term from this list, verdict = "ok".
+the layman test is a pre-approved term, a proper noun, an upstream-defined
+term, a plain-English rewrite, or the core-message line, verdict = "ok".
 
 Always reply with a single JSON object. No prose outside the JSON."""
 

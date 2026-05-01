@@ -584,6 +584,8 @@ List every non-obvious term the script uses in its argument — project-specific
 
 This gate protects against the failure mode where central concepts carry the thesis but remain undefined — the viewer nods along without actually following the argument.
 
+**Re-runs after any post-v3 narration change.** The agent re-invokes `audit_narration.py` after bridge revisions, replacements, manual rewrites. The layman-pass rolling glossary surfaces any term whose first-use definition got dropped. Address before proceeding.
+
 ##### Layman-first explanation rule
 
 Applies to everything presented to a viewer: narration in the final video, and chat output to the user during the build (structure proposals, plan summaries, option lists, fix explanations).
@@ -604,6 +606,17 @@ Applies equally to:
 - **In-chat presentation to the user** — the user is smart and the substance owner, but they are not pre-loaded on every mechanism. When proposing a fix, a structure, or a decision, lead with what it DOES in plain terms before naming the mechanism.
 
 **Mechanical enforcement on the narration side.** The layman-first rule is procedurally enforced by the layman-accessibility pass in `scripts/audit_narration.py`. For each beat, the auditor asks whether a non-technical viewer can understand it from the narration alone — and flags beats that rely on unexplained jargon / terms-of-art / insider vocabulary. The auditor maintains a rolling glossary: a term flagged on first use is considered "established" for subsequent beats, so the rule catches first-use violations without punishing legitimate reuse. `build_preview_data.py` refuses to produce a final render while layman flags are unresolved; the only way past is to address the flag or build as an explicit preview via `--skip-audit --preview` (which writes a bypass marker so the render is not mistaken for final). Prose rules on this one lose to pattern-matching in agent drafting — the audit pass is what actually enforces the rule.
+
+##### Layman-pass false positives (do not count as violations)
+
+Four classes of items LLM auditors (qwen, claude-as-second-opinion, future auditors) commonly flag but that should NOT count as layman violations:
+
+1. **Proper nouns of real things.** Names of real tools, projects, products, companies, services, or people (`artlu.ai`, `AWS`, `Crowdstrike`, `MCP`, product names, person names). They are the actual referent — they cannot be made plainer without becoming wrong.
+2. **Terms defined earlier in the same script.** Once a term is introduced with its plain-English definition (e.g. `slug — the short readable bit at the end of a web address`), subsequent uses are not opaque. The auditor's rolling glossary is the gate; reuse is compliance, not violation.
+3. **Plain-English rewrites of jargon.** Figurative phrases, metaphors, and colloquialisms substituted for technical terms ARE the layman version — e.g. "stepped outside it" replacing "verified externally," "hiding inside other project names" replacing "substring of others." Flagging the rewrite is flagging the fix.
+4. **The locked core-message line.** The line confirmed at Job E is non-negotiable per `STORY.md § Job E`. The auditor must not propose rewrites of the core-message line.
+
+A flag matching any of these four classes is a known auditor false positive. The agent records the flag in the audit report but does not block the build on it and does not iterate the script to satisfy it. Iterating on auditor false positives is a documented stall (`rules.md § Prompt-engineering stall signal`).
 
 ##### Timestamps, not chunk IDs
 
@@ -730,6 +743,35 @@ Rule:
 - when a line falls flat on the silent read, reach for an inflection cue (ellipsis / em-dash / fragment) before reaching for any production-side fix
 - production fixes (split chunks, hold pauses, SFX, overlays) come AFTER the script-side fix has been tried
 
+##### 5b-2. Brand pronunciation registry
+
+Non-obvious pronunciations live in `session.json` as `pronunciations: {word: replacement}`. `batch_tts.py` substitutes the replacement **directly into the narration text** before TTS — plain-text by default. SSML (`<sub>`, `<phoneme>`) is opt-in via an `ssml:` alias prefix and should be used sparingly; Chirp3-HD does not reliably honor those tags (caught on dev-log-04: IPA `<phoneme>` rendered as "art-dash-lu-dot-ai" instead of single-word "artlu").
+
+Replacement strategies:
+- **Phonetic respelling** for single words: `"artlu": "artloo"`.
+- **Compound rewrite** for domain or multi-token brands: `"artlu.ai": "artloodot AI"` (joins to avoid prosody pause before letter sequences).
+- **Special-case override** for hard-to-pronounce inflections: `"artlu.ai's": "artloo's"` (drops the .ai for possessive forms TTS can't smooth out).
+- **Length-sorted processing** runs longer keys first so compound patterns match before their substrings.
+
+Founder/brand origin facts the founder cares about (e.g. artlu = ultra backwards) live in the session brief. Agent may use once per video as callback/aside/opener — discretionary, not mandatory.
+
+##### 5c. Amplifiers fan flames; they don't start fires
+
+Amplifiers (memes, broll cuts, reaction-gifs, voiced reactions like "hmm…", expressive visual inserts) go on **flame beats** — beats where the script creates an emotional response in the viewer (recognition, surprise, doubt, vindication, "wait, what?").
+
+The skill is reading the script as the audience and marking every beat: **flame or no-flame**. Amplifiers go on flames. Putting one on a no-flame beat doesn't create emotion — it reads as forced.
+
+Pause matters when the amplifier is voiced or visual-only: pair with `pause_after: short` or `medium` (0.3–0.6s). Skipping the pause makes the reaction feel rushed; `long` (1.2s) drags.
+
+##### 5c-2. Sibling-cache memes — evaluated per-beat, not auto-rejected or auto-reused
+
+Sibling-cache memes (`spoolcast-content/sessions/<other>/source/fetched-assets/memes/`) get evaluated per-beat:
+- **Reuse is fine** when the sibling meme is exactly right for the new beat (genuine fit on emotion + register + cultural reference).
+- **Reject reuse** when reuse is happening to avoid sourcing a fresh meme that would fit better.
+- **Don't refuse reuse** when a sibling meme genuinely is the right choice for the new beat.
+
+The intent: don't lazy-grab from the cache as a shortcut, but don't refuse to reuse on principle either. The fit is what matters.
+
 ##### 6. Guardrails belong where the viewer is most likely to overinterpret
 
 The line “TRIBE is not reading a real person’s brain” did not exist just because it was accurate.
@@ -817,6 +859,8 @@ The density curve across a video: **very dense (0-15s) → dense (15-60s) → no
 Concrete: a narration block like *"You build things. Getting attention for what you built is a separate job. Different skills. Different time. Different energy."* in the cold open probably wants each sentence as its own chunk — three images in ~7 seconds, not one image across all three. The tricolon *"Different skills / Different time / Different energy"* can even be a three-panel micro-montage inside a single chunk if that lands cleaner than three separate chunks.
 
 Outside the cold open, this rule relaxes — long multi-beat chunks are fine past the 15-second mark because the viewer has already committed. Within the cold open, they're a failure mode.
+
+**First-40s broll cap.** Max 2 consecutive broll chunks in the first 40s; next chunk must be illustrated (character or concept diagram). Outside the first 40s: relaxed. Why: cold viewers stay for character beats; consecutive screenshots read as documentation, drive early drop-off.
 
 ##### 9a-2. Cold-open → Act 1 handoff: continuous, not reset
 
