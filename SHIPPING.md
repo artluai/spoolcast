@@ -381,6 +381,18 @@ ffmpeg -y -i thumbnail.png -vf "scale=1920:1080:flags=lanczos" thumbnail-1920x10
 
 A direct scale (not preserving aspect via padding) is correct here — kie.ai outputs are close enough to 16:9 that the 0.5-1% horizontal stretch is imperceptible, and any pad-to-fit approach reintroduces the black bars we're trying to eliminate.
 
+#### Thumbnail style registry
+
+Every thumbnail prompt = registered style template + scene-specific block (subject, props, caption text). Pick from this registry or add a new entry; don't reinvent style language each session.
+
+**`noir-debug`** — gritty black-and-white graphic novel / ink illustration. Heavy crosshatching, bold shadows, high contrast, sharp ink lines, cinematic desk lighting, dramatic noir atmosphere. Mostly pure black and white with only selective red accents. Bold distressed brush-lettering headline across the top; red brushstroke underline beneath the headline. Composition clean and thumbnail-readable, central subject, slightly ominous tone.
+
+When using a registered style: prepend the template verbatim to the scene-specific block. Don't paraphrase — the template is the contract.
+
+#### Hook-word series-reuse
+
+Hook words and concepts used in the prior 2 series videos' titles or thumbnail captions are stale. Don't lean on the same angle ("lied," "AI fail," "broken," etc.) in back-to-back uploads — the viewer registers repetition as the channel running out of ideas. Swap the hook angle unless rerun is editorially correct (and named).
+
 #### Don't self-hedge in the title or thumbnail
 
 Above-the-fold language (title, thumbnail text, first two lines of description) must lead with the **strongest accurate** claim — never the most hedged accurate claim. Hedging words that belong in the video's narration (where nuance is earned) sabotage the click when they appear on the thumbnail.
@@ -660,6 +672,19 @@ Caught on dev-log-02 C1 + C9: these chunks exposed every failure mode in turn �
 
 Caught on dev-log-02 mobile pass: 3 chunks (C14, C21, C44) generated as split-panel wojak layouts, Qwen's mobile-crop audit under-rated two of them because it evaluated each panel in isolation and missed that the overall composition broke. The upstream fix here (portrait-safe default at Stage 2 when mobile is planned) prevents the class of breakage before it reaches audit.
 
+### Audit-fix paths — resize-to-fit vs paid regen
+
+When `audit_mobile_crops.py` flags a chunk as broken, pick one:
+
+- **Resize-to-fit** (free, default for clipped-edge failures): scale the widescreen scene to fit inside the 9:16 canvas, pad with a per-chunk color sampled from the source PNG's edges (median of 8 edge blocks — 4 corners + 4 mid-edges). White-for-everything fails on broll PNGs that aren't on a white background; per-chunk sampling makes the pad blend in.
+
+  ```bash
+  scripts/.venv/bin/python scripts/mobile_pad_to_fit.py \
+      --session <id> --only <chunk-ids>
+  ```
+
+- **AI regen** (paid kie.ai, ~$0.05 per chunk): `batch_scenes.py --mobile-variant --only <chunks>`. Use when the composition needs a native portrait gen — split panels, off-canvas focal subject, beat that doesn't survive a scale-down.
+
 ### Mobile-crop audit — comprehension test
 
 `audit_mobile_crops.py` grades each cropped mobile scene against a single primary question:
@@ -719,7 +744,13 @@ Intermediate ASS / SRT files stay under `working/` because they're pipeline bypr
 | TikTok | 10 min | ≤60 s favored |
 | YouTube Shorts | 3 min (hard, since Oct 2024) | ≤60 s for the Shorts shelf algorithm sweet spot; 60 s–3 min still qualifies as a Short but is pushed less aggressively |
 
-A video over a platform's preferred cap uploads fine but won't get pushed to non-followers. For source videos ≥60 s targeting TikTok/Shorts, use `export_mobile.py --split-duration 60` to produce multi-part exports.
+A video over a platform's preferred cap uploads fine; it just loses non-follower algo push. For source videos ≥60 s, run `mobile_export.py --split-duration <60 or 90>` once and use the same parts on TikTok, Shorts, and Reels.
+
+Pick `--split-duration` per editorial trade-off:
+- **60s** — maximizes per-part algo push on TikTok/Shorts, more parts, more between-part drop-off.
+- **90s** — fewer parts, less algo boost. Use when a 60s split would yield 5+ parts (4–5 min source).
+
+Default: 60s. 90s is an editorial override for fewer-parts.
 
 ### Split mode + part badge
 
@@ -769,7 +800,9 @@ Separate artifact from the video. Key differences from widescreen thumbnail:
 - **Title + part indicator baked in.** Unlike the widescreen thumbnail (prompt-only, no text overlay), the mobile thumbnail composites BOTH the video's title and a part indicator onto the base image:
   - **Title** — the video's promotional title. Caveat Bold, large (≈120–160 px at 1080-wide canvas). Positioned upper or lower third depending on base image content.
   - **Part indicator** — e.g. `PART 1 OF 2`. Montserrat Black, smaller (≈50–70 px). Positioned above OR below the title — consistent placement per session across all parts.
-- **Base image** — either (a) a kie.ai-generated 9:16 thumbnail (prompt-only, matching widescreen convention) or (b) a representative scene scaled-to-cover 9:16. Option (a) is preferred when the video has a distinct cover concept; option (b) is a stopgap using an existing scene asset.
+- **Base image** — default (a) a kie.ai-generated 9:16 thumbnail using the **widescreen's prompt verbatim** (with aspect changed to 9:16 and the baked-headline lines stripped — title is composited via PIL). Fallback (b) a representative scene scaled-to-cover 9:16 — use as a stopgap when kie.ai spend isn't justified.
+
+- **Thumbnail prompt persistence.** When a widescreen thumbnail is generated, save its prompt to `sessions/<id>/working/thumbnail-prompt.md`. Mobile and any other variants read this file as the source-of-truth scene+style. Aspect and headline-handling are appended per output. Reusing the persisted prompt keeps mobile visually consistent with the widescreen and removes the temptation to invent a new scene description.
 - **File naming:** `renders/mobile/<session>-mobile-thumb-pt1of2.png`, `-pt2of2.png`, etc. One file per part.
 - **Grid-safe area: top ~70% of the 9:16 frame.** TikTok / Reels / Shorts grid views center-crop the thumbnail to roughly square (4:5 or 1:1). All critical content — caption, figure, part badge, key visual — must live in the upper ~1344 px of the 1920 px frame. The bottom ~30% is bonus content visible only on full-tap view. Designs that put the punchline element (struck-out text, hand-lettered tagline, key annotation) in the bottom band lose it on grid.
 

@@ -45,11 +45,43 @@ Read these files in this exact order:
 2. [STORY.md](./STORY.md) — script extraction, pacing, viewer context
 3. [VISUALS.md](./VISUALS.md) — assets, preprocessor, transitions
 4. [SHIPPING.md](./SHIPPING.md) — review board, publishing
-5. [VIDEO_OUTPUT_RULES.md](./VIDEO_OUTPUT_RULES.md) — engine-level video output rules (character cloning, Kling 3.0 gotchas, ffmpeg concat, caption placement, SSML pacing) — supplementary to the procedural stages, learned from running real productions
+5. [VIDEO_OUTPUT_RULES.md](./VIDEO_OUTPUT_RULES.md) — engine-level video output rules (character cloning, Kling 3.0 gotchas, ffmpeg concat, caption rendering, SSML pacing) — supplementary to the procedural stages, learned from running real productions
+6. [VIDEO_MODELS.md](./VIDEO_MODELS.md) — quick spec reference for Kling / Seedance / Veo / gpt-image-2 / nano-banana-2 / seedream: pricing, request shapes, character-ref field per model, decision matrix by episode profile
 
 Delivery modes (agent-skill vs standalone-app, autopilot) are covered inside this file — see § Delivery Modes below.
 
 If you are about to challenge or change a rule, also read [DESIGN_NOTES.md](./DESIGN_NOTES.md) — it captures the reasoning behind current decisions and what was tried and abandoned. The rule files tell you what to do; design notes tell you why.
+
+## Topic → File Index (for finding rules by topic, not by procedural order)
+
+When you know what topic you're working on but not which file owns the rules, use this table. Each topic lists the canonical owning file and (where relevant) cross-references that are easy to miss.
+
+| Topic | Primary file | Cross-refs |
+|---|---|---|
+| Pipeline workflow / stages / session config | PIPELINE.md | — |
+| Script extraction / narration / pacing / Job E core-message | STORY.md | — |
+| Asset generation / preprocessor / transitions | VISUALS.md | — |
+| Review board / publishing / mobile export A.1 | SHIPPING.md | — |
+| **Caption rendering — line stacking, font, ASS/libass technique** | VIDEO_OUTPUT_RULES.md §5–§6.1 | SHIPPING.md § "Caption style (burned-in, mobile A.1)" has the spoolcast-pipeline-specific values (fontsize, wrap width, margin_v_y per aspect) |
+| **Caption placement (avoiding covering imagery)** | VIDEO_OUTPUT_RULES.md §6 | — |
+| Character cloning recipe (real-figure caricatures) | VIDEO_OUTPUT_RULES.md §2 | per-figure classifier ladder in §2.3 |
+| **Asset scope (engine-wide / series / session)** | VIDEO_OUTPUT_RULES.md §1.5 | — |
+| **Per-episode cast manifest (`cast.txt`) + sync resolution order** | VIDEO_OUTPUT_RULES.md §1.5 | series-specific application in `news-anime-bot/rules.md` §3 |
+| **script.md heading conventions for artlu.ai showcase rendering (`## Sources`, `## Audit notes`)** | `news-anime-bot/rules.md §9.5` | promote to engine doc once a second show adopts the pattern |
+| Style anchor protection (never overwrite without permission) | VIDEO_OUTPUT_RULES.md §1 | — |
+| **Variable beat duration / tail buffer / dead-air avoidance** | VIDEO_OUTPUT_RULES.md §8 | — |
+| **Audio static at concat boundaries (pre-normalize before concat)** | VIDEO_OUTPUT_RULES.md §12 | — |
+| ffmpeg concat timestamp drift | VIDEO_OUTPUT_RULES.md §4 | — |
+| ffmpeg drawtext escapes (`%`, Unicode arrows) | VIDEO_OUTPUT_RULES.md §3.1 | — |
+| SSML pacing for Chirp3-HD (`<break>` works, `<emphasis>` distorts) | VIDEO_OUTPUT_RULES.md §7 | — |
+| Parallelize TTS calls | VIDEO_OUTPUT_RULES.md §11 | — |
+| Kling 3.0 request shape / gotchas / pricing | VIDEO_OUTPUT_RULES.md §3, §9 | VIDEO_MODELS.md "Kling 3.0" |
+| Seedance 2.0 / Fast request shape / pricing | VIDEO_OUTPUT_RULES.md §10 | VIDEO_MODELS.md "Seedance" |
+| Veo 3.1 spec / pricing | VIDEO_MODELS.md "Veo 3.1" | — |
+| gpt-image-2 / nano-banana-2 / seedream pricing | VIDEO_MODELS.md "Image generation models" | — |
+| Model selection (which model for which episode profile) | VIDEO_MODELS.md "Model selection matrix" | — |
+
+**For show-specific bibles** (e.g., news-anime-bot), each show has its own `rules.md` that LAYERS on top of these engine rules. The show bible owns: cast list, voice, branding, beat structure, episode-format conventions. The engine rules own: technical patterns reusable across shows. Show rules.md should cross-ref engine rules — not duplicate them.
 
 ## What Each File Does
 
@@ -123,6 +155,8 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
 - **Beat-description vocabulary must match the style library.** When writing a beat description for a chunk that uses a style-library character reference, use the exact character name / description terms from the locked style's `characters[].description` field. Do not substitute generic placeholders that describe a different character register (e.g., writing a generic stand-in when the style registers a specific character identity). Mixed vocabulary — the style anchor pulling toward one character register while the prompt pulls toward another — causes silent output drift: the model averages the two signals and the result matches neither. At Stage 2 shot-list build, check every beat description against the session's style library: any character term used in the prompt must correspond to a registered character in `styles/<style>/style.json`, or must be a one-off unregistered entity the beat explicitly treats as outside the style. No session should ship beat descriptions referencing characters the style doesn't know about.
 
 - **Persistent generator output is signal, not noise.** If the generator produces the same element in ≥3 chunks without being named in beat descriptions, that element fits the content's register. Do NOT write `"NO [element]"` to suppress it — tag with the matching library reference instead. `"NO [element]"` is only valid for explicit rule violations, user-directed removals, or literal misreads (e.g. a cardboard box when the beat specified a labeled diagram-box). If Stage 1e roster was done correctly — including library-implied characters, not just script-named ones — this guard-rail rarely fires.
+
+- **Adjacent-chunk visual delta.** When consecutive chunks share the same character + same scene environment, each beat_description names a delta — emotional register (doomer→chad), composition focal, lighting state, or pose. Explicit delta drives the AI to compose differently. Apply when the same character appears in 2+ adjacent chunks within the same Act. Caught on dev-log-04 C43→C44: both beat_descriptions said "builder + small diagram"; AI generated near-duplicate frames. Fix was rewriting C44 to name the chad-register shift explicitly.
 - **Ending-archetype check (two-pass).** STORY.md § "Ending sequence (required)" lists 8 valid archetypes (settle-and-hold, cliffhanger, call-to-action, circular-callback, open-question, quiet-payoff, coda/reframe, punch-and-cut) plus a documented opt-out-with-justification. At pre-render, `audit_narration.py` runs two complementary checks:
   1. **Mechanical pass.** Verify the declared archetype (from `session.json` → `ending_archetype` or shot-list `notes`) is one of the 8 valid values (or a justified opt-out). For the declared archetype, check the structural requirements: `weight: high` on final narrated beat; ≥2.5s held silence via `pause_after: "long"` or a dedicated outro hold chunk (punch-and-cut archetype exempt); matching signals if cliffhanger (`"to be continued"` / `"next time"` / forward-pointing visual); final line tone matches the archetype (no trailing rhetorical questions on settle-and-hold, no hard resolution on open-question, etc.). Red-flag final narrations to catch: *"What's next?"* without a cliffhanger signal, single trailing imperative with no breathing room, unsignaled cliffhanger.
   2. **Emotional-landing LLM pass.** After the mechanical pass, an LLM is given the declared archetype + the final 3–5 chunks' narrations + scene descriptions, and asked: *"does this ending deliver the emotional outcome declared?"* Three verdicts: **landed**, **mismatched** (creates a different feeling than declared), **jarring** (creates no coherent feeling — reads as truncated / cut-off / abrupt). Jarring is a hard block; mismatched surfaces for target-revision or script-rework. This complements the mechanical pass — the structural requirements can all pass while the ending still feels emotionally flat. The LLM question isn't "does it match the archetype structure"; it's *"does the viewer finish this feeling like the story landed?"*
@@ -131,7 +165,8 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
   **Meme placement — every meme must have audio playing during its on-screen time. No silent meme beats.** Valid placements:
     1. **Overlay on an existing narration chunk** — the meme is declared as an entry in the host chunk's `overlays` field, sitting on top of the chunk's main illustration. The host chunk's narration is the audio covering the meme. Required per-overlay fields: `source` (path), `position` (x, y as 0–1 canvas fractions), `size` (width as 0–1 fraction, height auto), `entry_time_sec` (offset from chunk start), `duration_sec` (must fit declared `meme_type`), `exit_style` (`cut` or `fade`), `meme_type`, `mark_on_word` (the narration word the meme syncs to; `"chunk-start"` valid only with one-line reason). The scene beneath keeps playing; the meme pops in, holds, pops out. Preferred placement — keeps chunk pacing tight without forcing narration compression.
     2. **Its own chunk, with narration audio** — the meme is the chunk's `image_path` (`image_source: broll_image`, `broll_source_kind: meme`, `broll_framing: full-frame`), and the chunk has a normal narration beat whose audio plays over the meme for the full chunk duration. Chunk duration = narration duration; author the narration to fit the declared `meme_type` range. When a meme's type doesn't match the companion narration's duration, shorten the narration — don't leave the meme held past its `meme_type` cap.
-    3. **Its own chunk, with SFX audio** — same as (2) but the audio is an SFX file instead of narration. **Blocked until `ROADMAP.md` §6 SFX support ships.** Until then, (1) and (2) are the only valid placements.
+    3. **Its own chunk, with SFX audio** — same as (2) but the audio is an SFX file instead of narration. **Blocked until `ROADMAP.md` §6 SFX support ships.** Until then, (1) and (2) and (4) are the only valid placements.
+    4. **Cross-chunk overlay** — declared at shot-list root in `cross_chunk_overlays[]`, NOT inside any chunk. Spans up to 2 adjacent chunks. The overlay's video clock starts at zero when it appears (composition-level Sequence wrap), so animated reactions don't freeze when they cross a chunk cut. Required fields: `source`, `start_chunk_id`, `timing_start_s` (offset within `start_chunk_id`), `duration_s`, `meme_type`, `mark_on_word`, `mark_chunk_id` (which chunk's narration owns the marked word — `start_chunk_id` or the next chunk), plus the standard positional fields. Same `meme_type` duration caps apply (≤2.5s for sustained-punchline). Need >2.5s of full-screen amplifier? Make it its own chunk via existing `image_source: meme/broll_image` patterns — don't stretch a cross-chunk overlay past meme_type bounds.
 
   **Banned:** meme as a standalone chunk with no audio (silent-hold meme). Produces dead air (caught on dev-log-02 — silent meme beats felt like dead air; see `ROADMAP.md` §6).
 
@@ -194,8 +229,11 @@ These apply everywhere unless explicitly replaced by a future system rewrite:
 - **Meme viewer-test.** A normal viewer (no tech background, no prior series videos seen) must (a) recognize the meme, (b) get the joke, (c) connect it to the line — in the size and time given. Four checks:
   - **Recognition.** Universal face/format = fine. Same meme used in any of the prior 2 sessions of the series = stale; swap unless rerun is editorially correct (declare `editorial_rerun_reason` on the overlay to suppress the flag).
   - **Size.** Width ≥ 0.30 of canvas; ≥ 0.35 if recognition is borderline.
-  - **Connection.** `mark_on_word` declared; the marked word exists in the chunk's narration; peak word lands inside the on-screen window.
+  - **Connection.** `mark_on_word` declared; the marked word exists in the chunk's narration (or `mark_chunk_id`'s narration for cross-chunk overlays); peak word lands inside the on-screen window. The marked word must leave at least the `meme_type`'s minimum duration of runway before the on-screen window ends (otherwise the meme can't play its full duration).
   - **Decode time.** Effective on-screen duration matches declared `meme_type` range.
+
+  Changing an overlay's `source` = re-running all four checks, not just editing the path. A swapped meme is a different joke, not a different image of the same joke.
+
   `audit_overlays.py` blocks render on violation.
 
 - **Auditor false-positive registry.** See `STORY.md § Layman-pass false positives` for the canonical 4-class registry (proper nouns / defined-upstream terms / plain-English rewrites / locked core-message line). Flags matching any class surface in the audit report but do NOT block the build, do NOT justify further script iteration. Iterating on them is a stall signal per § Prompt-engineering stall signal.
@@ -398,6 +436,27 @@ When collaborating with the user on any creative or editorial decision — a scr
 Jumping to specifics before the substance is agreed is a process failure. It wastes iterations on choices the user doesn't actually want, and it hides the editorial decision behind surface-level options the user can only react to aesthetically.
 
 Applied to review cycles: when the user pushes back on a draft, figure out which layer the objection is at — substance, structure, voice, or form — not just re-polish at the surface.
+
+### Documented process replaces my framing
+
+When a rule names the steps for the work at hand: cite the rule, identify the current gate, surface the gate's decision for the user. The rule defines the steps and forks — the agent's role is pointing at it and executing.
+
+**Options come from the rule, not from the agent.** When the rule lists options (a, b, c), present exactly those. When the rule specifies a single operation, execute. Self-check before any response containing "options" / "should I" / "paths": is every option present in the rule's literal text? If not, the extra one is synthesis — drop it before sending.
+
+Why: the instinct after reading a rule is to ship a paraphrase + invented forks as the answer. Showing the reading feels like contributing value. The synthesis is structurally a worse version of the source, and invented forks can invite the user back into the failure mode the rule was written to prevent.
+
+### Rule-writing style
+
+When writing or editing any rule in a guidelines file (`rules.md`, `STORY.md`, `VISUALS.md`, etc.), keep it succinct, technical, brief, and positively framed.
+
+- Lead with the rule itself in one sentence — state the action.
+- Use bullets, tables, or short clauses for sub-conditions. Stay tight.
+- Technical terms where they're precise. Plain language elsewhere.
+- Keep the *why* line if non-obvious; one short line.
+- Examples only when the rule is genuinely ambiguous without one — one is enough.
+- If a rule needs more than ~5 lines, it's probably two rules; split them.
+
+**Positive framing.** State the action to take. "Cite the rule" beats "skip paraphrasing the rule." Words like "don't" / "do not" / "avoid" / "never" / "no" describe the wrong action — replace with the right one. Narrative ("Caught on dev-log-XX: long story") belongs in DESIGN_NOTES.md; rule files get the one-line distillation.
 
 ## Delivery Modes
 

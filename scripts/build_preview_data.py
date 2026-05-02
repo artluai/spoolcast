@@ -522,6 +522,39 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
         # legacy field kept for compatibility with any old Composition code
         chunk["transition"] = chunk["entrance"]
 
+    # Cross-chunk overlays — top-level overlays that may span chunk boundaries.
+    # Lives at root of shot-list, not inside any chunk. Renderer wraps each in
+    # a composition-level Sequence so the overlay's video clock starts at zero
+    # when it appears (per-chunk overlay Sequence wrap pattern, applied at
+    # composition scope). See rules.md § Meme placement option (4).
+    cross_overlays_out: list[dict[str, Any]] = []
+    chunk_index = {c["id"]: c for c in chunks_out}
+    for ov in (shot_list.get("cross_chunk_overlays") or []):
+        start_id = ov.get("start_chunk_id", "")
+        start_chunk = chunk_index.get(start_id)
+        if not start_chunk:
+            print(f"[preview-data] WARN: cross-chunk overlay start_chunk_id={start_id!r} not found, skipping")
+            continue
+        ts = float(ov.get("timing_start_s", 0))
+        dur = float(ov.get("duration_s", 0))
+        abs_start = start_chunk["startFrame"] + round(ts * fps_value)
+        abs_end = abs_start + round(dur * fps_value)
+        # Clamp to total composition duration.
+        if abs_end > running_frame:
+            abs_end = running_frame
+        cross_overlays_out.append({
+            "src": _normalize_src(ov.get("source", "")),
+            "absStartFrame": abs_start,
+            "absEndFrame": abs_end,
+            "x": float(ov.get("x", 0.5)),
+            "y": float(ov.get("y", 0.5)),
+            "anchor": ov.get("anchor", "center"),
+            "width": float(ov.get("width", 0.45)),
+            "rotationDeg": float(ov.get("rotation_deg", 0)),
+            "entryTransition": ov.get("entry_transition", "cut"),
+            "exitTransition": ov.get("exit_transition", "cut"),
+        })
+
     return {
         "sessionId": session_id,
         "canvas": canvas,
@@ -534,6 +567,7 @@ def build(session_id: str, fps: int | None = None) -> dict[str, Any]:
         "chunkCount": len(chunks_out),
         "skipped": [{"chunk": c, "reason": r} for c, r in skipped],
         "chunks": chunks_out,
+        "crossChunkOverlays": cross_overlays_out,
     }
 
 

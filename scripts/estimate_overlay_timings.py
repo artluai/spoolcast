@@ -162,6 +162,94 @@ def update_shot_list(session_id: str, verbose: bool = True) -> dict:
                       f"mark={target:12} word#{wi+1}/{wn} beat={bid:5} "
                       f"→ {old_start:5.2f}→{new_start:5.2f}s (d={dur_overlay:.2f})")
 
+    # Cross-chunk overlays — anchor timing_start_s relative to start_chunk_id,
+    # using mark_chunk_id's narration to resolve mark_on_word. If
+    # mark_chunk_id != start_chunk_id, add the start chunk's full duration as
+    # an offset so the resulting timing_start_s is relative to start_chunk_id.
+    cross_overlays = data.get("cross_chunk_overlays") or []
+
+    def _chunk_total_duration(chunk: dict) -> float:
+        total = 0.0
+        for b in chunk.get("beats", []):
+            d = _audio_duration(session_id, b.get("id", ""))
+            if d is None:
+                d = _fallback_duration_from_text((b.get("narration") or "").strip())
+            total += d + _parse_pause(b.get("pause_after", ""))
+        return total
+
+    chunks_by_id = {c["id"]: c for c in data["chunks"]}
+    chunk_order = [c["id"] for c in data["chunks"]]
+
+    for ov in cross_overlays:
+        total_overlays += 1
+        target = ov.get("mark_on_word")
+        start_id = ov.get("start_chunk_id", "")
+        mark_id = ov.get("mark_chunk_id", start_id)
+        if not target or not start_id:
+            continue
+        mark_chunk = chunks_by_id.get(mark_id)
+        if not mark_chunk:
+            skipped.append((f"cross:{start_id}", target, f"mark_chunk_id={mark_id!r} not found"))
+            continue
+
+        # Find the word in mark_chunk's beats
+        beat_info: list[tuple[str, str, float, float]] = []
+        for b in mark_chunk.get("beats", []):
+            bid = b.get("id", "")
+            narr = (b.get("narration") or "").strip()
+            d = _audio_duration(session_id, bid)
+            if d is None:
+                d = _fallback_duration_from_text(narr) if narr else 0.0
+            beat_info.append((bid, narr, d, _parse_pause(b.get("pause_after", ""))))
+        beat_starts = {}
+        t = 0.0
+        for bid, narr, d, pause in beat_info:
+            beat_starts[bid] = t
+            t += d + pause
+
+        hit = None
+        for bid, narr, d, pause in beat_info:
+            pos = _find_word_position(narr, target)
+            if pos is not None:
+                hit = (bid, d, pos)
+                break
+        if hit is None:
+            skipped.append((f"cross:{start_id}", target, f"word not found in {mark_id}"))
+            continue
+
+        bid, d, (wi, wn) = hit
+        frac = (wi + 0.1) / wn if wn > 0 else 0.0
+        word_t_in_mark = beat_starts[bid] + frac * d
+        # Convert to time relative to start_chunk_id.
+        if mark_id == start_id:
+            word_t_in_start = word_t_in_mark
+        else:
+            # Sum durations of intervening chunks (start → ... → mark exclusive)
+            try:
+                si = chunk_order.index(start_id)
+                mi = chunk_order.index(mark_id)
+            except ValueError:
+                skipped.append((f"cross:{start_id}", target, "start/mark not in chunk order"))
+                continue
+            offset = sum(_chunk_total_duration(chunks_by_id[chunk_order[k]]) for k in range(si, mi))
+            word_t_in_start = offset + word_t_in_mark
+
+        old_start = float(ov.get("timing_start_s", 0.0))
+        old_end = float(ov.get("timing_end_s", 0.0))
+        dur_overlay = max(0.8, old_end - old_start) if old_end > old_start else float(ov.get("duration_s", 1.5))
+        new_start = max(0.0, word_t_in_start - 0.1)
+        new_end = new_start + dur_overlay
+
+        ov["timing_start_s"] = round(new_start, 2)
+        ov["duration_s"] = round(dur_overlay, 2)
+        # Keep timing_end_s in sync for any consumers that read it.
+        ov["timing_end_s"] = round(new_end, 2)
+        updated += 1
+        if verbose:
+            print(f"  cross→{Path(ov.get('source','')).name:28} "
+                  f"mark={target:12} chunk={mark_id:5}#{wi+1}/{wn} "
+                  f"→ start_chunk={start_id} t={new_start:.2f}s (d={dur_overlay:.2f}s)")
+
     shot_list_path.write_text(json.dumps(data, indent=2))
 
     print(f"\nSummary:")

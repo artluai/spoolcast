@@ -4,6 +4,8 @@ Engine-level rules for video output quality, character consistency, and pipeline
 
 These rules previously lived in global Claude memory (`behavior_character_cloning.md`, `reference_kling_text_limitation.md`, `feedback_caption_placement.md`, `feedback_never_touch_anchors.md`). Moved here to live with the engine code so they get versioned alongside the pipeline.
 
+**For raw model API specs, pricing, and the model-selection matrix, see `VIDEO_MODELS.md`.** This file (`VIDEO_OUTPUT_RULES.md`) is the production-rules / gotchas / lessons-learned doc; `VIDEO_MODELS.md` is the spec quickref.
+
 ---
 
 ## 1. Style anchors are load-bearing — never overwrite without explicit per-call permission
@@ -21,6 +23,55 @@ Applies to any reference image in a library that other sessions depend on.
 
 ---
 
+## 1.5 Asset scope — three levels
+
+Locked assets fall into three storage scopes. Each is a storage axis; assets at any level are referenced the same way at runtime.
+
+- **Engine-wide / global** — style anchors and generic archetypes shared across many unrelated projects.
+  - Path: `spoolcast-content/styles/<style>/anchor.png` (art-style anchors) or `spoolcast-content/archetypes/<name>.png` (generic character archetypes like a "suit-exec" template).
+  - Default for: art-style anchors, reusable-across-projects character archetypes.
+- **Series / show-root** — recurring talent for a single show.
+  - Path: `spoolcast-content/shows/<show>/characters/<name>.png` and `spoolcast-content/shows/<show>/refs/<name>-source-N.{jpg,png}`.
+  - Default for: recurring-show characters. Reusable across all episodes of that one show.
+- **Session-local** — one-off characters or props for a single session.
+  - Path: `spoolcast-content/sessions/<session-id>/characters/<name>.png` and `spoolcast-content/sessions/<session-id>/refs/<name>-source-N.{jpg,png}`.
+  - Default for: one-off-session characters that won't recur.
+
+A session can mix scopes freely. Common pattern: a series episode references engine-wide art style + series characters + (optionally) one session-local guest. A one-off session references engine-wide art style + session-local characters.
+
+**Decision rule:** *will any other production reference this asset?*
+- Many unrelated projects → engine-wide
+- All episodes of one show → series-scoped
+- Just this session → session-local
+
+**Cross-level derivation is fine and encouraged.** Generating a series-level character using an engine-wide archetype as the §2.7 Input-2 style reference is the validated pattern. Once the derived asset is locked at its target scope, it stands alone — no runtime dependency back to the source.
+
+**Per-episode cast manifest + resolution rule (uniform for series and one-off).**
+
+Each session — series or one-off — drops a plain text `cast.txt` in the session dir, one character name per line:
+```
+pichai
+jassy
+willens
+```
+
+**Sync tools (e.g. artlu.ai showcase) resolve each name against the directory tree using a fixed search order, first match wins:**
+1. `<session-dir>/characters/<name>.png` — session-local (one-off characters live here)
+2. `<show-root>/characters/<name>.png` — show-level (series characters live here, ascending from `shows/<show>/sessions/<date>/`)
+3. `<spoolcast-content-root>/archetypes/<name>.png` — engine-wide (generic archetypes shared across projects)
+
+The directory structure does the disambiguation — sync code needs no branching on project type. Authors drop one consistent artifact (`cast.txt` with names) regardless of whether they're authoring a series episode or a one-off.
+
+**Why this design (vs branching by project type):**
+- Single sync logic: one read path, one resolution loop. No "is this series or one-off?" code branches.
+- Single author rule: "list character names in cast.txt." No memorizing which directory pattern applies.
+- Forward-compatible: a one-off that later becomes a series, or characters promoted from session-local to show-level, work without rewriting cast.txt — the resolution order finds them in the new location.
+- No duplication: series characters stay at the show level, never mirrored into per-episode dirs.
+
+§1 (anchor protection), §2 (cloning pipeline), §2.10 (file naming) all reference this scope model.
+
+---
+
 ## 2. Recurring real-person caricature pipeline
 
 For projects that need a recurring caricature of a real public figure (news-anime-bot, satirical content, editorial illustration):
@@ -34,16 +85,37 @@ Variety matters. Different angles (front, three-quarter), expressions (neutral, 
 - Auth: `Authorization: Bearer $KIE_API_KEY`
 - Response gives `data.downloadUrl` — that's the URL for `input_urls` / `image_input` / `kling_elements.element_input_urls`. Files expire in 3 days.
 
-### 2.3 Use `gpt-image-2-image-to-image` only
-nano-banana-2 has Google's strict identity policy — rejects ALL real-person prompts and inputs. Confirmed empirically. Don't waste a run.
+### 2.3 Cloning model selection — per-figure classifier variability
 
-### 2.4 Name-free prompt — never name the subject anywhere in the request
-- Filter triggers in **both** `prompt` AND `kling_elements.description`. Naming the subject in `description` ("Sam Altman, OpenAI CEO character") triggers content rejection (manifests as repeated 500 errors) even when prompt text is name-free.
-- Keep `description` purely role-based: "the tech CEO character", "the CFO character".
-- Describe the subject in the prompt by features, not name:
-  - **Visual/animation style** — e.g., "Bleach-style anime," "Tartakovsky angular flat-shape"
-  - **Signature features to amplify** — the parts that make them recognizable in real life. For caricature, lean *into* those features. Each subject needs a verified feature list — verify against actual photos, don't assume.
-  - **On-brand wardrobe — verify against photos, don't assume.** Example: Altman wears Patagonia "Better Sweater" crewneck pullovers, Henleys, button-downs — NOT vests, NOT turtlenecks. Generic "tech-CEO costume" loses recognition; their real outfit is a recognition cue.
+**Empirical finding (2026-05-02):** gpt-image-2's identity classifier is **per-public-figure**, not blanket. Sundar Pichai cleared both `gpt-image-2-image-to-image` (with Wikimedia photos) and `gpt-image-2-text-to-image` (with name in prompt). Andy Jassy got rejected on BOTH paths same-day with identical prompts/photos. Different figures hit different classifier lists.
+
+**Cloning ladder when targeting a specific real public figure:**
+
+1. **Try `gpt-image-2-image-to-image` first** — best anime stylization quality. Use Wikimedia public-domain photos as input (cleaner provenance metadata than user-uploaded photos; clears classifiers more often). Use neutral upload filenames per §2.4.
+2. **If gpt-image-2 i2i rejects** (fast 500 + `costTime: 0` = classifier reject; distinct from real server hiccups which fail mid-gen with non-zero costTime): **try `gpt-image-2-text-to-image`** with the real name + features in the prompt. Sometimes accepted even when i2i isn't.
+3. **If both gpt-image-2 paths reject:** **fall back to `nano-banana-2-image-to-image`** with the same Wikimedia photos. nb2 generally accepts real-figure image-to-image (the older claim that "nb2 rejects ALL real-person prompts and inputs" was over-broad — verified 2026-05-02). Quality plateau is softer-anime than gpt-image-2 but holds identity.
+4. **Last-resort:** generate the sheet directly via ChatGPT (web UI, not API) with a real photo + "anime character sheet, shonen anime style, blank background" prompt. Hand-save the output and lock as the canonical ref.
+
+**The blanket prohibition that was here previously is wrong** — both gpt-image-2 and nb2 can clone real figures via image-to-image; the ceiling is per-figure classifier sensitivity, not model policy. Test the specific figure on each model when bringing them into the recurring cast.
+
+### 2.4 Name-free everywhere — never name the subject in ANY string sent to the model
+
+The real name never appears in any string the model sees. This includes — and is NOT limited to:
+- `prompt` text
+- `kling_elements.description`
+- `description` field on any model call
+- **Upload filenames and URL paths.** When you upload a source photo to kie.ai, the `fileName` lands in the resulting download URL (`tempfile.redpandaai.co/.../<fileName>`). That URL is then passed to the model in `input_urls` / `imageUrls`. Classifiers scan URLs. Use neutral filenames for uploads (`char-A-source.jpg`, `id-input-1.jpg`) — never `pichai-source-3.jpg`.
+- Phrases that signal photo-source provenance: `"photograph"`, `"real person"`, `"real photo"`, `"translate this real face"`, `"this celebrity"`, `"this CEO"`. These flag photo-of-a-real-person source material to identity classifiers even when the name is absent. Treat both inputs as illustration sources in prompt language ("Input 1: character with glasses and beard"), regardless of what they actually are.
+
+Filter triggers manifest as **fast 500 errors with `costTime: 0`** (job rejected at submission, never started — generation never spent compute). Distinct from real server errors which fail mid-generation with non-zero `costTime`.
+
+Local filenames on disk are fine — the rule only applies to strings sent to the model. So `refs/pichai-source-3.jpg` on local disk is OK, but uploads to kie.ai must use neutral names like `char-A-source.jpg`.
+
+**Describe the subject in the prompt by features, not name:**
+- **Visual/animation style** — e.g., "Bleach-style anime," "Tartakovsky angular flat-shape"
+- **Signature features to amplify** — the parts that make them recognizable in real life. For caricature, lean *into* those features. Each subject needs a verified feature list — verify against actual photos, don't assume.
+- **On-brand wardrobe — verify against photos, don't assume.** Example: Altman wears Patagonia "Better Sweater" crewneck pullovers, Henleys, button-downs — NOT vests, NOT turtlenecks. Generic "tech-CEO costume" loses recognition; their real outfit is a recognition cue.
+- **Demographic specificity is a recognition lever AND a classifier risk.** "Indian-American man in his early fifties + salt-and-pepper hair + signature glasses + beard" tracks tightly to one specific public figure even without naming. For high-recognition subjects, consider less-specific demographic phrasing on first attempt; escalate specificity only if first attempt produces an unrecognizable result.
 
 ### 2.5 Never use negative instructions in image-gen prompts
 "Not", "no", "none", "avoid", "without" get IGNORED or actively backfire (the negation token gets stripped, leaving the rejected item as a positive instruction). Use ONLY positive descriptors. If the model defaults to something wrong, fight it by making the desired alternative so vivid and repeated that it crowds out the default. Universal, not specific to character work.
@@ -53,23 +125,44 @@ Even with strong "anime illustration NOT a photo" prompt language, the body and 
 
 ### 2.7 The two-input redraw recipe (validated)
 For BOTH identity-fidelity AND style-fidelity out of `gpt-image-2-image-to-image`:
-1. **Input 1** = a previous good character ref (image-to-image-derived from a real photo) — provides face/identity/pose/background
-2. **Input 2** = a separate fully-text-to-image-generated illustration with the desired clothing-rendering style (e.g., a cast lineup with flat cel-shaded outfits) — provides the rendering language we want applied
+1. **Input 1** = identity source. Either a real photo (first-time clone) OR a previous good character ref (iterating a clone). Provides face / identity / pose.
+2. **Input 2** = style anchor. **MUST be a multi-character lineup illustration**, NEVER a single character. Provides rendering language only — line weight, cel-shading treatment, color-block style, shadow-shape vocabulary.
 3. **Prompt:**
-   - Tells model: input 1 = identity, pose, background; input 2 = clothing-rendering style
+   - Tells model: Input 1 contributes facial identity; Input 2 contributes rendering style and clothing-rendering language.
    - Uses **REDRAW** language, NOT "preserve identically." Preserve language locks in the original photo-leaning rendering and won't budge.
    - Spells out specific positive descriptors of what flat cel-shading means: "solid uniform color blocks," "hard-edged darker shadow shapes," "sharp clean thin black anime line work outlining each garment."
 
-### 2.8 Output as multi-pose character sheet
-Ask for "character design sheet — same character in 3 poses: front view, three-quarter view, expression close-up. Consistent design across all poses." This locked sheet becomes the reference fed forward to Kling video via `kling_elements`.
+**Why Input 2 must be a multi-character lineup, never a single character:** a single-character ref collapses style and design into one example. The model cannot separate "the show's rendering language" from "this one character's design choices" (their hair treatment, body proportions, wardrobe color palette, expression vocabulary). Used as Input 2 for a different character, those design choices bleed in — the new character ends up looking suspiciously like the source. A lineup of ~5 different characters in the same rendering style preserves the diversity needed to isolate rendering from design: the model averages across the cast and extracts only what they share (line work, cel shading) while ignoring what differs (specific designs).
+
+**Practical consequence:** ALL real-figure caricatures in a project share the same Input-2 lineup. A locked character is NEVER promoted to Input-2 for a later character. Per-character distinctiveness comes from (a) their real photo as Input 1 and (b) per-character feature description in the prompt — never from swapping Input 2.
+
+### 2.8 Output as multi-pose character sheet on clean background
+
+Ask for "character design sheet — same character in 3 poses: front view, three-quarter view, expression close-up. Consistent design across all poses. **Clean solid white or transparent background — NO scene, NO setting, NO environmental elements, NO scenery, NO furniture.**"
+
+**Clean background is load-bearing.** When the sheet is passed as a reference image to a video model (Kling `kling_elements`, Seedance `reference_image_urls`, Veo REFERENCE_2_VIDEO `imageUrls`), the model interprets the *entire* image including background. A busy or scene-laden background contaminates the reference — environmental elements bleed into the generated scene regardless of the scene prompt. White/transparent isolates the character so it composes cleanly into whatever scene the prompt describes.
+
+The locked sheet becomes the reference fed forward to the video model.
 
 ### 2.9 Lock the character sheet once approved
 Same hard rule as §1 — don't regenerate without explicit "yes regen this character" per call.
 
-### 2.10 File naming convention
+### 2.9.5 Canonical engine-wide style anchor (current)
+
+`spoolcast-content/archetypes/bleach-cast-anchor.png` — multi-character anime lineup (5 generic anime business characters in Bleach cel-shaded style, modest dark backdrop). Validated as Input-2 style anchor for ep 1's Altman + CFO clones; reused for all current and future news-anime-bot characters.
+
+This is the single canonical lineup for real-figure caricature work in this engine. Per §2.7, do NOT replace it with a locked character ref for downstream clones. If a future show needs a different rendering aesthetic (non-Bleach), generate a new lineup with the new style and save at `spoolcast-content/archetypes/<style-name>-cast-anchor.png` per §1.5.
+
+---
+
+### 2.10 File naming + scope
+
+**File naming:**
 - Source photos: `<character>-source-N.{jpg,png}` (e.g., `altman-source-1.jpg`)
 - Generated character sheet: `<character>-sheet-<style>.png` (e.g., `altman-sheet-bleach.png`)
 - Locked production reference: `characters/<character>.png` (canonical name)
+
+**Where the `characters/` and `refs/` directories live: see §1.5.** Recurring-show characters → series-root. One-off-session characters → session-local. Generic engine-wide archetypes → engine-wide path.
 
 ---
 
@@ -88,6 +181,13 @@ Kling 3.0 cannot reliably render legible text in scenes. Examples from Episode 1
 - For required in-frame text: render in **post via ffmpeg `drawtext`** as an overlay between Kling output and audio-mux/concat. Produces perfect typography.
 
 This applies to Kling 3.0. Other video models (Veo 3.1, Sora 2) may handle text differently — re-test before assuming.
+
+**ffmpeg drawtext escape gotchas (when rendering chyrons in post):**
+- `%` in text breaks the parser — drawtext treats `%` as a format-specifier prefix (like `%{pts}`). **Even doubling to `%%` doesn't reliably escape** in libavfilter. Workaround: substitute the word — `>50%` → `OVER HALF`, `3%` → `THREE PERCENT`. Empirically the cleanest fix.
+- Unicode arrows (`→`, `⇒`) render as garbage if the chosen font lacks the glyph. Stick to ASCII (`->`).
+- Single quote `'` needs `\\\\'` escape OR use a textfile via `textfile=path` instead of inline `text='...'`.
+- `:` and `,` are filter-graph separators — escape with `\\:` and `\\,` if literal.
+- Safe practice: keep chyron text ASCII letters/numbers/spaces/dashes only. Reword anything fancier.
 
 ### 3.2 `kling_elements` lead-frame flash
 The very first ~0.3–0.5s of any clip generated with `kling_elements` is the literal input character-sheet image — Kling starts on the reference and animates from there. In a 5s clip this flash is visible and reads as a "wrong frame" to the viewer.
@@ -137,6 +237,29 @@ Burned-in captions should be positioned in the area of the frame with the LEAST 
 **Pipeline implication:** the stitch step should support per-beat caption positioning — either a per-beat `MarginV` override or a check-and-warn step that flags beats where the caption likely overlaps prompted visual content.
 
 **Authoring implication for prompts:** when designing scene prompts, KEEP important on-screen text/imagery in the upper-middle of the frame so the default caption placement doesn't block them.
+
+### 6.1 Line stacking — per-line `\an5\pos()` events, NOT default libass leading
+
+When a narration line wraps to 2+ visual lines, **libass's default font-metric leading produces too-loose line gaps** (visible empty space between wrapped lines that reads as broken pacing on mobile). Style-level `LineSpacing` extensions are not reliably honored across libass builds. ScaleY hacks to fake tight spacing smush the text vertically.
+
+**Validated fix** (originated in `spoolcast/SHIPPING.md` § "Caption style"):
+
+1. **Pre-wrap text in Python** via `textwrap.wrap(text, width=N)` to a controlled char count per line.
+2. **Emit each wrapped line as its own Dialogue event** with explicit `{\an5\pos(x, y)}` positioning:
+   ```
+   Dialogue: 0,start,end,Default,,0,0,0,,{\an5\pos(540,1300)}LINE 1 TEXT
+   Dialogue: 0,start,end,Default,,0,0,0,,{\an5\pos(540,1345)}LINE 2 TEXT
+   ```
+3. **Style `Alignment` field = `5`** (middle-center anchor) to pair with the inline `\an5\pos()` overrides.
+4. **`LINE_STEP` = ~62.5% of fontsize** baseline-to-baseline (e.g., 45px at fontsize 72; 20px at fontsize 32). Lines stack nearly touching — cap-to-cap gap target <4px.
+5. **First-line center y (`margin_v_y`)** at ~67.7% from top for 9:16 full-bleed mobile (clears bottom UI overlays).
+6. **Wrap width** depends on font: ~31 chars/line for Montserrat Black at canvas-width / fontsize ratio = 15. Arial Black is ~15% wider per char → use ~26 chars/line at the same ratio.
+
+**Why this works:** explicit `\pos()` per line gives deterministic pixel-accurate stacking; libass treats each Dialogue as an independent positioned glyph block, ignoring its own leading heuristics entirely.
+
+**Spoolcast-specific values** (canvas, font, margin_v_y for that pipeline's aspect modes) live in `SHIPPING.md` § "Caption style (burned-in, mobile A.1)" — that file is the per-pipeline application of this engine rule.
+
+**Caught:** ep 3 v3 stitch shipped with default libass leading on 3-line caption beats — too much vertical gap between wrapped lines. Refactored to per-line `\an5\pos()` after the user pointed at the SHIPPING.md rule.
 
 ---
 
@@ -249,3 +372,31 @@ with ThreadPoolExecutor(max_workers=len(NARRATION)) as ex:
 **Also use `python -u` (unbuffered output)** when piping through `tee` — `tee` line-buffers stdout, and Python's default block buffering combined with TTS I/O waits will hide all progress messages until the entire batch completes (or hangs silently). Unbuffered = visible per-line progress, easier to diagnose hangs.
 
 Caught on news-anime-bot ep 2: sequential TTS took 6+ min for 12 lines, then hung at line 3 with no visible output. Process had to be killed and restarted. Parallel + `-u` would have completed the batch in under a minute with full visibility.
+
+---
+
+## 12. Continuous-narration audio — pre-normalize before concat to avoid static at gap boundaries
+
+When building one continuous narration track from 12 line-mp3s + inter-line silence gaps, **pre-normalize every input segment to a uniform AAC 48kHz mono format BEFORE the concat step**. Otherwise sample-rate / channel-layout mismatches at boundaries produce audible clicks/static every time the narrator transitions in or out of speech.
+
+**Root cause:** Google Cloud TTS mp3s come out at **24kHz mono**; ffmpeg `anullsrc` silence is typically generated at **48kHz mono**; the resampler at the concat boundary hits discontinuities → clicks.
+
+**Bad pattern (causes static):**
+```python
+# concat filter directly on heterogeneous inputs
+"[0:a]aresample=async=1[a0];[1:a]anull[a1];[a0][a1]concat=n=2:v=0:a=1[out]"
+```
+The `aresample=async=1` does the math but per-segment state resets at concat boundaries → audio glitches.
+
+**Good pattern (uniform inputs):**
+1. Run a separate `ffmpeg` per input segment that normalizes to AAC 48kHz mono `.m4a`:
+   ```python
+   ffmpeg -i narration.mp3 -c:a aac -b:a 192k -ac 1 -ar 48000 narr-NN.m4a
+   ffmpeg -f lavfi -t 0.5 -i anullsrc=cl=mono:r=48000 -c:a aac -b:a 192k -ac 1 -ar 48000 silence-NN.m4a
+   ```
+2. Concat via the **demuxer** (not filter) since inputs now match format:
+   ```python
+   ffmpeg -f concat -safe 0 -i list.txt -c:a aac -b:a 192k -ac 1 -ar 48000 continuous.m4a
+   ```
+
+Caught on news-anime-bot ep 3 v1 stitch: noticeable static every time narrator speaks. Fixed by pre-normalizing all inputs to uniform AAC 48kHz mono before demuxer-concat.

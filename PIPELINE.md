@@ -915,6 +915,38 @@ Constraints (enforced at validation time, not render time):
 - Hard cap: 3 concurrent overlays per chunk at any moment.
 - Soft cap per video: ~5-10 overlay insertions total. More than that is a design smell — redesign as full-frame scenes.
 
+#### Cross-Chunk Overlay Spec (root-level field)
+
+For overlays whose joke needs more time than a single chunk's runway provides, declare them at the **shot-list root** (sibling to `chunks[]`), not inside any chunk's `Overlays` column. The renderer wraps each in a composition-level Sequence so the video clock starts at zero on appearance — animated reactions stay animated across the chunk cut.
+
+```json
+{
+  "chunks": [...],
+  "cross_chunk_overlays": [
+    {
+      "source": "source/fetched-assets/memes/meme-confused-travolta.mp4",
+      "start_chunk_id": "C14",
+      "timing_start_s": 4.8,
+      "duration_s": 1.5,
+      "meme_type": "quick-react-animated",
+      "mark_on_word": "different",
+      "mark_chunk_id": "C15",
+      "x": 0.5, "y": 0.5, "anchor": "center", "width": 0.45,
+      "entry_transition": "cut", "exit_transition": "cut"
+    }
+  ]
+}
+```
+
+Required fields per entry: `source`, `start_chunk_id`, `timing_start_s`, `duration_s`, `meme_type`, `mark_on_word`, `mark_chunk_id` (which chunk's narration owns the marked word — `start_chunk_id` or its immediate next chunk), `x`, `y`, `anchor`, `width`, `entry_transition`, `exit_transition`.
+
+Constraints (enforced by `audit_overlays.py`):
+- Span ≤ 2 adjacent chunks.
+- Same `meme_type` duration caps as in-chunk overlays apply (≤2.5s for sustained-punchline). Need >2.5s of full-screen amplifier? Promote to its own chunk via `image_source: meme/broll_image`.
+- All viewer-test checks (recognition, size, connection, decode time) still apply.
+
+See rules.md § Meme placement option (4) for editorial rules.
+
 Typical use: brand-name mention in narration gets the brand's logo inserted at the word's timestamp, top-right corner, ~12% canvas width, fades in and out over ~0.3s.
 
 **A.1 mobile overlay adjustments:** the `Overlays` column's `width` is normalized to widescreen canvas (1920-px). When the mobile export chain (A.1) composites these on the 1080-px mobile canvas, it multiplies `width` by 1.8× (capped at 0.9) — compensates for the tall 4:5 mobile canvas making normalized widths feel visually smaller. Position (x, y) is NOT scaled. SVG overlay sources must be rasterized via `rsvg-convert` before compositing (ffmpeg has no SVG decoder). See SHIPPING.md § Mobile layout conventions + § SVG overlay rasterization.

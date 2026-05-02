@@ -94,6 +94,22 @@ type Overlay = {
   exitTransition?: string;
 };
 
+// Cross-chunk overlay: top-level, lives outside any chunk's Sequence so it can
+// span chunk boundaries without resetting its video clock at the cut.
+// See rules.md § Meme placement option (4).
+type CrossChunkOverlay = {
+  src: string;
+  absStartFrame: number;
+  absEndFrame: number;
+  x: number;
+  y: number;
+  anchor: string;
+  width: number;
+  rotationDeg?: number;
+  entryTransition?: string;
+  exitTransition?: string;
+};
+
 type Chunk = {
   id: string;
   imageSrc: string;
@@ -266,50 +282,53 @@ const OverlayLayer: React.FC<{overlays: Overlay[]; canvasWidth: number; canvasHe
   canvasWidth,
   canvasHeight,
 }) => {
-  const frame = useCurrentFrame();
   if (!overlays || overlays.length === 0) return null;
   return (
     <>
       {overlays.map((ov, i) => {
-        if (frame < ov.startFrameInChunk || frame >= ov.endFrameInChunk) return null;
         const w = ov.width * canvasWidth;
         const px = ov.x * canvasWidth;
         const py = ov.y * canvasHeight;
         const {tx, ty} = anchorToOffsets(ov.anchor);
         const rot = ov.rotationDeg ?? 0;
+        const lower = ov.src.toLowerCase();
+        const isVideo = lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
+        // Wrap each overlay in its own Sequence so video overlays get a
+        // time origin starting at zero when they appear. Without this,
+        // OffthreadVideo plays based on the parent chunk's frame and a
+        // late-mounted overlay would skip past the source duration and
+        // freeze on the last frame.
         return (
-          <div
+          <Sequence
             key={`${ov.src}-${i}`}
-            style={{
-              position: "absolute",
-              left: px,
-              top: py,
-              width: w,
-              transform: `translate(${tx}, ${ty}) rotate(${rot}deg)`,
-              transformOrigin: "center center",
-            }}
+            from={ov.startFrameInChunk}
+            durationInFrames={Math.max(1, ov.endFrameInChunk - ov.startFrameInChunk)}
+            layout="none"
           >
-            {(() => {
-              const lower = ov.src.toLowerCase();
-              const isVideo = lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
-              if (isVideo) {
-                return (
-                  <OffthreadVideo
-                    src={staticFile(ov.src)}
-                    style={{width: "100%", height: "auto", display: "block"}}
-                    muted
-                    loop
-                  />
-                );
-              }
-              return (
+            <div
+              style={{
+                position: "absolute",
+                left: px,
+                top: py,
+                width: w,
+                transform: `translate(${tx}, ${ty}) rotate(${rot}deg)`,
+                transformOrigin: "center center",
+              }}
+            >
+              {isVideo ? (
+                <OffthreadVideo
+                  src={staticFile(ov.src)}
+                  style={{width: "100%", height: "auto", display: "block"}}
+                  muted
+                />
+              ) : (
                 <Img
                   src={staticFile(ov.src)}
                   style={{width: "100%", height: "auto", display: "block"}}
                 />
-              );
-            })()}
-          </div>
+              )}
+            </div>
+          </Sequence>
         );
       })}
     </>
@@ -594,10 +613,67 @@ const ChunkRenderer: React.FC<{chunk: Chunk; priorChunk: Chunk | null}> = ({
   );
 };
 
+const CrossChunkOverlayLayer: React.FC<{
+  overlays: CrossChunkOverlay[];
+  canvasWidth: number;
+  canvasHeight: number;
+}> = ({overlays, canvasWidth, canvasHeight}) => {
+  if (!overlays || overlays.length === 0) return null;
+  return (
+    <>
+      {overlays.map((ov, i) => {
+        const w = ov.width * canvasWidth;
+        const px = ov.x * canvasWidth;
+        const py = ov.y * canvasHeight;
+        const {tx, ty} = anchorToOffsets(ov.anchor);
+        const rot = ov.rotationDeg ?? 0;
+        const lower = ov.src.toLowerCase();
+        const isVideo =
+          lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
+        return (
+          <Sequence
+            key={`cco-${ov.src}-${i}`}
+            from={ov.absStartFrame}
+            durationInFrames={Math.max(1, ov.absEndFrame - ov.absStartFrame)}
+            layout="none"
+          >
+            <div
+              style={{
+                position: "absolute",
+                left: px,
+                top: py,
+                width: w,
+                transform: `translate(${tx}, ${ty}) rotate(${rot}deg)`,
+                transformOrigin: "center center",
+              }}
+            >
+              {isVideo ? (
+                <OffthreadVideo
+                  src={staticFile(ov.src)}
+                  style={{width: "100%", height: "auto", display: "block"}}
+                  muted
+                />
+              ) : (
+                <Img
+                  src={staticFile(ov.src)}
+                  style={{width: "100%", height: "auto", display: "block"}}
+                />
+              )}
+            </div>
+          </Sequence>
+        );
+      })}
+    </>
+  );
+};
+
 export const SpoolcastComposition: React.FC = () => {
   const chunks = previewData.chunks as Chunk[];
+  const crossChunkOverlays =
+    ((previewData as {crossChunkOverlays?: CrossChunkOverlay[]}).crossChunkOverlays) ?? [];
   const playbackRate: number =
     (previewData as {playbackRate?: number}).playbackRate ?? 1.0;
+  const {width, height} = useVideoConfig();
 
   return (
     <AbsoluteFill style={{backgroundColor: "#ffffff"}}>
@@ -628,6 +704,12 @@ export const SpoolcastComposition: React.FC = () => {
           })}
         </Sequence>
       ))}
+      {/* Cross-chunk overlays render after the chunks loop = z-order on top. */}
+      <CrossChunkOverlayLayer
+        overlays={crossChunkOverlays}
+        canvasWidth={width}
+        canvasHeight={height}
+      />
     </AbsoluteFill>
   );
 };
