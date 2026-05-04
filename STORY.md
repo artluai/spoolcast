@@ -2,6 +2,8 @@
 
 Everything editorial: script extraction, pacing, and viewer context.
 
+Scope: this file contains reusable editorial guidance plus `illustration-chunk-remotion` screenplay, shot-list, chunk, and Remotion-specific rules. Show-specific adapters may use the reusable principles, but their own `rules.md` owns execution order and production artifacts.
+
 ## Table of Contents
 
 - [Part 1 — Script Extraction](#part-1--script-extraction)
@@ -43,7 +45,7 @@ Everything editorial: script extraction, pacing, and viewer context.
 
 #### Why This Document Exists
 
-The current spoolcast rules explain the system well once a session has already become a shot list.
+The current `illustration-chunk-remotion` rules explain the system well once a session has already become a shot list.
 
 They do **not** capture the most editorially important stage well enough:
 
@@ -73,11 +75,11 @@ This is based on the real `tribe-session-001` pipeline:
 
 #### The Actual Pipeline, In Order
 
-This is the order that was actually followed.
+This is the order that was actually followed for the `tribe-session-001` image-chunk explainer.
 
 It matters.
 
-The main failure mode is skipping the middle and pretending a transcript can go straight into a shot list.
+The main failure mode for this adapter is skipping the middle and pretending a transcript can go straight into a shot list.
 It cannot.
 
 ##### 1. Start by stabilizing the raw session package

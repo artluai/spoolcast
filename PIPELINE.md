@@ -1,7 +1,8 @@
 # Pipeline
 
-Procedural reference — read top-to-bottom as you move through stages.
-Workflow → Session config spec → Shot-list spec → Render config.
+Universal production lifecycle for spoolcast videos, plus the current `illustration-chunk-remotion` format adapter.
+
+Every video follows the universal lifecycle in Part 1. A format adapter then fills in the concrete files, scripts, render method, and audit gates for that video type. Do not apply one adapter to another format. If ownership is unclear, stop and surface the conflict.
 
 ## Table of Contents
 
@@ -24,7 +25,7 @@ Workflow → Session config spec → Shot-list spec → Render config.
   - [Failure Conditions](#failure-conditions)
   - [Validation Checklist](#validation-checklist)
   - [Environment Rule](#environment-rule)
-- [Part 2 — Session Config Spec](#part-2--session-config-spec)
+- [Part 2 — Session Config Spec (`illustration-chunk-remotion`)](#part-2--session-config-spec)
   - [Purpose](#purpose-1)
   - [Canonical Location](#canonical-location)
   - [Required Fields](#required-fields)
@@ -35,7 +36,7 @@ Workflow → Session config spec → Shot-list spec → Render config.
   - [Example](#example)
   - [Resolution + Aspect Ratio + Canvas Dimensions](#resolution--aspect-ratio--canvas-dimensions)
   - [Validation Rules](#validation-rules)
-- [Part 3 — Shot-List Spec](#part-3--shot-list-spec)
+- [Part 3 — Shot-List Spec (`illustration-chunk-remotion`)](#part-3--shot-list-spec)
   - [Purpose](#purpose-2)
   - [Canonical Structure](#canonical-structure)
   - [Required Headers](#required-headers)
@@ -50,7 +51,7 @@ Workflow → Session config spec → Shot-list spec → Render config.
   - [Downstream Field Mapping](#downstream-field-mapping)
   - [What The Shot List Must Not Do](#what-the-shot-list-must-not-do)
   - [Validation Rules](#validation-rules-1)
-- [Part 4 — Render Config](#part-4--render-config)
+- [Part 4 — Render Config (`illustration-chunk-remotion`)](#part-4--render-config)
   - [Purpose](#purpose-3)
   - [Preview Rule](#preview-rule)
   - [Runtime Requirements](#runtime-requirements)
@@ -76,46 +77,97 @@ Workflow → Session config spec → Shot-list spec → Render config.
 
 ### End-to-end flow (decision tree)
 
-Single reference for how a session moves from empty state to shipped. Widescreen (A) is the mandatory path; mobile (A.1) is an optional fork after Stage 8 shipping. Every stage has a mechanical gate that must pass before the next stage starts.
+Universal schedule for how any video moves from idea/materials to shipped artifact. Every stage has a format-specific mechanical gate that must pass before the next stage starts.
+
+Stage 0 has two valid branches:
+
+- **Existing format:** choose a registered adapter such as `illustration-chunk-remotion` or `news-anime-bot`, then follow that adapter's files, scripts, and gates.
+- **New format:** when no registered adapter fits the requested video, run a format-definition pass first. Do not force the request into the nearest existing adapter.
+
+#### New Format Definition Pass
+
+Before producing a video with a new format, fill these blanks and write them into a new adapter rules file:
+
+| Required decision | Must define |
+|---|---|
+| Adapter name | short stable id, e.g. `interview-clips`, `screen-recording-demo` |
+| Owner rules file | where agents read the format-specific workflow |
+| Session location | where session folders live |
+| Source-of-truth files | script, manifest, shot plan, edit list, config, or equivalent |
+| Production units | chunks, beats, scenes, clips, chapters, segments, or equivalent |
+| Audio contract | narration, source audio, music, silence, SFX, or explicit no-audio |
+| Visual contract | generated images, generated video, screen recordings, broll, slides, or equivalent |
+| Assembly method | Remotion, ffmpeg stitch, external editor, or other renderer |
+| Audit gates | concrete checks that block each stage |
+| Publish/package checklist | final required deliverables and approvals |
+| Auditor routing | how `scripts/spoolcast_audit.py` detects and routes this format |
+
+Gate: new-format production cannot start until the adapter table maps universal stages 0-12 to concrete files/scripts/gates.
 
 | # | Stage | What it does | Driver | In → Out | Gate | On fail |
 |---|---|---|---|---|---|---|
-| 0 | Scaffold | Creates session dir + config | `init_session.py` | ids, budget, style → `session.json` + subdirs | config parses | fix config |
-| 1a | Core message | Locks the one-sentence takeaway | agent | raw source → locked core message | user confirms (STORY.md § Job E) | surface gap, don't proceed |
-| 1b | Structure | Decides Act / chapter shape | agent | core message → Act structure | user approves | revise |
-| 1c | Screenplay | Drafts v1 → v3 voiceover | agent | structure → `voiceover.md` + drafts | v3 on disk | re-draft |
-| 2 | Shot-list | Per-beat shot-list from screenplay | shot-list editor | v3 → `shot-list.json/.xlsx` | `validate_shot_list.py` = 0 | fix violations |
-| 3 | Chunking | Groups beats into illustration units | agent | beats → chunks | all chunks have `boundary_kind` + `weight` | author chunks |
-| 4a | Narration audit | QA on narration text | `audit_narration.py` | narration → `narration-audit.json` | exit 0 | fix narration |
-| 4b | External pre-flight | Ensures externals + sidecars on disk before any kie call | `batch_scenes.py` pre-flight | shot-list → externals verified | pre-flight passes | source missing asset |
-| 4c | Scene gen | One AI illustration per chunk | `batch_scenes.py` / `generate_scene.py` | shot-list + style → `scenes/*.png` + manifest | PNG + manifest entry per chunk | regen failed chunks |
-| 4d | Scene audit | Vision QA on PNGs (Qwen-VL) | `audit_scenes.py` | PNGs → `scene-audit.json` | exit 0 | regen flagged |
-| 5 | Preprocess | Builds reveal frame sequences | `batch_preprocess.py` | PNGs → `frames/*/` | all frame counts present | re-preprocess |
-| 6 | Review board | Human-review HTML artifact | `build_review_board.py` | shot-list + scenes → `review/shot-review.html` | human review passes | regen flagged |
-| 7 | Render | Remotion assembles the widescreen video | `render_with_audit.sh` | preview-data + frames + audio → `<session>-1.0x.mp4` | `audit_render.py` passes | fix flagged frames |
-| 8a | Rate post-process | Speeds 1.0× → shipped rate (optional) | ffmpeg `setpts` | 1.0× mp4 → `<session>-<rate>x.mp4` | duration matches expected | re-run |
-| 8b | Captions SRT | Full SRT at shipped rate | `generate_srt.py` | preview-data + shot-list → `<session>-<rate>x.srt` | cue count > 0 | regenerate |
-| 8c | Thumbnail | Widescreen YouTube thumbnail | `generate_thumbnail.py` | prompt → `<session>-thumbnail-1920x1080.png` | exactly 1920×1080 | rescale |
-| 8d | Publish | Upload to YouTube | `publish_youtube.py` | Stage 8 artifacts → YouTube URL | Pre-upload checklist (SHIPPING.md § Part 2) ✓ | fix failing items |
-| — | **Decision** | Ship mobile variants? | agent/user | Stage 8 artifacts → branch into A.1 or end | user chooses | widescreen ends |
+| 0 | Format/session setup | Choose existing adapter or run the new-format definition pass | agent / app | request + existing folders → known format + session root | format owner known and adapter gates defined | stop and define adapter |
+| 1 | Input intake | Gather user materials or declare agent-sourced inputs | agent / app | files, links, images, videos, docs, notes → input inventory | inventory exists or "agent-sourced" recorded | collect inputs |
+| 2 | Story / goal lock | Lock what the video is trying to say or do | agent / user | input inventory → core message / topic / goal | user or format gate confirms | surface gap |
+| 3 | Structure | Decide act, chapter, episode, or sequence shape | agent / user | goal → structure | approved or format rule accepts | revise |
+| 4 | Screenplay / production plan | Write the plan the format will produce from; not always voiceover | agent / format adapter | structure → script, screenplay, shot plan, or equivalent | plan exists on disk | revise |
+| 5 | Production units | Break plan into format-owned units | format adapter | plan → chunks, shots, beats, scenes, clips, or segments | every unit has id, intent, timing rule, asset needs | author units |
+| 6 | Audio plan / generation | Decide and produce narration, music, source audio, silence, or SFX | format adapter | units → audio assets / explicit no-audio decision | required audio exists or is explicitly not needed | fix audio |
+| 7 | Visual asset generation / collection | Produce or collect required visuals | format adapter | units → images, clips, broll, screenshots, generated scenes | every unit has required visual asset | source/regenerate |
+| 8 | Asset audit | Check produced assets before assembly | format adapter | assets → audit report | audit passes or accepted exceptions recorded | fix flagged assets |
+| 9 | Assembly | Build the video from approved assets | format adapter | assets + audio + timing → render/stitch output | output exists and timing/dimensions sane | reassemble |
+| 10 | Output audit | Mechanically inspect the assembled output | format adapter | output → audit report | audit passes | fix output |
+| 11 | Variants | Produce requested platform/aspect variants | format adapter | approved master → variants, thumbnails, SRTs | every requested variant passes its gate | fix variants |
+| 12 | Publish / package | Upload or prepare final deliverables | human / uploader | audited outputs → platform URLs or package | platform checklist passes | fix checklist |
+
+### Format Adapter: illustration-chunk-remotion
+
+This adapter is the current generic spoolcast still-image pipeline: screenplay/shot-list → production chunks → AI scene PNGs → reveal frames → Remotion widescreen render. Run `scripts/spoolcast_audit.py --session <id>` for sessions under `spoolcast-content/sessions/<id>/` that use this adapter.
+
+| Universal stage | Adapter step | Driver | In → Out | Gate | On fail |
+|---|---|---|---|---|---|
+| 0 | Scaffold | `init_session.py` | ids, budget, style → `session.json` + subdirs | config parses | fix config |
+| 1 | Input intake | agent | raw source → `working/asset-inventory.md` | inventory exists or agent-sourced recorded | collect inputs |
+| 2 | Core message | agent | raw source → locked core message | user confirms (STORY.md § Job E) | surface gap, don't proceed |
+| 3 | Structure | agent | core message → Act structure | user approves | revise |
+| 4 | Screenplay | agent | structure → `voiceover.md` + drafts | v3 on disk | re-draft |
+| 5 | Shot-list + chunking | shot-list editor / agent | v3 → `shot-list.json/.xlsx` with chunks | `validate_shot_list.py` = 0; all chunks have `boundary_kind` + `weight` | fix violations |
+| 6 | Narration/audio audit | `audit_narration.py` | narration → `narration-audit.json` | exit 0 | fix narration |
+| 7a | External pre-flight | `batch_scenes.py` pre-flight | shot-list → externals verified | pre-flight passes | source missing asset |
+| 7b | Scene generation | `batch_scenes.py` / `generate_scene.py` | shot-list + style → `scenes/*.png` + manifest | PNG + manifest entry per generated chunk | regen failed chunks |
+| 8 | Scene audit | `audit_scenes.py` | PNGs → `scene-audit.json` | exit 0 | regen flagged |
+| 9a | Preprocess | `batch_preprocess.py` | PNGs → `frames/*/` | all frame counts present | re-preprocess |
+| 9b | Review board | `build_review_board.py` | shot-list + scenes → `review/shot-review.html` | human review passes | regen flagged |
+| 9c | Render | `render_with_audit.sh` | preview-data + frames + audio → `<session>-1.0x.mp4` | `audit_render.py` passes | fix flagged frames |
+| 10 | Widescreen output audit | `audit_render.py` via render script | mp4 → `render-audit.passed` | sentinel exists | fix output |
+| 11a | Rate post-process | ffmpeg `setpts` | 1.0× mp4 → `<session>-<rate>x.mp4` | duration matches expected | re-run |
+| 11b | Captions SRT | `generate_srt.py` | preview-data + shot-list → `<session>-<rate>x.srt` | cue count > 0 | regenerate |
+| 11c | Thumbnail | `generate_thumbnail.py` | prompt → `<session>-thumbnail-1920x1080.png` | exactly 1920×1080 | rescale |
+| 12 | Publish | `publish_youtube.py` / manual | Stage 11 artifacts → YouTube URL | pre-upload checklist passes | fix failing items |
+
+Optional mobile variant A.1 for this adapter:
+
+| # | Step | What it does | Driver | In → Out | Gate | On fail |
+|---|---|---|---|---|---|---|
 | A.1-1 | Prereq | Stage 8 complete | — | — | `render-audit.passed` sentinel | complete widescreen |
-| A.1-2 | Mobile crop fill | Center-crops widescreen scenes → 4:5 | `mobile_export.py` (planned) | `scenes/*.png` → `scenes/mobile/*-mobile.png` | every non-bumper generated chunk has a mobile PNG | re-run crop |
+| A.1-2 | Smart-crop mobile scenes | Crops eligible widescreen scene images into mobile canvas | `smart_crop_mobile.py` | shot-list `image_path` / scenes → `scenes/mobile/*-mobile.png` | every eligible chunk has a mobile PNG or logged skip | re-run crop |
 | A.1-3 | Mobile-crop audit | Vision check on cropped PNGs | `audit_mobile_crops.py` | mobile PNGs → `mobile-crop-audit.json` | report written | re-run |
-| A.1-4 | Regen at 4:5 | Byte-faithful replay, aspect-only override | `replay_mobile.py --aspect 4:5` | flagged + manifest → regen PNGs | regen OR orphan warning logged | orphan → continue; kie fail → retry once |
-| A.1-5 | Re-audit regens | Catches broken regens | `audit_mobile_crops.py --only` | regens → audit | 0 broken after 1 retry | fail loudly at retry limit |
-| A.1-6 | Mobile render | Stitches mobile PNGs at shipped rate | `mobile_export.py` (planned) | mobile PNGs + master + SRT → per-part MP4(s) | exact 1080×1920, duration matches rate | re-run |
+| A.1-4 | Fix failed crops only | Pad-to-fit or regenerate only chunks flagged by the crop audit | `mobile_pad_to_fit.py` / `replay_mobile.py` / `batch_scenes.py --mobile-variant --only` | flagged chunks → fixed mobile PNGs | fixed PNG exists for each flagged chunk | retry once or fail loudly |
+| A.1-5 | Re-audit fixes | Catches remaining broken mobile assets | `audit_mobile_crops.py --only` | fixed PNGs → updated audit | 0 broken after 1 retry | fail loudly at retry limit |
+| A.1-6 | Mobile stitch/export | Stitches mobile PNGs, muxes master audio, burns captions, optionally splits | `mobile_export.py` | mobile PNGs + master + SRT → per-part MP4(s) | exact 1080×1920, duration matches rate | re-run |
 | A.1-7 | Burn captions | Baked into step 6 via libass | `caption_assets.py` + ffmpeg | rate-matched SRT → captioned MP4 | no font-fallback warnings | verify fontsdir |
 | A.1-8 | Duration / split | Split on chunk boundaries if > platform cap | part logic in step 6 | total duration → N parts | each part ≤ platform cap at shipped rate | adjust split |
-| A.1-9 | Thumbnail per part | 1080×1920 full-screen thumbnails | `generate_mobile_thumbnail.py` (planned) | base + title + part → `*-mobile-thumb-pt<n>of<total>.png` | exact 1080×1920, no bars | regen |
-| A.1-10 | Per-part SRTs | Windowed SRTs for accessibility upload | windowing utility (planned) | shipped SRT → `*-mobile-pt<n>of<total>.srt` | duration matches part MP4 | re-window |
-| A.1-11 | Final audit | Mechanical pre-upload checklist | `audit_mobile_publish.py` (planned) | all per-part artifacts → report | SHIPPING.md § A.1 Pre-upload checklist ✓ | fix items |
+| A.1-9 | Thumbnail per part | 1080×1920 full-screen thumbnails from persisted widescreen prompt | `mobile_thumbnails.py` | `working/thumbnail-prompt.md` + base + part → `*-mobile-thumb-pt<n>of<total>.png` | exact 1080×1920, no bars | regen |
+| A.1-10 | Per-part SRTs | Windowed SRTs for accessibility upload | `mobile_export.py` split mode | shipped SRT → `*-mobile-pt<n>of<total>.srt` | duration matches part MP4 | re-window |
+| A.1-11 | Final audit | Mechanical pre-upload checklist | `audit_mobile_publish.py` | all per-part artifacts → report | SHIPPING.md § A.1 Pre-upload checklist ✓ | fix items |
 | A.1-12 | Publish per part | Upload to platform(s) | platform uploaders (manual) | per-part artifacts → platform URLs | platform accepts | platform troubleshoot |
 
-**Universal principles for the table above:**
+**Universal principles for the lifecycle and adapter tables above:**
 
 - **Mechanical gates are mandatory.** A stage "passed" only when the listed gate passed — never when the code "looks right." See rules.md § Verified = mechanical check passed.
 - **`Driver: agent` is AI-driven by default but human-doable.** Per rules.md § Delivery Modes, the AI agent executes these stages autonomously in autopilot mode, with user confirmation in agent-skill mode. A human reviewer may also drive the stage directly. The stage's gate is what's mandatory, not who drives it.
-- **A.1 never shims A code paths.** When an A.1 stage looks like "extract from widescreen master and scale," check for a mobile-native source first. See SHIPPING.md § A vs A.1 separation.
+- **Format adapters own implementation.** Engine docs can supply reusable mechanics, but they do not override the format owner for execution order.
+- **A.1 never shims A code paths.** In the illustration-chunk adapter, when an A.1 stage looks like "extract from widescreen master and scale," check for a mobile-native source first. See SHIPPING.md § A vs A.1 separation.
 - **Failures surface loudly, not silently.** Manifest orphans, rate mismatches, audit regressions — all surface with specific warnings so a reviewer can correlate bad output with the cause (rules.md § Empirical verification beats logical inference).
 
 ### Workflow Rules
@@ -133,17 +185,16 @@ This file defines:
 - validation rules
 - failure conditions
 
-This file is generic.
-It must not depend on any specific session.
+The universal lifecycle is generic. Format adapter sections may name concrete scripts, files, and gates, but must not depend on any specific session.
 
 #### System Goal
 
-Turn a session — a chat, a build, a conversation, an idea — into:
+Turn a session — a chat, build, conversation, idea, news story, or content package — into:
 
-1. a screenplay and shot list that tell the real story honestly
-2. one AI-generated illustration per narration chunk in a per-session locked visual style
-3. a deterministic reveal of each illustration (via the preprocessor)
-4. a reliable final video rendered by Remotion against narration audio
+1. a locked story/goal and production plan
+2. format-owned production units with explicit timing, audio, and visual requirements
+3. generated or collected assets that match those units
+4. an assembled video with mechanical audit gates before shipping
 
 The system should minimize:
 - stale data
@@ -158,12 +209,16 @@ When something is important across chats or tools:
 
 #### Source Of Truth
 
-Two per-session sources of truth coexist:
+Every format adapter must declare its own source-of-truth files before production starts.
+
+For the `illustration-chunk-remotion` adapter:
 
 - **Shot list** is the source of truth for structure: chapters, beats, chunks, narration text, timing, visual intent.
 - **Session config** is the source of truth for style, image provider, reveal behavior, and AI budget (see PIPELINE.md § Session Config Spec).
 
-Downstream artifacts may include:
+Other adapters may use different source-of-truth files, such as `script.md`, `run_clips.py`, `cast.txt`, or a show-specific manifest. The adapter owner decides. Root engine docs do not silently replace the adapter's declared source of truth.
+
+For `illustration-chunk-remotion`, downstream artifacts may include:
 - scene manifests
 - generated scene illustrations
 - preprocessor frame sequences
@@ -175,19 +230,20 @@ None of those may silently override the shot list or the session config.
 
 Shared documentation should avoid absolute local paths unless a path is truly required for a working local setup.
 
-#### Global Visual Model
+#### Visual Model
 
-All videos use one primary visual layer per frame: the illustrated scene.
+Each format adapter owns its visual model.
 
-That means:
-- each narration chunk is represented by one AI-generated full-frame illustration
-- the illustration is the whole scene at the primary layer
-- emphasis comes from moving to the next illustration on the next chunk
-- returning to a prior illustration later is allowed
+For the `illustration-chunk-remotion` adapter, the primary visual model is one AI-generated full-frame illustration per narration chunk:
+
+- generate one primary illustration per chunk
+- treat that illustration as the whole primary scene
+- create emphasis by moving to the next illustration on the next chunk
+- reuse a prior illustration only when the shot list explicitly says to do so
 
 ##### Overlay carve-out
 
-Overlays (logos, badges, small reference artifacts) are permitted on top of the primary illustration, under strict constraints:
+For the `illustration-chunk-remotion` adapter, overlays (logos, badges, small reference artifacts) are permitted on top of the primary illustration, under strict constraints:
 
 - every overlay's position, size, entry timestamp, exit timestamp, and any entry/exit transition must be **explicitly specified per-overlay** in the shot list
 - the renderer may not improvise placement, size, or timing — it only plays the specified values
@@ -291,9 +347,9 @@ Why this order: a regen costs real money per call; a crop is free. Starting with
 Reverse order (regens first, then crops) leaves gaps in the folder and makes the regen decision unnecessarily early. Concrete cost in this session: we skipped the crop pass and went straight to regens for 9 chunks — even the ones that would have survived a crop fine. Cheaper and simpler to have cropped all first.
 - `working/`: temporary planning artifacts that should not become source of truth
 
-#### Pipeline Stages
+#### Illustration-Chunk Remotion Adapter Stages
 
-The workflow has nine separate stages:
+The `illustration-chunk-remotion` adapter has these implementation stages:
 
 1. source-to-script (editorial, externally owned)
 1.5. **asset inventory** — survey every real artifact already on disk or easily sourceable that could illustrate a concrete reference in the narration. Output: `sessions/<id>/working/asset-inventory.md`, one-line entries with paths, grouped by kind (prior shipped videos/renders/frames, session files, manifests, style anchors, chat transcripts, existing screenshots). No acquisition here — this is a survey, not a sourcing step. Purpose: collapses the concrete-reference check at Stage 2 from a search into a lookup. See rules.md § Non-Negotiable System Defaults for the check itself.
@@ -674,11 +730,11 @@ Avoid:
 **Fully automated chain (runs end-to-end when mobile export is requested; no human gate between steps):**
 
 1. **Prereq:** widescreen master shipped (Stage 8, audit_render mechanical pass).
-2. **Crop** every non-bumper `image_source: generated` widescreen PNG to 4:5 into `scenes/mobile/<chunk>-mobile.png`. Bumpers skipped — ROADMAP item 5 (Remotion-native) handles them.
+2. **Smart-crop** every eligible widescreen scene image into `scenes/mobile/<chunk>-mobile.png` via `smart_crop_mobile.py`. Bumpers are rendered mobile-native by the export stitcher.
 3. **Audit** the cropped PNGs via `audit_mobile_crops.py`. Flags broken/clipped chunks. Writes `working/mobile-crop-audit.json`. Note: `audit_scenes.py` on widescreen PNGs covers STRUCTURAL mobile-safety only (split-panels, off-center focals) and misses text-clipping — `audit_mobile_crops.py` is the authoritative legibility check for A.1. Both are useful at different stages.
-4. **Regen** every flagged chunk at native 4:5 via `replay_mobile.py --aspect 4:5`. Byte-faithful: reads the widescreen prompt + image_input from the manifest, only overrides aspect. If any flagged chunk has no manifest entry (orphan — see VISUALS.md § Manifest race condition), the replay logs a warning and skips that chunk; the chain CONTINUES rather than halting. The orphan chunk retains its cropped-from-widescreen version in `scenes/mobile/` as a fallback, and the warning is surfaced at the end so a reviewer can correlate any bad output with the skipped chunks.
-5. **Re-audit** the regens via `audit_mobile_crops.py`. Anything still broken → auto-retry once. Fail loudly at retry limit.
-6. **Render** the mobile video via Remotion at 4:5 canvas: scene PNGs + live-rendered bumpers (ROADMAP item 5) + preprocessor reveal frames.
+4. **Fix only flagged chunks.** Use `mobile_pad_to_fit.py` for crop/edge failures; use `replay_mobile.py` for byte-faithful aspect replay when the widescreen scene should stay the same; use `batch_scenes.py --mobile-variant --only <chunks>` only when the shot-list intentionally changed or replay is impossible.
+5. **Re-audit** the fixes via `audit_mobile_crops.py`. Anything still broken → auto-retry once. Fail loudly at retry limit.
+6. **Stitch/export** the mobile video via `mobile_export.py`: mobile PNGs + mobile-native bumper cards + master audio + burned captions.
 7. **Burn captions** via ffmpeg libass using the SHIPPING.md § Part 3 caption style.
 8. **Duration check.** If the result exceeds the target platform cap (Reels ≤3 min algo / TikTok ≤60 s favored / Shorts 60 s hard) → auto-split on chunk boundaries with a "to be continued…" card + part badge.
 9. **Regenerate thumbnail** at mobile aspect (4:5 or 9:16 per platform target).
@@ -707,6 +763,8 @@ Prefer re-derivation (`batch_scenes.py --mobile-variant`) when:
 - The widescreen manifest entry is missing or the image_input URL is dead.
 
 ## Part 2 — Session Config Spec
+
+Scope: this part applies to `illustration-chunk-remotion` sessions. Other adapters may use different config files.
 
 ### Session Config Spec
 
@@ -842,13 +900,15 @@ A session is invalid if:
 
 ## Part 3 — Shot-List Spec
 
+Scope: this part applies to `illustration-chunk-remotion` sessions. Other adapters may use different production-unit specs.
+
 ### Shot List Specification
 
 #### Purpose
 
 This file defines what the shot list is, which fields it must contain, what each field means, what values are allowed, and how those fields are used downstream.
 
-The shot list is the source of truth.
+For this adapter, the shot list is the source of truth.
 
 #### Canonical Structure
 
@@ -1132,7 +1192,7 @@ Allowed contents:
 - local file URL if appropriate
 - explicit reuse markers such as `same as 01B`
 
-In the current system:
+In this adapter:
 - this field is the visual driver
 - this is what the review board should show
 - this is what the preview/render pipeline should use
@@ -1580,6 +1640,8 @@ The shot list fails validation if:
 
 ## Part 4 — Render Config
 
+Scope: this part applies to `illustration-chunk-remotion` Remotion renders. Other adapters may use ffmpeg stitching or another assembler.
+
 ### Render Rules
 
 #### Purpose
@@ -1812,7 +1874,7 @@ Preview-data generation must:
 - read from the current session config
 - read from the current scene manifest
 - read from the current preprocessor frame folders
-- export only the layers allowed by the current system
+- export only the layers allowed by this adapter
 
 Current rule:
 - preview data must contain one-chunk-per-entry with frame sequence references

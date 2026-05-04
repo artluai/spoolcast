@@ -2,6 +2,8 @@
 
 Everything on-screen and how it animates: asset generation, preprocessor, transitions.
 
+Scope: this file primarily describes the `illustration-chunk-remotion` visual system. Reusable engine mechanics, such as style anchors, asset scope, provider gotchas, and overlay safety, may be referenced by other adapters only when the adapter explicitly points here.
+
 ## Table of Contents
 
 - [Part 1 — Assets (generation, sourcing, overlays)](#part-1--assets-generation-sourcing-overlays)
@@ -69,11 +71,11 @@ Everything on-screen and how it animates: asset generation, preprocessor, transi
 
 #### Purpose
 
-This file defines how agents and apps should generate, source, validate, reuse, fetch, manifest, and budget visual assets.
+This file defines how agents and apps should generate, source, validate, reuse, fetch, manifest, and budget visual assets for the `illustration-chunk-remotion` adapter.
 
 #### Global Asset Rule
 
-The primary visual system uses one AI-generated illustration per narration chunk.
+The `illustration-chunk-remotion` primary visual system uses one AI-generated illustration per narration chunk.
 
 That means:
 - generate illustrations per chunk, not per beat
@@ -81,7 +83,7 @@ That means:
 - create contrast by moving to the next illustration on the next chunk
 - reuse a prior chunk's illustration explicitly when narrative calls for it
 
-A second mode — stock and sourced assets — is supported but is not the default. See "Alternate Mode: Stock / Sourced Assets" below.
+A second mode — stock and sourced assets — is supported inside this adapter but is not the default. See "Alternate Mode: Stock / Sourced Assets" below.
 
 #### Primary Visual Pipeline: AI-Illustrated Scenes
 

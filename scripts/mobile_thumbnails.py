@@ -53,13 +53,14 @@ TITLE_FONT = FONTS_DIR / "Caveat-Bold.ttf"
 PART_FONT = FONTS_DIR / "Montserrat-Black.ttf"
 
 # Mobile prompt suffix appended to the persisted widescreen prompt. Forces 9:16
-# aspect + grid-safe composition + no baked headline (PIL composites the title).
+# aspect + grid-safe composition. Headline + brush underline are KEPT (baked by
+# kie, matching widescreen verbatim). PIL only composites the part indicator.
 MOBILE_SUFFIX = (
     "\n\nMOBILE ADAPTATION: render this in 9:16 vertical portrait composition "
-    "(not 16:9 widescreen). The figure + central focal element occupy the upper "
-    "70% of the frame (grid-safe area). DO NOT bake any headline text into the "
-    "image — the title overlay is composited separately. Skip the brush-lettering "
-    "headline and red brushstroke underline that the widescreen prompt requests."
+    "(not 16:9 widescreen). The figure + central focal element occupy the "
+    "middle of the frame; the headline + brush underline sit at the top. "
+    "Reserve some empty space directly beneath the red brushstroke underline "
+    "for a part-indicator overlay that will be composited separately."
 )
 
 # Fallback prompt — used only when working/thumbnail-prompt.md does not exist.
@@ -185,70 +186,35 @@ def scale_to_cover(img: Image.Image, target_w: int, target_h: int) -> Image.Imag
 
 def composite_part(
     base: Image.Image,
-    title: str,
     part_n: int,
     total: int,
     out_path: Path,
 ) -> None:
+    """Composite ONLY the part badge. Headline is already baked into `base` by
+    kie (via the widescreen prompt). PIL adds nothing for the headline so the
+    text + font match the widescreen verbatim.
+    """
     canvas = base.copy().convert("RGB")
     draw = ImageDraw.Draw(canvas)
-
-    title_font = ImageFont.truetype(str(TITLE_FONT), TITLE_SIZE)
     part_font = ImageFont.truetype(str(PART_FONT), PART_SIZE)
-
-    # Title positioning: lower portion of grid-safe area (top ~70% = upper 1344px).
-    # Place title with bottom edge ~y=1300 so it sits inside grid-safe.
-    # Wrap title if it exceeds canvas width.
-    margin_x = 60
-    max_text_w = W - 2 * margin_x
-
-    def wrap(text: str, font: ImageFont.FreeTypeFont) -> list[str]:
-        words = text.split()
-        lines: list[str] = []
-        cur: list[str] = []
-        for w in words:
-            trial = (" ".join(cur + [w])).strip()
-            bbox = draw.textbbox((0, 0), trial, font=font)
-            if bbox[2] - bbox[0] > max_text_w and cur:
-                lines.append(" ".join(cur))
-                cur = [w]
-            else:
-                cur.append(w)
-        if cur:
-            lines.append(" ".join(cur))
-        return lines
-
-    title_lines = wrap(title, title_font)
-    line_h = TITLE_SIZE + 10
-    title_block_h = line_h * len(title_lines)
     part_text = f"PART {part_n} OF {total}"
     part_bbox = draw.textbbox((0, 0), part_text, font=part_font)
-    part_h = part_bbox[3] - part_bbox[1]
     part_w = part_bbox[2] - part_bbox[0]
+    part_h = part_bbox[3] - part_bbox[1]
 
-    # Position part badge above the title block. Anchor block bottom at y=1280.
-    block_bottom_y = 1280
-    spacing = 24
-    title_top_y = block_bottom_y - title_block_h
-    part_y = title_top_y - spacing - part_h
+    # Position: just below the kie-baked headline + red brush underline. Kie
+    # typically places those in the top ~15% of a 1920-tall portrait — y=380
+    # gives reliable below-underline placement with a small breathing margin.
+    part_y = 380
 
-    # Translucent dark band behind the text for legibility regardless of base.
-    band_padding_y = 30
-    band_top = part_y - band_padding_y
-    band_bottom = block_bottom_y + band_padding_y
-    band = Image.new("RGBA", (W, band_bottom - band_top), (0, 0, 0, 140))
+    # Translucent dark band for legibility regardless of base content underneath.
+    band_pad = 18
+    band_top = part_y - band_pad
+    band_bottom = part_y + part_h + band_pad
+    band = Image.new("RGBA", (W, band_bottom - band_top), (0, 0, 0, 130))
     canvas.paste(band, (0, band_top), band)
 
-    # Draw part badge (centered).
     draw.text(((W - part_w) // 2, part_y), part_text, font=part_font, fill="#ff3b3b")
-
-    # Draw title (centered, multi-line).
-    y = title_top_y
-    for line in title_lines:
-        bb = draw.textbbox((0, 0), line, font=title_font)
-        line_w = bb[2] - bb[0]
-        draw.text(((W - line_w) // 2, y), line, font=title_font, fill="white")
-        y += line_h
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(out_path, format="PNG")
@@ -258,7 +224,8 @@ def composite_part(
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--session", required=True)
-    p.add_argument("--title", required=True)
+    p.add_argument("--title", default=None,
+                   help="DEPRECATED: title is baked by kie via the widescreen prompt; this arg is ignored")
     p.add_argument("--num-parts", type=int, default=None,
                    help="default: auto-detect from existing renders/mobile/*.mp4")
     p.add_argument("--base", default=None,
@@ -311,7 +278,7 @@ def main() -> int:
 
     for i in range(1, n + 1):
         out = mobile_dir / f"{args.session}-mobile-thumb-pt{i}of{n}.png"
-        composite_part(base_img, args.title, i, n, out)
+        composite_part(base_img, i, n, out)
 
     print(f"[mobile-thumb] done. {n} thumbnails in {mobile_dir}")
     return 0

@@ -2,6 +2,8 @@
 
 End-of-pipeline: review and publish.
 
+Scope: review-board and A.1 mobile-export rules are `illustration-chunk-remotion` adapter rules. Publishing, captions, and platform checks are reusable only where a format adapter explicitly points here.
+
 ## Table of Contents
 
 - [Part 1 — Review Board](#part-1--review-board)
@@ -44,7 +46,7 @@ End-of-pipeline: review and publish.
 
 #### Purpose
 
-This file defines how the HTML review board should work.
+This file defines how the `illustration-chunk-remotion` HTML review board should work.
 
 The review board exists for human review.
 
@@ -118,7 +120,7 @@ It should not be:
 
 #### Visual Rules
 
-The review board should reflect the current system:
+The review board should reflect the `illustration-chunk-remotion` system:
 - one illustration per chunk
 - no second visual layer
 - final-frame illustration shown, not the reveal animation
@@ -586,10 +588,10 @@ The boundary test: if the artifact you're producing is reusable for the widescre
 
 | | A (widescreen) | A.1 (mobile) |
 |---|---|---|
-| Canvas | 1920×1080 | 1080×1920 (4:5 content centered) |
+| Canvas | 1920×1080 | 1080×1920 mobile canvas |
 | Renderer | Remotion (headless browser) | ffmpeg stitcher |
 | Scene source | `scenes/<chunk>.png` | `scenes/mobile/<chunk>-mobile.png` |
-| Bumper rendering | Remotion live-render | Remotion live-render at 1080×1920 (text-only bumpers are regenerated through Remotion at the mobile canvas, not cropped from the widescreen render and not re-typeset via ffmpeg `drawtext`) |
+| Bumper rendering | Remotion live-render | mobile-native card rendered by `mobile_export.py`, not cropped from widescreen |
 | SVG overlay | Browser-native | `rsvg-convert` → PNG → ffmpeg overlay |
 | Meme / reuse composition | Remotion | ffmpeg overlay on parent mobile PNG |
 | Playback rate | 1.15× post-process from 1.0× | 1.15× inherited from A |
@@ -786,10 +788,12 @@ A mismatch on any of (1), (5), (7) is the class of failure most likely to slip t
 
 ### Pipeline script location (A.1)
 
-- **Production path:** `scripts/mobile_export.py` — handles Stage 1–4 of the mobile stitcher (asset resolution, per-chunk clip build, concat + audio mux, burn captions, split into parts) for any session via `--session <id>`. Uses `scripts/caption_assets.py` for ASS generation, `scripts/smart_crop_mobile.py` for 9:16 / 1:1 scene crops, `scripts/replay_mobile.py` for chunk regens at new aspects, `scripts/audit_mobile_crops.py` for legibility audits.
-- **Split mode** (`--split-duration <sec>`): cuts the unburned `concat-audio.mp4` at chunk boundaries, windows + rebases the burn SRT per part, builds per-part ASS with the correct `Part N of M` badge, burns each part separately. Outputs `<session>-mobile-pt<n>of<total>.mp4` and `<session>-mobile-pt<n>of<total>.srt` per part. Helpers: `compute_chunk_ranges`, `find_split_indexes` (skips meme boundaries), `cut_mp4`, `window_srt`. Graduated from a one-off `/tmp/split-mobile.py` written for dev-log-02 (caught on pilot when the helper had been lost).
-- **Still in /tmp — needs to graduate:** `/tmp/gen-mobile-thumbs.py` — composites the widescreen thumbnail concept into 1080×1920 with `PART N OF M` badge overlay. Hardcodes session paths. Functions to lift: `make_thumb`. Should become `mobile_export.py --thumbnails` so a new session doesn't have to recreate them.
-- **Shared helpers already at scripts/:** `caption_assets.py`, `smart_crop_mobile.py`, `replay_mobile.py`, `audit_mobile_crops.py`, `burn_captions.py`. Do NOT duplicate logic from these into the stitcher — import and reuse.
+- **Crop:** `scripts/smart_crop_mobile.py` writes `source/generated-assets/scenes/mobile/<chunk>-mobile.png` from approved widescreen scene images.
+- **Audit:** `scripts/audit_mobile_crops.py` writes `working/mobile-crop-audit.json`; export is blocked until the audit reports zero broken chunks.
+- **Fix flagged crops only:** `scripts/mobile_pad_to_fit.py` for free fit/pad fixes; `scripts/replay_mobile.py` for byte-faithful aspect replay; `scripts/batch_scenes.py --mobile-variant --only <chunks>` only when replay is impossible or the shot-list intentionally changed.
+- **Export:** `scripts/mobile_export.py` resolves mobile assets, renders bumper cards, builds clips, muxes master audio, burns captions/watermarks, splits parts, and writes per-part SRTs.
+- **Thumbnails:** `scripts/mobile_thumbnails.py` generates per-part 1080×1920 thumbnails from `working/thumbnail-prompt.md`.
+- **Shared helpers:** `caption_assets.py`, `smart_crop_mobile.py`, `replay_mobile.py`, `audit_mobile_crops.py`, `burn_captions.py`. Do NOT duplicate logic from these into one-off scripts.
 
 ### Mobile thumbnail (A.1)
 
@@ -797,10 +801,10 @@ Separate artifact from the video. Key differences from widescreen thumbnail:
 
 - **Full-screen 1080×1920** (9:16) — unlike the video which uses 1080×1920 canvas with 4:5 content + letterbox bars, the thumbnail has NO bars. Covers the entire phone preview area in social feeds.
 - **Per-part** when the mobile export is split. Split into 3 parts → 3 thumbnails. Each thumbnail carries its part's visual identity.
-- **Title + part indicator baked in.** Unlike the widescreen thumbnail (prompt-only, no text overlay), the mobile thumbnail composites BOTH the video's title and a part indicator onto the base image:
-  - **Title** — the video's promotional title. Caveat Bold, large (≈120–160 px at 1080-wide canvas). Positioned upper or lower third depending on base image content.
-  - **Part indicator** — e.g. `PART 1 OF 2`. Montserrat Black, smaller (≈50–70 px). Positioned above OR below the title — consistent placement per session across all parts.
-- **Base image** — default (a) a kie.ai-generated 9:16 thumbnail using the **widescreen's prompt verbatim** (with aspect changed to 9:16 and the baked-headline lines stripped — title is composited via PIL). Fallback (b) a representative scene scaled-to-cover 9:16 — use as a stopgap when kie.ai spend isn't justified.
+- **Headline baked in (kie), part indicator composited (PIL).** Mobile reuses the widescreen prompt verbatim, so kie bakes the same headline text with the same brush-lettering treatment as the widescreen — no separate title font, no font-mismatch. PIL composites only the part indicator on top.
+  - **Headline** — same text as the widescreen thumbnail (e.g. `THE BUG WAS IN MY DEBUGGER.`). Baked by kie via the widescreen prompt; PIL adds nothing for the headline.
+  - **Part indicator** — e.g. `PART 1 OF 3`. Montserrat Black, ≈50–70 px. Composited via PIL just below the kie-baked headline + red brushstroke underline. Consistent placement per session across all parts.
+- **Base image** — default (a) a kie.ai-generated 9:16 thumbnail using the **widescreen's prompt verbatim** with only aspect/grid-safe adaptation appended. Fallback (b) a representative scene scaled-to-cover 9:16 — use as a stopgap when kie.ai spend isn't justified.
 
 - **Thumbnail prompt persistence.** When a widescreen thumbnail is generated, save its prompt to `sessions/<id>/working/thumbnail-prompt.md`. Mobile and any other variants read this file as the source-of-truth scene+style. Aspect and headline-handling are appended per output. Reusing the persisted prompt keeps mobile visually consistent with the widescreen and removes the temptation to invent a new scene description.
 - **File naming:** `renders/mobile/<session>-mobile-thumb-pt1of2.png`, `-pt2of2.png`, etc. One file per part.

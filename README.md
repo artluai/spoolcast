@@ -1,6 +1,8 @@
 # spoolcast
 
-Turn a script into a short illustrated video. Each narration sentence maps to one AI-generated scene, locked to a per-session visual style. A deterministic Python script paints the scene in stroke-by-stroke. Remotion renders everything headless into an mp4. No editor, no overlays, no renderer improvisation.
+Spoolcast is a video-production engine with a universal lifecycle and format-specific adapters.
+
+The current generic adapter is `illustration-chunk-remotion`: turn a script into a short illustrated video where narration maps to AI-generated scene chunks, a deterministic Python preprocessor builds reveal frames, and Remotion renders the mp4. Show-specific adapters, such as `news-anime-bot`, may use generated video clips, TTS, and ffmpeg stitching instead.
 
 ## What it produces
 
@@ -14,9 +16,9 @@ Earlier work:
 
 People who build things and don't want marketing to be a second job. If you ship code, write posts, or run a side project and want explainer-style videos that match the cadence of your work (not a weekend of editing per video), this is the pipeline.
 
-## How the pipeline works
+## How the generic illustration pipeline works
 
-**Widescreen (A) — the mandatory path:**
+**`illustration-chunk-remotion` widescreen (A) — the mandatory path for this adapter:**
 
 - **Stage 0 — Scaffold.** Create the session directory and config.
 - **Stage 1 — Source → script.** Extract narration from raw source: core message → Act structure → screenplay v3.
@@ -28,23 +30,23 @@ People who build things and don't want marketing to be a second job. If you ship
 - **Stage 7 — Render.** Remotion assembles the widescreen master; mechanical render audit gates shipping.
 - **Stage 8 — Ship.** Rate post-process, captions, thumbnail, upload to YouTube.
 
-**Mobile (A.1) — optional fork after Stage 8:**
+**`illustration-chunk-remotion` mobile (A.1) — optional fork after Stage 8:**
 
 - Crop widescreen scenes to 4:5 into `scenes/mobile/`, audit what's clipped, regenerate broken chunks at native 4:5.
 - Stitch mobile PNGs + shipped-rate audio into per-part 1080×1920 MP4s, burn captions with libass, auto-split on chunk boundaries if over the platform cap.
 - Generate per-part thumbnails and SRTs, upload to TikTok / Reels / Shorts.
 
-Full table with drivers, inputs, outputs, gates, and failure modes: **[PIPELINE.md § End-to-end flow](./PIPELINE.md#end-to-end-flow-decision-tree)**.
+Universal lifecycle plus adapter tables with drivers, inputs, outputs, gates, and failure modes: **[PIPELINE.md § End-to-end flow](./PIPELINE.md#end-to-end-flow-decision-tree)**.
 
 ## Repo layout
 
 ```
 spoolcast/                    # this repo — reusable pipeline
 ├── rules.md                  # index — read first
-├── PIPELINE.md               # workflow, session config, shot-list schema, render
-├── STORY.md                  # script extraction + pacing + viewer context
-├── VISUALS.md                # asset generation + preprocessor + transitions
-├── SHIPPING.md               # review + publish
+├── PIPELINE.md               # universal lifecycle + illustration-chunk adapter
+├── STORY.md                  # editorial guidance + illustration-chunk story rules
+├── VISUALS.md                # illustration-chunk visuals + reusable visual mechanics
+├── SHIPPING.md               # illustration-chunk review/mobile + reusable publish refs
 ├── DESIGN_NOTES.md           # why log — lessons learned, approaches killed
 ├── src/                      # Remotion composition
 ├── scripts/                  # pipeline scripts (generate, preprocess, render, audit, publish)
@@ -101,7 +103,8 @@ npm install
 cp .env.example .env   # if available, else create from scratch
 # Add your API keys to .env
 
-# 5. Read the rules (at minimum rules.md + PIPELINE.md + STORY.md)
+# 5. Read rules.md first, then run the auditor to route to the right format
+scripts/spoolcast_audit.py --session <session-id-or-path>
 ```
 
 ## Real scenarios

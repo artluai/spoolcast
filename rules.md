@@ -2,7 +2,7 @@
 
 Start here.
 
-Spoolcast turns chat, content, and ideas into illustrated videos. Each narration chunk becomes one AI-generated scene in a per-session locked style; a deterministic preprocessor reveals it over time; Remotion plays the resulting PNG sequences against audio.
+Spoolcast turns chat, content, news, and ideas into videos. Different video formats plug into the same high-level lifecycle: some use image chunks + Remotion, some use generated video clips + ffmpeg stitching, and future formats may use other adapters.
 
 This file tells any new agent or app:
 - which rule files exist
@@ -15,15 +15,28 @@ Read repo-local rules before making suggestions, writing workflow docs, or chang
 
 Before writing any editorial content, generating any assets, or running any script:
 
-1. **Identify the current pipeline stage** (see table below). Don't assume — check the session directory state.
-2. **Read the stage-specific rule file(s)** named in § What Each File Does. At minimum, read the file that owns the stage you're in.
-3. **Confirm with the user what they want you to do.** If source/ exists but the shot-list is empty and the user says "make a video," you're at Stage 1 (script extraction), not Stage 7 (render). Don't skip ahead.
-4. **Before drafting any editorial content, read STORY.md § 3 Jobs A–E.** Core-message confirmation (Job E) is the most load-bearing decision in the whole pipeline — skip it and every downstream decision drifts.
+1. **Identify the video format and pipeline owner.** Run `scripts/spoolcast_audit.py --session <id-or-path>`. It routes registered formats such as `illustration-chunk-remotion` and `news-anime-bot` to their auditors. If no existing adapter fits, start the new-format definition pass in PIPELINE.md Stage 0 instead of forcing the request into the nearest format.
+2. **Read the stage-specific rule file(s)** named by the owning format. At minimum, read the file that owns the stage you're in.
+3. **Confirm with the user what they want you to do.** If ownership or stage is unclear, stop and ask instead of applying the wrong adapter.
+4. **Before drafting generic illustration-chunk editorial content, read STORY.md § 3 Jobs A–E.** Show-specific formats may define their own story gates.
 5. **Propose your first step in chat. Wait for confirmation. Then work.**
 
 Violating this protocol is how iteration loops get born — the agent runs ahead, the user catches misses in review, expensive re-renders happen. The protocol is cheaper.
 
-### Stage identification
+### Format Decision
+
+At Stage 0, choose one:
+
+1. **Use an existing format.** Current registered adapters:
+   - `illustration-chunk-remotion` — generic image chunks + Remotion.
+   - `news-anime-bot` — generated video clips + TTS + ffmpeg stitch.
+2. **Define a new format.** Use PIPELINE.md § New Format Definition Pass. Fill the adapter blanks, write the owner rules file, add auditor routing, and only then start production.
+
+If the user asks for a video that does not fit an existing adapter, do not improvise production steps mid-session. Treat that as a new-format request.
+
+### Stage identification — illustration-chunk-remotion only
+
+This table applies only to generic sessions under `spoolcast-content/sessions/<id>/` that use the image-chunk / Remotion adapter. Show-specific videos, such as `news-anime-bot`, own their stage logic in the show rules.
 
 | Session state | Stage | Primary rule file |
 |---|---|---|
@@ -35,13 +48,13 @@ Violating this protocol is how iteration loops get born — the agent runs ahead
 | Rendered mp4 exists | Stage 8 — shipping | SHIPPING.md |
 | Rendered 16:9 mp4 exists, mobile variants requested | Post-Stage 8 — mobile export from widescreen (A.1, optional) | SHIPPING.md § Mobile Export from Widescreen |
 
-Run `scripts/validate_shot_list.py --session <id>` at any point to confirm the shot-list is schema-valid before proceeding. `build_preview_data.py` runs the validator automatically before emitting preview-data.
+For illustration-chunk-remotion sessions, run `scripts/validate_shot_list.py --session <id>` at any point to confirm the shot-list is schema-valid before proceeding. `build_preview_data.py` runs the validator automatically before emitting preview-data.
 
 ## Read Order
 
-Read these files in this exact order:
+For generic `illustration-chunk-remotion` sessions, read these files in this exact order:
 
-1. [PIPELINE.md](./PIPELINE.md) — workflow, session config, shot-list spec, render config
+1. [PIPELINE.md](./PIPELINE.md) — universal lifecycle plus the `illustration-chunk-remotion` adapter, session config, shot-list spec, render config
 2. [STORY.md](./STORY.md) — script extraction, pacing, viewer context
 3. [VISUALS.md](./VISUALS.md) — assets, preprocessor, transitions
 4. [SHIPPING.md](./SHIPPING.md) — review board, publishing
@@ -52,13 +65,15 @@ Delivery modes (agent-skill vs standalone-app, autopilot) are covered inside thi
 
 If you are about to challenge or change a rule, also read [DESIGN_NOTES.md](./DESIGN_NOTES.md) — it captures the reasoning behind current decisions and what was tried and abandoned. The rule files tell you what to do; design notes tell you why.
 
+For show-specific sessions, read the show's `rules.md` first. Then use the files above only as supporting engine references unless the show adapter explicitly points back to them.
+
 ## Topic → File Index (for finding rules by topic, not by procedural order)
 
 When you know what topic you're working on but not which file owns the rules, use this table. Each topic lists the canonical owning file and (where relevant) cross-references that are easy to miss.
 
 | Topic | Primary file | Cross-refs |
 |---|---|---|
-| Pipeline workflow / stages / session config | PIPELINE.md | — |
+| Universal lifecycle / generic illustration-chunk workflow / session config | PIPELINE.md | Show-specific workflows own their own adapter tables |
 | Script extraction / narration / pacing / Job E core-message | STORY.md | — |
 | Asset generation / preprocessor / transitions | VISUALS.md | — |
 | Review board / publishing / mobile export A.1 | SHIPPING.md | — |
@@ -142,13 +157,21 @@ Not a rules file. Read it when you want to understand why something is the way i
 
 ## Non-Negotiable System Defaults
 
-These apply everywhere unless explicitly replaced by a future system rewrite:
+These are the defaults every format must honor:
+
+- Identify the format owner before running a workflow.
+- Use the source-of-truth files declared by that format owner.
+- Treat mechanical gates as blocking gates, not suggestions.
+- Surface rule conflicts before acting.
+- Do not let downstream artifacts silently override upstream source-of-truth files.
+
+The rules below are `illustration-chunk-remotion` defaults unless a show adapter explicitly points to them as reusable engine mechanics:
 
 - The shot list is the source of truth for structure and narration.
 - The session config is the source of truth for style, reveal behavior, and budget.
-- Videos use one primary visual layer per frame: the illustrated scene.
+- The primary visual layer is the illustrated scene.
 - Overlays (logos, badges, small reference artifacts) are permitted only when every overlay's position, size, entry/exit timing, and duration are explicitly specified per-overlay in the shot list. Renderer-improvised placement, size, or timing is banned. AI-judged or AI-generated transparency is banned — overlay sources must be authoritative images with clean alpha (brand logos, official badges, cleanly-cropped real screenshots). See PIPELINE.md § Render Config overlay placement schema and VISUALS.md § Assets overlay sourcing. See DESIGN_NOTES.md "Killed: foreground overlays → Reconsidered" for the reasoning.
-- One AI illustration per narration chunk is the default **for abstract/conceptual beats**. When a chunk's narration references a specific real thing that exists (a shipped video, a real file, a real screenshot, a real quote, a real asset), the default visual flips to broll of the real artifact. Illustration over broll in that case requires a one-line per-chunk justification recorded in the shot list. See *Concrete-reference check* below; stock/broll context rules still live in STORY.md § Part 2. **This default applies at every drafting stage — screenplay visual-intent notes included — not just at shot-list build. The Stage 2 concrete-reference and meme-placement checks are formal enforcement against the inventory; the defaults themselves are universal.**
+- One AI illustration per narration chunk is the `illustration-chunk-remotion` default **for abstract/conceptual beats**. When a chunk's narration references a specific real thing that exists (a shipped video, a real file, a real screenshot, a real quote, a real asset), the default visual flips to broll of the real artifact. Illustration over broll in that case requires a one-line per-chunk justification recorded in the shot list. See *Concrete-reference check* below; stock/broll context rules still live in STORY.md § Part 2. **This default applies at every drafting stage inside this adapter — screenplay visual-intent notes included — not just at shot-list build. The Stage 2 concrete-reference and meme-placement checks are formal enforcement against the inventory.**
 - **Concrete-reference check.** During shot-list drafting (Stage 2), scan each chunk's narration for a reference to a specific real thing. Match the reference against the asset inventory produced in Stage 1d. When a match exists, the cell default is the real artifact, not an AI redraw. Without this check, "illustration by default" silently turns every concrete reference into a lossy re-creation of something the viewer could be seeing directly. The inventory makes the check a lookup, not a search — so the cost of *"is there a real artifact?"* collapses to near-zero at shot-list time.
 - **Recurring-reference check.** When building the shot-list, scan for (a) characters/objects with stable visual identity that appear in 2+ chunks, AND (b) style-library registered characters whose register any chunk invokes — even without naming them by key. Both get `references: [...]` tags. Without (b), library characters (e.g. `chad`) get bypassed because no beat names them and the model renders a drifted identity. Chunks with a recurring stable entity but no reference entry need a one-line `context_justification` — typical valid reasons: one-off cameo, intentional drift, stylized variant. **Evolving visuals are not references.** A diagram that builds up across chunks (cloud alone → cloud + box → equals + strike-through), a shape that transforms between beats, a scene state that changes — these are concept sequences, not identities. Tagging them with a reference over-constrains every chunk to the same frozen state and breaks progression. Evolving visuals stay prompt-only per chunk.
 - **Test-on-one per beat TYPE before the batch.** If the shot-list spans multiple beat types (text-cards, diagrams, character scenes, composites, bumpers), run ONE of each type through the generator and verify visually BEFORE batching. One character-scene passing is not evidence that text-cards will render correctly. Catches class-of-output drift (e.g. text-cards rendering as split-panel comics instead of typography).
@@ -460,15 +483,15 @@ When writing or editing any rule in a guidelines file (`rules.md`, `STORY.md`, `
 
 ## Delivery Modes
 
-Spoolcast is delivered in two shapes. The pipeline (Stages 0–8 in PIPELINE.md) is identical in both. What changes is who initiates each step, how decisions are surfaced, where user-confirmation gates fall, and what happens when the user chooses not to decide. Both modes must honor every rule in this file and in PIPELINE.md / STORY.md / VISUALS.md / SHIPPING.md.
+Spoolcast is delivered in two interaction shapes. The universal lifecycle in PIPELINE.md is the same; the concrete gates, files, scripts, and validators come from the active format adapter. What changes between modes is who initiates each step, how decisions are surfaced, where user-confirmation gates fall, and what happens when the user chooses not to decide.
 
 ### Mode 1 — Agent Skill (conversational)
 
-Spoolcast runs as a skill inside a chat agent. The user drops a raw session package into a working directory; the agent drives the pipeline by asking questions, proposing options, and waiting for user decisions. Currently the only shipped mode (V1 + V2 both produced this way).
+Spoolcast runs as a skill inside a chat agent. The user drops source material into a working directory; the agent drives the active format adapter by asking questions, proposing options, and waiting for user decisions. This is the shipped mode for the generic `illustration-chunk-remotion` adapter and the current show-specific workflows.
 
 **Default interaction shape (user-driven).** At every decision point the agent (1) says what stage we're at in plain terms, (2) proposes 2–3 options or one clear recommendation with tradeoffs, (3) waits for the user to pick / edit / propose their own, (4) only then acts.
 
-**Gate list, in order:**
+**Gate list for `illustration-chunk-remotion`, in order:**
 
 1. **Stage 0 — scaffold.** Agent confirms session id, budget, style. Runs `init_session.py`.
 2. **Stage 1a — core message (Job E).** Agent proposes 2–3 candidates with tradeoffs. User picks or rewrites. Locked before anything else.
@@ -493,8 +516,8 @@ At session start, the agent MUST offer a second path: *"Do you want me to make e
 
 If the user picks autopilot:
 
-- The agent makes all Job E / angle / structure / pacing / visual / chunking / publishing decisions itself using the defaults below.
-- The agent still writes source analysis + screenplay drafts to disk for traceability.
+- The agent makes the format-owned story / structure / pacing / visual / production-unit / publishing decisions itself using the defaults below.
+- The agent still writes the adapter's required planning artifacts to disk for traceability.
 - The agent surfaces one thing at session end: the finished video plus a short summary of the choices it made (core message locked, structure used, any tradeoffs worth knowing about).
 - The agent is allowed to interrupt autopilot only when:
   1. A rule conflict is triggered (rules.md § User request vs existing rule — the 3-option surface).
@@ -504,11 +527,10 @@ If the user picks autopilot:
 
 **Defaults the agent uses in autopilot:**
 
-- **Core message:** picks the outcome-focused candidate unless the source material clearly calls for architecture-focused or meta-lesson framing. Documents the choice in source analysis §6.5 with a one-line reason.
-- **Structure:** follows the dominant shape the source material suggests. If ambiguous, defaults to the 4-Act shape (cold open → problem → reframe → payoff).
-- **Style anchor:** inherits from the most recent sibling session in `sessions/` unless the session notes specify otherwise.
-- **Reveal style:** `paint-auto`.
-- **Thumbnail/title:** script-first per SHIPPING.md.
+- **Core message:** uses the format's story gate. For `illustration-chunk-remotion`, pick the outcome-focused candidate unless the source material clearly calls for architecture-focused or meta-lesson framing.
+- **Structure:** follows the dominant shape the source material suggests. For `illustration-chunk-remotion`, if ambiguous, default to the 4-Act shape (cold open → problem → reframe → payoff).
+- **Style anchor:** inherits from the active format's style rules.
+- **Thumbnail/title:** uses the active format's publishing rules.
 
 Autopilot is NOT a silent bypass — the agent still writes the same artifacts, runs the same validators, honors the rule-conflict protocol. It just doesn't wait at every gate.
 
@@ -532,21 +554,22 @@ Open design questions (resolve when building):
 
 Regardless of mode, every delivery must:
 
-- Honor the core-message confirmation gate (STORY.md § Job E). Never proceed past Stage 1 without it.
+- Honor the active format's story / goal confirmation gate before production.
 - Honor the rule-conflict protocol (rules.md § User request vs existing rule). Silent rule rewrites are banned.
 - Lead with plain-English presentation (STORY.md § Layman-first explanation rule). Jargon-first UI copy fails the same test as jargon-first agent chat.
-- Write the same canonical artifacts to disk in the same locations (PIPELINE.md § Canonical Content Layout). Mode-specific state (UI drafts, etc.) goes in `working/`.
-- Run the same validators (`validate_shot_list.py`, `audit_narration.py`) before any render.
+- Write the active adapter's canonical artifacts to disk in its declared locations. Mode-specific state (UI drafts, etc.) goes in the adapter's working area.
+- Run the active adapter's validators before any render or stitch.
 
 ## Expected App Behavior
 
 A standalone app should:
 
 - model the workflow as explicit stages
-- keep the shot list and session config as the two per-session sources of truth
+- identify the format owner first
+- keep the active adapter's declared files as the source of truth
 - enforce regeneration after upstream edits
 - never silently carry stale downstream data
-- use only illustrated scenes per chunk (or documented alternate-mode backgrounds with `context_justification`)
-- delete legacy removed columns before processing a sheet
-- never generate reveal animation inside the renderer
-- enforce the pacing schema (STORY.md § Part 2): no broll without `context_justification`, no topic-shift without bridge narration, no Act boundary without bumper + opener
+- for `illustration-chunk-remotion`, use only illustrated scenes per chunk unless documented alternate-mode backgrounds have `context_justification`
+- for `illustration-chunk-remotion`, delete legacy removed columns before processing a sheet
+- for `illustration-chunk-remotion`, never generate reveal animation inside the renderer
+- enforce the pacing schema owned by the active adapter

@@ -1,6 +1,8 @@
 # Video Output Rules
 
-Engine-level rules for video output quality, character consistency, and pipeline mechanics. These were learned the hard way during the news-anime-bot Episode 1 build (April 2026, kling-3.0/video + gpt-image-2 + Google Chirp3-HD TTS + ffmpeg) and apply to any video this engine produces.
+Engine-level mechanics library for video output quality, character consistency, captions, ffmpeg, and model gotchas. These were learned the hard way during the news-anime-bot Episode 1 build (April 2026, kling-3.0/video + gpt-image-2 + Google Chirp3-HD TTS + ffmpeg).
+
+This file is not an execution order. Use only the sections that the active format adapter or show rules explicitly reference.
 
 These rules previously lived in global Claude memory (`behavior_character_cloning.md`, `reference_kling_text_limitation.md`, `feedback_caption_placement.md`, `feedback_never_touch_anchors.md`). Moved here to live with the engine code so they get versioned alongside the pipeline.
 

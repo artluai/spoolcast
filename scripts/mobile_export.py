@@ -463,14 +463,17 @@ def main() -> int:
         except Exception as e:
             print(f"ERROR: could not read mobile-crop audit at {audit_path}: {e}", file=sys.stderr)
             return 2
-        broken = [c for c in audit.get("chunks", []) if c.get("broken")]
+        audit_chunks = audit.get("chunks")
+        if audit_chunks is None:
+            audit_chunks = audit.get("results", [])
+        broken = [c for c in audit_chunks if c.get("broken")]
         if broken:
             print(
                 f"ERROR: mobile-crop audit shows {len(broken)} broken chunk(s) — refusing to produce mp4.",
                 file=sys.stderr,
             )
             for c in broken:
-                cid = c.get("id") or "<unnamed>"
+                cid = c.get("chunk_id") or c.get("id") or "<unnamed>"
                 sev = c.get("severity") or "?"
                 reason = c.get("broken_reason") or ""
                 print(f"  [{sev:6}] {cid}: {reason}", file=sys.stderr)

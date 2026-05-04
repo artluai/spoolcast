@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'input=$(cat); cmd=$(echo \"$input\" | jq -r \".tool_input.command // empty\"); if echo \"$cmd\" | grep -qE \"(npx |node .*)remotion render\"; then SESSION=$(echo \"$cmd\" | sed -nE \"s#.*sessions/([a-z0-9-]+)/.*#\\1#p\" | head -1); if [ -n \"$SESSION\" ]; then echo \"[post-render hook] running audit_render.py for session $SESSION\"; cd /Users/ralphxu/Documents/Projects/spoolcast && scripts/.venv/bin/python scripts/audit_render.py --session \"$SESSION\" || echo \"[post-render hook] AUDIT FAILED — render is NOT verified. Do not claim done until audit passes. See report in working/render-audit.json.\"; fi; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}

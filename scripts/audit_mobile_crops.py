@@ -293,6 +293,9 @@ def main() -> int:
         "provider": args.provider,
         "model": model,
         "audited_at": datetime.now(timezone.utc).isoformat(),
+        "chunks": results,
+        # Backward-compatible alias for older readers. New code should use
+        # `chunks`, matching the rest of the spoolcast shot-list vocabulary.
         "results": results,
         "summary": {"broken": broken, "skipped": skipped, "total": len(chunks)},
     }
